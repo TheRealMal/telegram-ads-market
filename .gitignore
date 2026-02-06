@@ -1,0 +1,6 @@
+**/.env
+**/.go_pkg_cache/
+**/.go_build_cache/
+/config/
+/data/
+test.json

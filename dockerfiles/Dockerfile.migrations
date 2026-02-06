@@ -1,0 +1,8 @@
+FROM ghcr.io/kukymbr/goose-docker:3.22.1
+
+WORKDIR /migrations
+
+COPY migrations/ /migrations/
+
+ENTRYPOINT ["sh", "-c"]
+CMD goose -dir /migrations up

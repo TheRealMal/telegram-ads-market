@@ -1,0 +1,198 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	apperrors "ads-mrkt/internal/errors"
+	"ads-mrkt/internal/market/domain"
+	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/pkg/auth"
+)
+
+// CreateListingRequest is the body for POST /api/v1/market/listings.
+// Prices must be JSON array of [duration, price] pairs, e.g. [["24hr", 100], ["48hr", 200]].
+type CreateListingRequest struct {
+	Status    string          `json:"status"` // active | inactive
+	ChannelID *int64          `json:"channel_id,omitempty"`
+	Type      string          `json:"type"`   // lessor | lessee
+	Prices    json.RawMessage `json:"prices"` // [["<number_of_hours>hr", <price>], ...]
+}
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	Create listing
+// @Accept		json
+// @Produce	json
+// @Param		request	body	CreateListingRequest	true	"listing body"
+// @Success	200		{object}	response.Template{data=entity.Listing}	"Created listing"
+// @Failure	400		{object}	response.Template{data=string}	"Bad request"
+// @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
+// @Failure	403		{object}	response.Template{data=string}	"Forbidden"
+// @Router		/market/listings [post]
+func (h *Handler) CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
+	var req CreateListingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
+	}
+	if err := domain.ValidateListingPrices(req.Prices); err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	l := &entity.Listing{
+		Status:    entity.ListingStatus(req.Status),
+		ChannelID: req.ChannelID,
+		Type:      entity.ListingType(req.Type),
+		Prices:    req.Prices,
+	}
+	if l.Status == "" {
+		l.Status = entity.ListingStatusInactive
+	}
+	if err := h.listingService.CreateListing(r.Context(), userID, l); err != nil {
+		return nil, toServiceError(err)
+	}
+	return l, nil
+}
+
+// @Tags		Market
+// @Summary	Get listing by ID
+// @Produce	json
+// @Param		id	path	int	true	"Listing ID"
+// @Success	200	{object}	response.Template{data=entity.Listing}	"Listing"
+// @Failure	400	{object}	response.Template{data=string}	"Bad request"
+// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Router		/market/listings/{id} [get]
+func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	l, err := h.listingService.GetListing(r.Context(), id)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	if l == nil {
+		return nil, apperrors.ServiceError{Err: nil, Message: "not found", Code: apperrors.ErrorCodeNotFound}
+	}
+	return l, nil
+}
+
+// @Tags		Market
+// @Summary	List all listings with optional type filter (public, no auth)
+// @Produce	json
+// @Param		type	query	string	false	"Filter by type: lessor | lessee"
+// @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of listings"
+// @Router		/market/listings [get]
+func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	var typ *entity.ListingType
+	if t := r.URL.Query().Get("type"); t != "" {
+		tp := entity.ListingType(t)
+		typ = &tp
+	}
+	list, err := h.listingService.ListListingsAll(r.Context(), typ)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	return list, nil
+}
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	List current user's listings with optional type filter
+// @Produce	json
+// @Param		type	query	string	false	"Filter by type: lessor | lessee"
+// @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of my listings"
+// @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
+// @Router		/market/my-listings [get]
+func (h *Handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+	var typ *entity.ListingType
+	if t := r.URL.Query().Get("type"); t != "" {
+		tp := entity.ListingType(t)
+		typ = &tp
+	}
+	list, err := h.listingService.ListListingsByUserID(r.Context(), userID, typ)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	return list, nil
+}
+
+// UpdateListingRequest is the body for PATCH /api/v1/market/listings/:id.
+// Prices if set must be [["<number_of_hours>hr", <price>], ...].
+type UpdateListingRequest struct {
+	Status    *string         `json:"status,omitempty"`
+	ChannelID *int64          `json:"channel_id,omitempty"`
+	Type      *string         `json:"type,omitempty"`
+	Prices    json.RawMessage `json:"prices,omitempty"`
+}
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	Update listing
+// @Accept		json
+// @Produce	json
+// @Param		id		path	int					true	"Listing ID"
+// @Param		request	body	UpdateListingRequest	true	"fields to update"
+// @Success	200		{object}	response.Template{data=entity.Listing}	"Updated listing"
+// @Failure	400		{object}	response.Template{data=string}	"Bad request"
+// @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
+// @Failure	403		{object}	response.Template{data=string}	"Forbidden"
+// @Failure	404		{object}	response.Template{data=string}	"Not found"
+// @Router		/market/listings/{id} [patch]
+func (h *Handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	existing, err := h.listingService.GetListing(r.Context(), id)
+	if err != nil || existing == nil {
+		return nil, toServiceError(err)
+	}
+
+	var req UpdateListingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
+	}
+	if len(req.Prices) > 0 {
+		if err := domain.ValidateListingPrices(req.Prices); err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+	}
+
+	l := *existing
+	l.ID = id
+	if req.Status != nil {
+		l.Status = entity.ListingStatus(*req.Status)
+	}
+	if req.ChannelID != nil {
+		l.ChannelID = req.ChannelID
+	}
+	if req.Type != nil {
+		l.Type = entity.ListingType(*req.Type)
+	}
+	if req.Prices != nil {
+		l.Prices = req.Prices
+	}
+
+	if err := h.listingService.UpdateListing(r.Context(), userID, &l); err != nil {
+		return nil, toServiceError(err)
+	}
+	return &l, nil
+}
