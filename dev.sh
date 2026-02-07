@@ -59,11 +59,13 @@ case "${1}" in
             mkdir $go_pkg_cache_dir
             echo "[$name] Created Go pkg cache dir at: $go_pkg_cache_dir"
         fi
+        chmod 777 "$go_pkg_cache_dir"
 
         if [[ ! -d $go_build_cache_dir ]]; then
             mkdir $go_build_cache_dir
             echo "[$name] Created Go build cache dir at: $go_build_cache_dir"
         fi
+        chmod 777 "$go_build_cache_dir"
 
         # Create the network if it doesn't exist
         if [ "$network" = "" ]; then
@@ -131,7 +133,8 @@ case "${1}" in
         docker run -it --rm \
             -v `pwd`:/app \
             -v "$go_pkg_cache_dir":/go/pkg \
-            -v "$go_build_cache_dir":/home/not/.cache/go-build \
+            -v "$go_build_cache_dir":/app/.go_build_cache \
+            -e GOCACHE=/app/.go_build_cache \
             -p 8080:8080 \
             -u not \
             -l "$name" \

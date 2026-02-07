@@ -1,0 +1,27 @@
+# Production: single host, path-based routing, self-signed TLS.
+# No domain required. Access via https://<server-ip> or https://<hostname>
+#
+#   /api/v1/*     -> Market API (api:8080)
+#   /*            -> Frontend (web:3000)
+#
+# Frontend uses same-origin for API (NEXT_PUBLIC_API_URL empty).
+
+{
+	local_certs
+}
+
+# Redirect HTTP to HTTPS
+:80 {
+	redir https://{host}{uri} permanent
+}
+
+# HTTPS: path-based routing
+:443 {
+	tls internal
+	handle /api/v1* {
+		reverse_proxy api:8080
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}
