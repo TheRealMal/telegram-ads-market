@@ -93,6 +93,7 @@ services:
       - api
 
   api:
+    image: ads-mrkt-server
     build:
       context: .
       dockerfile: Dockerfile
@@ -118,9 +119,7 @@ services:
         condition: service_healthy
 
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ads-mrkt-server
     restart: unless-stopped
     command: ["bot", "http"]
     env_file:
@@ -142,9 +141,7 @@ services:
         condition: service_healthy
 
   userbot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ads-mrkt-server
     restart: unless-stopped
     command: ["userbot", "run"]
     env_file:

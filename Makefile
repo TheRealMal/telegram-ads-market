@@ -16,6 +16,8 @@ swagger: ## Generate swagger documentation
 	-q
 	swag fmt
 
+start: ## Start the server
+	docker compose -f docker-compose.https-selfsigned.yml up -d
 
 help: ## Show this help message
 	@echo "Platform Scripts"
