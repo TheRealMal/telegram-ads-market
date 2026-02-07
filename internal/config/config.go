@@ -1,7 +1,9 @@
 package config
 
 import (
+	telegramconfig "ads-mrkt/internal/helpers/telegram/config"
 	dbconfig "ads-mrkt/internal/postgres/config"
+	redisconfig "ads-mrkt/internal/redis/config"
 	serverconfig "ads-mrkt/internal/server/config"
 	userbotconfig "ads-mrkt/internal/userbot/config"
 	authconfig "ads-mrkt/pkg/auth/config"
@@ -16,6 +18,8 @@ type Config struct {
 	Server   serverconfig.Config
 	Health   healthconfig.Config
 	Auth     authconfig.Config
+	Redis    redisconfig.Config
+	Telegram telegramconfig.Config
 }
 
 func (c *Config) InternalHandling() {

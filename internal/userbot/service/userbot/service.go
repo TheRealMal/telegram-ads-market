@@ -42,7 +42,6 @@ func New(cfg config.Config, stateStorage updates.StateStorage, marketRepository 
 
 	dispatcher := tg.NewUpdateDispatcher()
 	dispatcher.OnChannel(s.handleChannelUpdate)
-	dispatcher.OnChannelParticipant(s.handleChannelParticipant)
 
 	s.updatesManager = updates.New(updates.Config{
 		Handler: dispatcher,

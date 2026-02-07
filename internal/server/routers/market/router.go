@@ -21,6 +21,8 @@ type handler interface {
 	ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
 
 type authMiddleware interface {
@@ -161,6 +163,24 @@ func (r *Router) GetRoutes() http.Handler {
 			server.WithMethod(
 				server.WithJSONResponse(r.handler.SignDeal),
 				http.MethodPost,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("POST /api/v1/market/deals/{id}/send-chat-message", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.SendDealChatMessage),
+				http.MethodPost,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("GET /api/v1/market/deals/{id}/messages", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.ListDealMessages),
+				http.MethodGet,
 			),
 		),
 		"/api/v1",

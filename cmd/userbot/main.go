@@ -1,38 +1,50 @@
-package main
+package userbot
 
 import (
-	"ads-mrkt/internal/config"
-	marketrepository "ads-mrkt/internal/market/repository/market"
-	"ads-mrkt/internal/postgres"
-	userbotrepository "ads-mrkt/internal/userbot/repository/state"
-	userbotservice "ads-mrkt/internal/userbot/service/userbot"
 	"context"
-	"log"
-	"log/slog"
+
+	"ads-mrkt/internal/config"
+	marketrepo "ads-mrkt/internal/market/repository/market"
+	"ads-mrkt/internal/postgres"
+	userbotrepo "ads-mrkt/internal/userbot/repository/state"
+	userbotservice "ads-mrkt/internal/userbot/service/userbot"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatal("failed to load config", "error", err)
+func UserbotCmd(ctx context.Context, conf *config.Config) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "userbot",
+		Short: "Userbot (Telegram client) commands",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Usage()
+		},
 	}
 
-	ctx := context.Background()
+	cmd.AddCommand(runCmd(ctx, conf))
 
-	slog.Info("initializing database")
-	db, err := postgres.New(ctx, cfg.Database)
-	if err != nil {
-		log.Fatal("failed to initialize db connection", "error", err)
-	}
+	return cmd
+}
 
-	stateStorage := userbotrepository.New(db)
-	marketRepository := marketrepository.New(db)
+func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
+	return &cobra.Command{
+		Use:   "run",
+		Short: "run userbot (polling for channel updates)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			pg, err := postgres.New(ctx, cfg.Database)
+			if err != nil {
+				return errors.Wrap(err, "postgres")
+			}
 
-	slog.Info("initializing bot")
-	b := userbotservice.New(cfg.UserBot, stateStorage, marketRepository)
+			stateStorage := userbotrepo.New(pg)
+			marketRepo := marketrepo.New(pg)
+			b := userbotservice.New(cfg.UserBot, stateStorage, marketRepo)
 
-	slog.Info("polling")
-	if err := b.Start(ctx); err != nil {
-		log.Fatal("failed to start polling", "error", err)
+			if err := b.Start(ctx); err != nil {
+				return errors.Wrap(err, "userbot start")
+			}
+			return nil
+		},
 	}
 }

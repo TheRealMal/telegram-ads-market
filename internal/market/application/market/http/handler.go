@@ -27,25 +27,32 @@ type DealService interface {
 	SignDeal(ctx context.Context, userID int64, dealID int64) error
 }
 
+type DealChatService interface {
+	SendDealChatMessage(ctx context.Context, dealID, userID int64) (*entity.DealChat, error)
+	ListDealMessages(ctx context.Context, dealID, userID int64) ([]*entity.DealChat, error)
+}
+
 type ChannelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	RefreshChannel(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
 }
 
 type Handler struct {
-	userService    UserService
-	listingService ListingService
-	dealService    DealService
-	channelService ChannelService
-	jwtManager     *auth.JWTManager
+	userService     UserService
+	listingService  ListingService
+	dealService     DealService
+	dealChatService DealChatService
+	channelService  ChannelService
+	jwtManager      *auth.JWTManager
 }
 
-func NewHandler(userService UserService, listingService ListingService, dealService DealService, channelService ChannelService, jwtManager *auth.JWTManager) *Handler {
+func NewHandler(userService UserService, listingService ListingService, dealService DealService, dealChatService DealChatService, channelService ChannelService, jwtManager *auth.JWTManager) *Handler {
 	return &Handler{
-		userService:    userService,
-		listingService: listingService,
-		dealService:    dealService,
-		channelService: channelService,
-		jwtManager:     jwtManager,
+		userService:     userService,
+		listingService:  listingService,
+		dealService:     dealService,
+		dealChatService: dealChatService,
+		channelService:  channelService,
+		jwtManager:      jwtManager,
 	}
 }

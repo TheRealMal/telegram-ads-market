@@ -3,7 +3,7 @@
 # Name and label of the devopment container
 name=ads-mrkt-dev
 
-# Name of the network used by all containers in the Not Game ecosystem
+# Name of the network used by all containers
 shared_network=ads-mrkt-network
 
 # Absolute path to the directory containing this script
@@ -20,6 +20,19 @@ bot_token=${BOT_TOKEN:-fakedevtoken}
 # Set proxy port
 proxy_port=""
 
+# Ensure .env exists from example.env when running app commands
+ensure_env() {
+    if [[ ! -f "$self_dir/.env" ]]; then
+        if [[ -f "$self_dir/example.env" ]]; then
+            cp "$self_dir/example.env" "$self_dir/.env"
+            echo "[$name] Created .env from example.env — please edit .env with your secrets"
+        else
+            echo "[$name] No .env or example.env found"
+            exit 1
+        fi
+    fi
+}
+
 # Generate the usage message by parsing comments of this file
 print_usage() {
     echo -e "Usage: $(realpath $0) <command>\n"
@@ -30,6 +43,12 @@ print_usage() {
 case "${1}" in
     #? build: Build the dev container and initialize/create dependencies
     build)
+        # Create .env from example.env if missing
+        if [[ ! -f "$self_dir/.env" && -f "$self_dir/example.env" ]]; then
+            cp "$self_dir/example.env" "$self_dir/.env"
+            echo "[$name] Created .env from example.env — please edit .env with your secrets"
+        fi
+
         # Attempt to find the shared network in list of active docker networks
         network=$(docker network ls --format "{{.Name}}" \
             | grep -w "$shared_network")
@@ -47,9 +66,6 @@ case "${1}" in
         fi
 
         # Create the network if it doesn't exist
-        #
-        # @Note: This has to match the network settings in Stickerer as it
-        # shouldn't matter which project creates the external network first
         if [ "$network" = "" ]; then
             echo "[$name] Creating external network: $shared_network"
             docker network create \
@@ -64,12 +80,32 @@ case "${1}" in
         docker build -t "$name" --build-arg NAME="$name" ./dockerfiles/dev
 	;;
 
-    #? run-all: Run all services within the dev container
+    #? run-all: Run bot, market and userbot in the background
     run-all)
-        ENV_FILE=.env go run ./cmd/userbot/main.go &
-        
-        # Wait for all background processes
+        ensure_env
+        export ENV_FILE=.env
+        go run ./cmd/bot/main.go &
+        go run ./cmd/market/main.go &
+        go run ./cmd/userbot/main.go &
         wait
+    ;;
+
+    #? run-bot: Run the Telegram bot service
+    run-bot)
+        ensure_env
+        ENV_FILE=.env go run ./cmd/bot/main.go
+    ;;
+
+    #? run-market: Run the market API service
+    run-market)
+        ensure_env
+        ENV_FILE=.env go run ./cmd/market/main.go
+    ;;
+
+    #? run-userbot: Run the user bot (Telegram client) service
+    run-userbot)
+        ensure_env
+        ENV_FILE=.env go run ./cmd/userbot/main.go
     ;;
 
     #? start: Start the dev container

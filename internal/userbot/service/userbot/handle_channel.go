@@ -32,14 +32,11 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		return fmt.Errorf("failed to upsert channel id=%d: %w", update.ChannelID, err)
 	}
 
-	if !channel.AdminRights.CanViewStats {
-		slog.Info("user does not have stats access", "channel_id", update.ChannelID)
-		return nil
-	}
-
-	slog.Info("updating channel stats", "channel_id", update.ChannelID)
-	if err = s.UpdateChannelStats(ctx, update.ChannelID, e.Channels[update.ChannelID].AccessHash); err != nil {
-		return fmt.Errorf("failed to update channel stats: %w", err)
+	if channel.AdminRights.CanViewStats {
+		slog.Info("updating channel stats", "channel_id", update.ChannelID)
+		if err = s.UpdateChannelStats(ctx, update.ChannelID, e.Channels[update.ChannelID].AccessHash); err != nil {
+			return fmt.Errorf("failed to update channel stats: %w", err)
+		}
 	}
 
 	return s.syncChannelAdmins(ctx, update.ChannelID, e.Channels[update.ChannelID].AccessHash)
@@ -87,30 +84,6 @@ func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash i
 			return fmt.Errorf("upsert channel admin user_id=%d: %w", userID, err)
 		}
 		slog.Info("synced channel admin", "channel_id", channelID, "user_id", userID, "role", role)
-	}
-	return nil
-}
-
-// handleChannelParticipant handles updateChannelParticipant (admin added/removed, participant join/leave).
-// Resyncs channel admins from Telegram so DB stays in sync.
-func (s *service) handleChannelParticipant(ctx context.Context, e tg.Entities, update *tg.UpdateChannelParticipant) error {
-	slog.Info("channel participant update", "channel_id", update.ChannelID, "user_id", update.UserID)
-
-	var accessHash int64
-	if ch, ok := e.Channels[update.ChannelID]; ok {
-		accessHash = ch.AccessHash
-	} else {
-		// Channel may not be in this update batch; try DB (we store it on channel join/update).
-		channel, err := s.marketRepository.GetChannelByID(ctx, update.ChannelID)
-		if err != nil || channel == nil {
-			slog.Info("channel not in entities and not in DB, skip admin sync", "channel_id", update.ChannelID)
-			return nil
-		}
-		accessHash = channel.AccessHash
-	}
-
-	if err := s.syncChannelAdmins(ctx, update.ChannelID, accessHash); err != nil {
-		return fmt.Errorf("sync channel admins after participant update: %w", err)
 	}
 	return nil
 }

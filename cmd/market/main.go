@@ -10,6 +10,7 @@ import (
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
+	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
 	listingservice "ads-mrkt/internal/market/service/listing"
 	userservice "ads-mrkt/internal/market/service/user"
 	"ads-mrkt/internal/postgres"
@@ -57,11 +58,12 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			userSvc := userservice.NewUserService(cfg.Auth.TelegramBotToken, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
 			dealSvc := dealservice.NewDealService(repo)
+			dealChatSvc := dealchatservice.NewService(repo, repo, nil) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo, repo)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)
-			handler := http.NewHandler(userSvc, listingSvc, dealSvc, channelSvc, jwtManager)
+			handler := http.NewHandler(userSvc, listingSvc, dealSvc, dealChatSvc, channelSvc, jwtManager)
 
 			healthChecker := health.NewChecker(cfg.Health, pg)
 			srv := server.NewServer(cfg.Server, healthChecker)
