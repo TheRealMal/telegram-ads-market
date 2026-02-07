@@ -15,7 +15,7 @@ func toServiceError(err error) apperrors.ServiceError {
 	switch {
 	case errors.Is(err, marketerrors.ErrNotFound):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeNotFound}
-	case errors.Is(err, marketerrors.ErrNotChannelAdmin), errors.Is(err, marketerrors.ErrUnauthorizedSide):
+	case errors.Is(err, marketerrors.ErrNotChannelAdmin), errors.Is(err, marketerrors.ErrUnauthorizedSide), errors.Is(err, marketerrors.ErrChannelStatsDenied):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeForbidden}
 	case errors.Is(err, marketerrors.ErrDealNotDraft):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}

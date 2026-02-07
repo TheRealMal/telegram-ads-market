@@ -8,15 +8,16 @@ import (
 )
 
 type UserService interface {
-	AuthUser(ctx context.Context, initDataStr string) (*entity.User, error)
+	AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error)
 }
 
 type ListingService interface {
 	CreateListing(ctx context.Context, userID int64, l *entity.Listing) error
 	GetListing(ctx context.Context, id int64) (*entity.Listing, error)
 	UpdateListing(ctx context.Context, userID int64, l *entity.Listing) error
+	DeleteListing(ctx context.Context, userID int64, id int64) error
 	ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error)
-	ListListingsAll(ctx context.Context, typ *entity.ListingType) ([]*entity.Listing, error)
+	ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error)
 }
 
 type DealService interface {
@@ -35,6 +36,7 @@ type DealChatService interface {
 type ChannelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	RefreshChannel(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
+	GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error)
 }
 
 type Handler struct {

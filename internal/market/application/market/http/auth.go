@@ -19,8 +19,8 @@ type AuthUserRequest struct {
 // @Summary	Authenticate user
 // @Accept		json
 // @Produce	json
-// @Param		request				body		AuthUserRequest	true	"request body"
-// @Param		X-Telegram-InitData	header		string			true	"Telegram init data"
+// @Param		request				body		AuthUserRequest					true	"request body"
+// @Param		X-Telegram-InitData	header		string							true	"Telegram init data"
 // @Success	200					{object}	response.Template{data=string}	"JWT token"
 // @Failure	401					{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/auth [post]
@@ -38,9 +38,8 @@ func (h *Handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		req = AuthUserRequest{Referrer: 0}
 	}
-	_ = req // reserved for future use
 
-	user, err := h.userService.AuthUser(r.Context(), initDataStr)
+	user, err := h.userService.AuthUser(r.Context(), initDataStr, req.Referrer)
 	if err != nil {
 		return nil, apperrors.ServiceError{
 			Err:     err,

@@ -15,11 +15,11 @@ type Update struct {
 
 // Message represents a message from Telegram.
 type UpdateMessage struct {
-	MessageID    int64              `json:"message_id"`
-	From         *User              `json:"from,omitempty"`
-	Chat         *Chat              `json:"chat"`
-	Text         string             `json:"text,omitempty"`
-	ReplyToMessage *ReplyToMessage   `json:"reply_to_message,omitempty"`
+	MessageID         int64              `json:"message_id"`
+	From              *User              `json:"from,omitempty"`
+	Chat              *Chat              `json:"chat"`
+	Text              string             `json:"text,omitempty"`
+	ReplyToMessage    *ReplyToMessage    `json:"reply_to_message,omitempty"`
 	SuccessfulPayment *SuccessfulPayment `json:"successful_payment,omitempty"` // Optional. Message is a service message about a successful payment, information about the payment.
 	RefundedPayment   *RefundedPayment   `json:"refunded_payment,omitempty"`
 }

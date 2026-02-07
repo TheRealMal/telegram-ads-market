@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS market.deal (
     status              market.deal_status  NOT NULL DEFAULT 'draft',
     escrow_address      TEXT                NULL,
     escrow_private_key  TEXT                NULL,
+    escrow_release_time TIMESTAMP           NULL,
+    
     created_at          TIMESTAMP           NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP           NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id),

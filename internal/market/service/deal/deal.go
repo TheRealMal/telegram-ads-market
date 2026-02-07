@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"ads-mrkt/internal/market/domain"
-	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
 
 func (s *DealService) CreateDeal(ctx context.Context, d *entity.Deal) error {

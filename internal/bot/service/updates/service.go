@@ -36,23 +36,23 @@ type eventService interface {
 
 type telegramService interface {
 	SendWelcomeMessage(ctx context.Context, chatID int64) error
+	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 }
 
-// DealChatReplier saves the reply text when a user replies to a deal-chat invite message. Can be nil.
-type DealChatReplier interface {
+type marketDealChatService interface {
 	SetRepliedMessageIfMatch(ctx context.Context, replyToChatID, replyToMessageID int64, repliedText string) error
 }
 
 type Service struct {
 	telegramClient  telegramService
 	eventService    eventService
-	dealChatReplier DealChatReplier
+	dealChatReplier marketDealChatService
 }
 
 func NewService(
 	telegramClient telegramService,
 	eventService eventService,
-	dealChatReplier DealChatReplier,
+	dealChatReplier marketDealChatService,
 ) *Service {
 	return &Service{
 		telegramClient:  telegramClient,
@@ -83,7 +83,6 @@ func (s *Service) StartBackgroundProcessingUpdates(ctx context.Context) {
 			if err := s.processUpdates(ctx); err != nil {
 				slog.Error("failed to process updates", "error", err)
 			}
-
 		}
 	}
 }
@@ -130,12 +129,21 @@ func (s *Service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 		}
 	}
 
-	// If user replied to a message, check if it's a deal-chat invite and save the reply.
+	// If user replied to a message, check if it's a deal-chat invite and save the reply; then set reaction on the user's message.
 	if update.Message != nil && update.Message.ReplyToMessage != nil && update.Message.ReplyToMessage.Chat != nil && s.dealChatReplier != nil {
 		replyTo := update.Message.ReplyToMessage
 		if err := s.dealChatReplier.SetRepliedMessageIfMatch(ctx, replyTo.Chat.ID, replyTo.MessageID, update.Message.Text); err != nil {
 			slog.Error("failed to set deal chat replied message", "error", err, "chat_id", replyTo.Chat.ID, "message_id", replyTo.MessageID)
 		}
+		if update.Message.Chat == nil {
+			return nil
+		}
+
+		// Reply was saved; set a reaction on the user's message to acknowledge.
+		if err := s.telegramClient.SetMessageReaction(ctx, update.Message.Chat.ID, update.Message.MessageID, "👍"); err != nil {
+			slog.Debug("failed to set message reaction on saved reply", "error", err, "chat_id", update.Message.Chat.ID, "message_id", update.Message.MessageID)
+		}
+
 	}
 	return nil
 }

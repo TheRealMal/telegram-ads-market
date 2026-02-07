@@ -14,8 +14,10 @@ type handler interface {
 	ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListMyChannels(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	RefreshChannel(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	GetChannelStats(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -104,6 +106,15 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+	mux.HandleFunc("DELETE /api/v1/market/listings/{id}", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.DeleteListing),
+				http.MethodDelete,
+			),
+		),
+		"/api/v1",
+	))
 
 	// Channels (auth required)
 	mux.HandleFunc("GET /api/v1/market/my-channels", server.WithMetrics(
@@ -119,6 +130,15 @@ func (r *Router) GetRoutes() http.Handler {
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
 				server.WithJSONResponse(r.handler.RefreshChannel),
+				http.MethodGet,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("GET /api/v1/market/channels/{id}/stats", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.GetChannelStats),
 				http.MethodGet,
 			),
 		),

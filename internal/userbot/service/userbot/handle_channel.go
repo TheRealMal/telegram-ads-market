@@ -11,11 +11,16 @@ import (
 )
 
 func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update *tg.UpdateChannel) error {
-	slog.Info("channel update received", "channel_id", update.ChannelID, "title", e.Channels[update.ChannelID].Title)
+	channelEnt, ok := e.Channels[update.ChannelID]
+	if !ok || channelEnt == nil {
+		slog.Info("channel update skipped: channel not in entities", "channel_id", update.ChannelID)
+		return nil
+	}
+	slog.Info("channel update received", "channel_id", update.ChannelID, "title", channelEnt.Title)
 
 	fullChannel, err := s.telegramClient.API().ChannelsGetFullChannel(ctx, &tg.InputChannel{
 		ChannelID:  update.ChannelID,
-		AccessHash: e.Channels[update.ChannelID].AccessHash,
+		AccessHash: channelEnt.AccessHash,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get full channel: %w", err)
@@ -26,7 +31,7 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		slog.Error("failed to map channel", "channel_id", update.ChannelID, "full_channel", fullChannel)
 		return nil
 	}
-	channel.AccessHash = e.Channels[update.ChannelID].AccessHash
+	channel.AccessHash = channelEnt.AccessHash
 
 	if err = s.marketRepository.UpsertChannel(ctx, channel); err != nil {
 		return fmt.Errorf("failed to upsert channel id=%d: %w", update.ChannelID, err)
@@ -34,12 +39,12 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 
 	if channel.AdminRights.CanViewStats {
 		slog.Info("updating channel stats", "channel_id", update.ChannelID)
-		if err = s.UpdateChannelStats(ctx, update.ChannelID, e.Channels[update.ChannelID].AccessHash); err != nil {
+		if err = s.UpdateChannelStats(ctx, update.ChannelID, channelEnt.AccessHash); err != nil {
 			return fmt.Errorf("failed to update channel stats: %w", err)
 		}
 	}
 
-	return s.syncChannelAdmins(ctx, update.ChannelID, e.Channels[update.ChannelID].AccessHash)
+	return s.syncChannelAdmins(ctx, update.ChannelID, channelEnt.AccessHash)
 }
 
 // syncChannelAdmins fetches current admins from Telegram and replaces channel_admin rows for the channel.

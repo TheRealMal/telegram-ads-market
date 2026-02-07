@@ -84,28 +84,29 @@ case "${1}" in
     run-all)
         ensure_env
         export ENV_FILE=.env
-        go run ./cmd/bot/main.go &
-        go run ./cmd/market/main.go &
-        go run ./cmd/userbot/main.go &
+        go run ./cmd/main.go userbot run &
+        LOCAL_PORT_PREFIX=1000 go run ./cmd/main.go market http &
+        LOCAL_PORT_PREFIX=2000 go run ./cmd/main.go bot http &
+        go run ./cmd/proxy/main.go &
         wait
     ;;
 
     #? run-bot: Run the Telegram bot service
     run-bot)
         ensure_env
-        ENV_FILE=.env go run ./cmd/bot/main.go
+        ENV_FILE=.env LOCAL_PORT_PREFIX=2000 go run ./cmd/main.go bot http
     ;;
 
     #? run-market: Run the market API service
     run-market)
         ensure_env
-        ENV_FILE=.env go run ./cmd/market/main.go
+        ENV_FILE=.env LOCAL_PORT_PREFIX=1000 go run ./cmd/main.go market http
     ;;
 
     #? run-userbot: Run the user bot (Telegram client) service
     run-userbot)
         ensure_env
-        ENV_FILE=.env go run ./cmd/userbot/main.go
+        ENV_FILE=.env go run ./cmd/main.go userbot run
     ;;
 
     #? start: Start the dev container
@@ -131,7 +132,7 @@ case "${1}" in
             -v `pwd`:/app \
             -v "$go_pkg_cache_dir":/go/pkg \
             -v "$go_build_cache_dir":/home/not/.cache/go-build \
-            -p 12000:12000 \
+            -p 8080:8080 \
             -u not \
             -l "$name" \
             --name "$name" \

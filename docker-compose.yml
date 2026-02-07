@@ -46,6 +46,23 @@ services:
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
 
+  web:
+    build:
+      context: .
+      dockerfile: dockerfiles/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_ADD_CHANNEL_USERNAME: ${NEXT_PUBLIC_ADD_CHANNEL_USERNAME:-}
+    env_file:
+      - .env
+    ports:
+      - "${WEB_FORWARD_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+    networks:
+      ads-mrkt-network:
+        ipv4_address: 172.32.0.9
+
 networks:
   ads-mrkt-network:
     external: true

@@ -1,7 +1,6 @@
 package config
 
 type Config struct {
-	JWTSecret        string `env:"JWT_SECRET" env-required:"true"`
-	JWTTimeToLive    int    `env:"JWT_TIME_TO_LIVE" env-default:"24"`      // hours
-	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN" env-required:"true"` // for Mini App init data verification
+	JWTSecret     string `env:"JWT_SECRET" env-required:"true"`
+	JWTTimeToLive int    `env:"JWT_TIME_TO_LIVE" env-default:"24"` // hours
 }

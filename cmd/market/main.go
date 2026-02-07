@@ -6,6 +6,7 @@ import (
 
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/config"
+	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/application/market/http"
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	channelservice "ads-mrkt/internal/market/service/channel"
@@ -14,6 +15,7 @@ import (
 	listingservice "ads-mrkt/internal/market/service/listing"
 	userservice "ads-mrkt/internal/market/service/user"
 	"ads-mrkt/internal/postgres"
+	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
 	marketrouter "ads-mrkt/internal/server/routers/market"
 	"ads-mrkt/pkg/auth"
@@ -54,12 +56,21 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return errors.Wrap(err, "create postgres client")
 			}
 
+			redisClient, err := redis.New(ctxRun, cfg.Redis)
+			if err != nil {
+				return errors.Wrap(err, "redis")
+			}
+			defer redisClient.Close()
+
+			// Telegram API client (for welcome message + middleware secret token)
+			telegramClient := telegram.NewAPIClient(ctxRun, cfg.Telegram, redisClient)
+
 			repo := marketrepo.New(pg)
-			userSvc := userservice.NewUserService(cfg.Auth.TelegramBotToken, repo)
+			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
 			dealSvc := dealservice.NewDealService(repo)
-			dealChatSvc := dealchatservice.NewService(repo, repo, nil) // pass TelegramSender to enable send-chat-message
-			channelSvc := channelservice.NewChannelService(repo, repo)
+			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
+			channelSvc := channelservice.NewChannelService(repo)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)

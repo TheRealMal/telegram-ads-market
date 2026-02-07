@@ -19,7 +19,7 @@ type Config struct {
 	Health   healthconfig.Config
 	Auth     authconfig.Config
 	Redis    redisconfig.Config
-	Telegram telegramconfig.Config
+	Telegram telegramconfig.Config `env-prefix:"TELEGRAM_"`
 }
 
 func (c *Config) InternalHandling() {

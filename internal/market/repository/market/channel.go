@@ -130,3 +130,27 @@ func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, st
 	}
 	return nil
 }
+
+type channelStatsRow struct {
+	Stats json.RawMessage `db:"stats"`
+}
+
+// GetChannelStats returns the stats JSON for a channel, or nil if none.
+func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json.RawMessage, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT stats FROM market.channel_stats WHERE channel_id = @channel_id`,
+		pgx.NamedArgs{"channel_id": channelID})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[channelStatsRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return row.Stats, nil
+}

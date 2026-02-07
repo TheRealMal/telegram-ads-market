@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS market.user (
     first_name  TEXT        NOT NULL DEFAULT '',
     last_name   TEXT        NOT NULL DEFAULT '',
     locale      TEXT        NOT NULL DEFAULT '',
+    referrer_id BIGINT      NOT NULL DEFAULT 0,
+    allows_pm   BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id)

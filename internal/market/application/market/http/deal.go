@@ -6,7 +6,9 @@ import (
 	"strconv"
 
 	apperrors "ads-mrkt/internal/errors"
+	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
+	_ "ads-mrkt/internal/server/templates/response"
 	"ads-mrkt/pkg/auth"
 )
 
@@ -24,12 +26,12 @@ type CreateDealRequest struct {
 // @Summary	Create deal
 // @Accept		json
 // @Produce	json
-// @Param		request	body	CreateDealRequest	true	"deal body"
+// @Param		request	body		CreateDealRequest					true	"deal body"
 // @Success	200		{object}	response.Template{data=entity.Deal}	"Created deal"
-// @Failure	400		{object}	response.Template{data=string}	"Bad request"
-// @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
-// @Failure	403		{object}	response.Template{data=string}	"Forbidden"
-// @Failure	404		{object}	response.Template{data=string}	"Not found"
+// @Failure	400		{object}	response.Template{data=string}		"Bad request"
+// @Failure	401		{object}	response.Template{data=string}		"Unauthorized"
+// @Failure	403		{object}	response.Template{data=string}		"Forbidden"
+// @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals [post]
 func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
@@ -49,6 +51,9 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if listing == nil {
 		return nil, apperrors.ServiceError{Err: nil, Message: "listing not found", Code: apperrors.ErrorCodeNotFound}
 	}
+	if listing.UserID == userID {
+		return nil, apperrors.ServiceError{Err: nil, Message: "cannot create deal on your own listing", Code: apperrors.ErrorCodeForbidden}
+	}
 
 	var lessorID, lesseeID int64
 	switch listing.Type {
@@ -62,6 +67,14 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, apperrors.ServiceError{Err: nil, Message: "invalid listing type", Code: apperrors.ErrorCodeBadRequest}
 	}
 
+	details := req.Details
+	if details == nil {
+		details = json.RawMessage("{}")
+	}
+	canonDetails, err := domain.ValidateDealDetails(details)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+	}
 	d := &entity.Deal{
 		ListingID: req.ListingID,
 		LessorID:  lessorID,
@@ -69,10 +82,7 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		Type:      req.Type,
 		Duration:  req.Duration,
 		Price:     req.Price,
-		Details:   req.Details,
-	}
-	if d.Details == nil {
-		d.Details = json.RawMessage("{}")
+		Details:   canonDetails,
 	}
 	if err := h.dealService.CreateDeal(r.Context(), d); err != nil {
 		return nil, toServiceError(err)
@@ -83,10 +93,10 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Tags		Market
 // @Summary	Get deal by ID
 // @Produce	json
-// @Param		id	path	int	true	"Deal ID"
+// @Param		id	path		int									true	"Deal ID"
 // @Success	200	{object}	response.Template{data=entity.Deal}	"Deal"
-// @Failure	400	{object}	response.Template{data=string}	"Bad request"
-// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Failure	400	{object}	response.Template{data=string}		"Bad request"
+// @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [get]
 func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -107,9 +117,9 @@ func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, 
 // @Tags		Market
 // @Summary	List deals by listing ID
 // @Produce	json
-// @Param		listing_id	path	int	true	"Listing ID"
+// @Param		listing_id	path		int										true	"Listing ID"
 // @Success	200			{object}	response.Template{data=[]entity.Deal}	"List of deals"
-// @Failure	400			{object}	response.Template{data=string}	"Bad request"
+// @Failure	400			{object}	response.Template{data=string}			"Bad request"
 // @Router		/market/listings/{listing_id}/deals [get]
 func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	listingIDStr := r.PathValue("listing_id")
@@ -141,13 +151,13 @@ type UpdateDealDraftRequest struct {
 // @Summary	Update deal draft (type, duration, price, details). Clears both signatures.
 // @Accept		json
 // @Produce	json
-// @Param		id		path	int						true	"Deal ID"
-// @Param		request	body	UpdateDealDraftRequest	true	"fields to update"
+// @Param		id		path		int									true	"Deal ID"
+// @Param		request	body		UpdateDealDraftRequest				true	"fields to update"
 // @Success	200		{object}	response.Template{data=entity.Deal}	"Updated deal"
-// @Failure	400		{object}	response.Template{data=string}	"Bad request"
-// @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
-// @Failure	403		{object}	response.Template{data=string}	"Forbidden"
-// @Failure	404		{object}	response.Template{data=string}	"Not found"
+// @Failure	400		{object}	response.Template{data=string}		"Bad request"
+// @Failure	401		{object}	response.Template{data=string}		"Unauthorized"
+// @Failure	403		{object}	response.Template{data=string}		"Forbidden"
+// @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [patch]
 func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
@@ -182,7 +192,11 @@ func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 		d.Price = *req.Price
 	}
 	if req.Details != nil {
-		d.Details = req.Details
+		canonDetails, err := domain.ValidateDealDetails(req.Details)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+		d.Details = canonDetails
 	}
 
 	if err := h.dealService.UpdateDealDraft(r.Context(), userID, &d); err != nil {
@@ -196,12 +210,12 @@ func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 // @Tags		Market
 // @Summary	Sign deal (lessor or lessee). When both have signed same terms, status becomes approved.
 // @Produce	json
-// @Param		id	path	int	true	"Deal ID"
+// @Param		id	path		int									true	"Deal ID"
 // @Success	200	{object}	response.Template{data=entity.Deal}	"Deal (possibly approved)"
-// @Failure	400	{object}	response.Template{data=string}	"Bad request"
-// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
-// @Failure	403	{object}	response.Template{data=string}	"Forbidden"
-// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Failure	400	{object}	response.Template{data=string}		"Bad request"
+// @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}		"Forbidden"
+// @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/sign [post]
 func (h *Handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
@@ -225,12 +239,12 @@ func (h *Handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{},
 // @Tags		Market
 // @Summary	Send deal chat invite message to the current user. Sends "Reply to this message to chat with the other side." and stores the message for reply tracking.
 // @Produce	json
-// @Param		id	path	int	true	"Deal ID"
+// @Param		id	path		int										true	"Deal ID"
 // @Success	200	{object}	response.Template{data=entity.DealChat}	"Created deal chat row"
-// @Failure	400	{object}	response.Template{data=string}	"Bad request"
-// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
-// @Failure	403	{object}	response.Template{data=string}	"Forbidden"
-// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Failure	400	{object}	response.Template{data=string}			"Bad request"
+// @Failure	401	{object}	response.Template{data=string}			"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}			"Forbidden"
+// @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/deals/{id}/send-chat-message [post]
 func (h *Handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
@@ -254,12 +268,12 @@ func (h *Handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (i
 // @Tags		Market
 // @Summary	List deal messages (chat invite + replies) for the deal in chronological order. Caller must be lessor or lessee.
 // @Produce	json
-// @Param		id	path	int	true	"Deal ID"
+// @Param		id	path		int											true	"Deal ID"
 // @Success	200	{object}	response.Template{data=[]entity.DealChat}	"List of deal chat messages"
-// @Failure	400	{object}	response.Template{data=string}	"Bad request"
-// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
-// @Failure	403	{object}	response.Template{data=string}	"Forbidden"
-// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Failure	400	{object}	response.Template{data=string}				"Bad request"
+// @Failure	401	{object}	response.Template{data=string}				"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}				"Forbidden"
+// @Failure	404	{object}	response.Template{data=string}				"Not found"
 // @Router		/market/deals/{id}/messages [get]
 func (h *Handler) ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())

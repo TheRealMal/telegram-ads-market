@@ -62,18 +62,16 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			eventRepo := eventredis.New(redisClient)
 			telegramEventSvc := eventtelegram.NewService(eventRepo)
 
-			// Deal_chat replier (saves reply when user replies to deal invite message)
-			var dealChatReplier botupdates.DealChatReplier
 			pg, err := postgres.New(ctxRun, cfg.Database)
 			if err != nil {
 				return errors.Wrap(err, "postgres")
 			}
+
 			marketRepo := marketrepo.New(pg)
-			dealChatSvc := dealchatservice.NewService(marketRepo, marketRepo, nil)
-			dealChatReplier = dealChatSvc
+			dealChatSvc := dealchatservice.NewService(marketRepo, nil)
 
 			// Bot updates service
-			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, dealChatReplier)
+			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, dealChatSvc)
 			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
 
 			// Webhook HTTP handler and router

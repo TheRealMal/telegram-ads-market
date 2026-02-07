@@ -58,3 +58,7 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Web (use deps stage and build output in Docker)
+web/node_modules
+web/.next

@@ -50,7 +50,7 @@ func New(db database) *stateStorage {
 func (s *stateStorage) GetState(ctx context.Context, userID int64) (updates.State, bool, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT pts, qts, date, seq
-		FROM telegram_state
+		FROM userbot.telegram_state
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
 		"user_id": userID,
@@ -85,7 +85,7 @@ func (s *stateStorage) GetState(ctx context.Context, userID int64) (updates.Stat
 // SetState stores the state in the database for a specific user
 func (s *stateStorage) SetState(ctx context.Context, userID int64, state updates.State) error {
 	_, err := s.db.Exec(ctx, `
-		INSERT INTO telegram_state (user_id, pts, qts, date, seq, updated_at)
+		INSERT INTO userbot.telegram_state (user_id, pts, qts, date, seq, updated_at)
 		VALUES (@user_id, @pts, @qts, @date, @seq, NOW())
 		ON CONFLICT (user_id) 
 		DO UPDATE SET 
@@ -112,7 +112,7 @@ func (s *stateStorage) SetState(ctx context.Context, userID int64, state updates
 // SetPts updates only the pts value for a specific user
 func (s *stateStorage) SetPts(ctx context.Context, userID int64, pts int) error {
 	result, err := s.db.Exec(ctx, `
-		UPDATE telegram_state
+		UPDATE userbot.telegram_state
 		SET pts = @pts, updated_at = NOW()
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
@@ -133,7 +133,7 @@ func (s *stateStorage) SetPts(ctx context.Context, userID int64, pts int) error 
 // SetQts updates only the qts value for a specific user
 func (s *stateStorage) SetQts(ctx context.Context, userID int64, qts int) error {
 	result, err := s.db.Exec(ctx, `
-		UPDATE telegram_state
+		UPDATE userbot.telegram_state
 		SET qts = @qts, updated_at = NOW()
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
@@ -154,7 +154,7 @@ func (s *stateStorage) SetQts(ctx context.Context, userID int64, qts int) error 
 // SetSeq updates only the seq value for a specific user
 func (s *stateStorage) SetSeq(ctx context.Context, userID int64, seq int) error {
 	result, err := s.db.Exec(ctx, `
-		UPDATE telegram_state
+		UPDATE userbot.telegram_state
 		SET seq = @seq, updated_at = NOW()
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
@@ -175,7 +175,7 @@ func (s *stateStorage) SetSeq(ctx context.Context, userID int64, seq int) error 
 // SetDate updates only the date value for a specific user
 func (s *stateStorage) SetDate(ctx context.Context, userID int64, date int) error {
 	result, err := s.db.Exec(ctx, `
-		UPDATE telegram_state
+		UPDATE userbot.telegram_state
 		SET date = @date, updated_at = NOW()
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
@@ -196,7 +196,7 @@ func (s *stateStorage) SetDate(ctx context.Context, userID int64, date int) erro
 // SetDateSeq updates both date and seq values for a specific user
 func (s *stateStorage) SetDateSeq(ctx context.Context, userID int64, date, seq int) error {
 	result, err := s.db.Exec(ctx, `
-		UPDATE telegram_state
+		UPDATE userbot.telegram_state
 		SET date = @date, seq = @seq, updated_at = NOW()
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
@@ -219,7 +219,7 @@ func (s *stateStorage) SetDateSeq(ctx context.Context, userID int64, date, seq i
 func (s *stateStorage) GetChannelPts(ctx context.Context, userID, channelID int64) (int, bool, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT pts
-		FROM telegram_channel_state
+		FROM userbot.telegram_channel_state
 		WHERE user_id = @user_id AND channel_id = @channel_id
 	`, pgx.NamedArgs{
 		"user_id":    userID,
@@ -244,7 +244,7 @@ func (s *stateStorage) GetChannelPts(ctx context.Context, userID, channelID int6
 // SetChannelPts stores channel-specific pts in the database
 func (s *stateStorage) SetChannelPts(ctx context.Context, userID, channelID int64, pts int) error {
 	_, err := s.db.Exec(ctx, `
-		INSERT INTO telegram_channel_state (user_id, channel_id, pts, updated_at)
+		INSERT INTO userbot.telegram_channel_state (user_id, channel_id, pts, updated_at)
 		VALUES (@user_id, @channel_id, @pts, NOW())
 		ON CONFLICT (user_id, channel_id)
 		DO UPDATE SET
@@ -266,7 +266,7 @@ func (s *stateStorage) SetChannelPts(ctx context.Context, userID, channelID int6
 func (s *stateStorage) ForEachChannels(ctx context.Context, userID int64, f func(ctx context.Context, channelID int64, pts int) error) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT channel_id, pts
-		FROM telegram_channel_state
+		FROM userbot.telegram_channel_state
 		WHERE user_id = @user_id
 	`, pgx.NamedArgs{
 		"user_id": userID,

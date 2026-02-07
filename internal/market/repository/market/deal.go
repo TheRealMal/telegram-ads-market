@@ -14,20 +14,22 @@ import (
 )
 
 type dealRow struct {
-	ID              int64           `db:"id"`
-	ListingID       int64           `db:"listing_id"`
-	LessorID        int64           `db:"lessor_id"`
-	LesseeID        int64           `db:"lessee_id"`
-	Type            string          `db:"type"`
-	Duration        int64           `db:"duration"`
-	Price           int64           `db:"price"`
-	Details         json.RawMessage `db:"details"`
-	LessorSignature *string         `db:"lessor_signature"`
-	LesseeSignature *string         `db:"lessee_signature"`
-	Status          string          `db:"status"`
-	EscrowAddress   *string         `db:"escrow_address"`
-	CreatedAt       time.Time       `db:"created_at"`
-	UpdatedAt       time.Time       `db:"updated_at"`
+	ID                int64           `db:"id"`
+	ListingID         int64           `db:"listing_id"`
+	LessorID          int64           `db:"lessor_id"`
+	LesseeID          int64           `db:"lessee_id"`
+	Type              string          `db:"type"`
+	Duration          int64           `db:"duration"`
+	Price             int64           `db:"price"`
+	Details           json.RawMessage `db:"details"`
+	LessorSignature   *string         `db:"lessor_signature"`
+	LesseeSignature   *string         `db:"lessee_signature"`
+	Status            string          `db:"status"`
+	EscrowAddress     *string         `db:"escrow_address"`
+	EscrowPrivateKey  *string         `db:"escrow_private_key"`
+	EscrowReleaseTime *time.Time      `db:"escrow_release_time"`
+	CreatedAt         time.Time       `db:"created_at"`
+	UpdatedAt         time.Time       `db:"updated_at"`
 }
 
 type dealReturnRow struct {
@@ -38,20 +40,22 @@ type dealReturnRow struct {
 
 func dealRowToEntity(row dealRow) *entity.Deal {
 	return &entity.Deal{
-		ID:              row.ID,
-		ListingID:       row.ListingID,
-		LessorID:        row.LessorID,
-		LesseeID:        row.LesseeID,
-		Type:            row.Type,
-		Duration:        row.Duration,
-		Price:           row.Price,
-		Details:         row.Details,
-		LessorSignature: row.LessorSignature,
-		LesseeSignature: row.LesseeSignature,
-		Status:          entity.DealStatus(row.Status),
-		EscrowAddress:   row.EscrowAddress,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
+		ID:                row.ID,
+		ListingID:         row.ListingID,
+		LessorID:          row.LessorID,
+		LesseeID:          row.LesseeID,
+		Type:              row.Type,
+		Duration:          row.Duration,
+		Price:             row.Price,
+		Details:           row.Details,
+		LessorSignature:   row.LessorSignature,
+		LesseeSignature:   row.LesseeSignature,
+		Status:            entity.DealStatus(row.Status),
+		EscrowAddress:     row.EscrowAddress,
+		EscrowPrivateKey:  row.EscrowPrivateKey,
+		EscrowReleaseTime: row.EscrowReleaseTime,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
 	}
 }
 
@@ -88,7 +92,7 @@ func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
 func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, type, duration, price, details,
-		       lessor_signature, lessee_signature, status, escrow_address, created_at, updated_at
+		       lessor_signature, lessee_signature, status, escrow_address, escrow_private_key, escrow_release_time, created_at, updated_at
 		FROM market.deal WHERE id = @id`,
 		pgx.NamedArgs{"id": id})
 	if err != nil {
@@ -109,7 +113,7 @@ func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, e
 func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, type, duration, price, details,
-		       lessor_signature, lessee_signature, status, escrow_address, created_at, updated_at
+		       lessor_signature, lessee_signature, status, escrow_address, escrow_private_key, escrow_release_time, created_at, updated_at
 		FROM market.deal WHERE listing_id = @listing_id ORDER BY updated_at DESC`,
 		pgx.NamedArgs{"listing_id": listingID})
 	if err != nil {
@@ -223,14 +227,15 @@ func (r *repository) SignDealInTx(ctx context.Context, dealID int64, userID int6
 
 // SetDealEscrowAddress sets escrow address and private key when deal status is approved.
 // Status filter from domain (entity.DealStatusApproved).
-func (r *repository) SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string) error {
+func (r *repository) SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string, releaseTime time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal
-		SET escrow_address = @address, escrow_private_key = @private_key, status = @status_waiting_escrow_deposit, updated_at = NOW()
+		SET escrow_address = @address, escrow_private_key = @private_key, escrow_release_time = @release_time, status = @status_waiting_escrow_deposit, updated_at = NOW()
 		WHERE id = @id AND status = @status_approved`,
 		pgx.NamedArgs{
 			"address":                       address,
 			"private_key":                   privateKey,
+			"release_time":                  releaseTime,
 			"id":                            dealID,
 			"status_approved":               string(entity.DealStatusApproved),
 			"status_waiting_escrow_deposit": string(entity.DealStatusWaitingEscrowDeposit),

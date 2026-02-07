@@ -8,7 +8,7 @@ import (
 )
 
 // AuthUser verifies Telegram Mini App init data, upserts the user into market.user, and returns the user.
-func (s *UserService) AuthUser(ctx context.Context, initDataStr string) (*entity.User, error) {
+func (s *UserService) AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error) {
 	initData, err := parseAndVerifyInitData(s.botToken, initDataStr)
 	if err != nil {
 		return nil, fmt.Errorf("verify init data: %w", err)
@@ -18,12 +18,14 @@ func (s *UserService) AuthUser(ctx context.Context, initDataStr string) (*entity
 	}
 
 	u := &entity.User{
-		ID:        initData.User.ID,
-		Username:  initData.User.Username,
-		Photo:     initData.User.PhotoURL,
-		FirstName: initData.User.FirstName,
-		LastName:  initData.User.LastName,
-		Locale:    initData.User.LanguageCode,
+		ID:         initData.User.ID,
+		Username:   initData.User.Username,
+		Photo:      initData.User.PhotoURL,
+		FirstName:  initData.User.FirstName,
+		LastName:   initData.User.LastName,
+		Locale:     initData.User.LanguageCode,
+		ReferrerID: referrerID,
+		AllowsPM:   initData.User.AllowsWriteToPM,
 	}
 	if err := s.userRepo.UpsertUser(ctx, u); err != nil {
 		return nil, fmt.Errorf("upsert user: %w", err)

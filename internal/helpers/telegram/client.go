@@ -27,6 +27,7 @@ const (
 	telegramPathCreateInvoiceLink      TelegramPath = "/createInvoiceLink"
 	telegramPathAnswerPreCheckoutQuery TelegramPath = "/answerPreCheckoutQuery"
 	telegramPathRefundStarPayment      TelegramPath = "/refundStarPayment"
+	telegramPathSetMessageReaction     TelegramPath = "/setMessageReaction"
 
 	messageWelcome = "Start message"
 	openAppURL     = "https://t.me/%s?startapp="
@@ -240,6 +241,31 @@ func (c *APIClient) sendRequest(ctx context.Context, uri string, payload []byte)
 	}
 
 	return bodyBytes, nil
+}
+
+// ReactionTypeEmoji is used in setMessageReaction (Bot API: type "emoji").
+type ReactionTypeEmoji struct {
+	Type  string `json:"type"`  // "emoji"
+	Emoji string `json:"emoji"` // e.g. "👍"
+}
+
+// SetMessageReaction sets the chosen reactions on a message. See https://core.telegram.org/bots/api#setmessagereaction.
+// Pass empty emoji to clear reactions. Bots can set up to one reaction per message (non-premium).
+func (c *APIClient) SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error {
+	uri := c.buildTelegramURL(telegramPathSetMessageReaction)
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
+	}
+	if emoji != "" {
+		payload["reaction"] = []ReactionTypeEmoji{{Type: "emoji", Emoji: emoji}}
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal setMessageReaction payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
 }
 
 // SendMessage sends a text message to the chat and returns the sent message (chat_id, message_id) on success.
