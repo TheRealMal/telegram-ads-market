@@ -1,12 +1,14 @@
-# Production stack: HTTPS (self-signed) + all services. No domain required.
+# Production stack: HTTPS with Certbot (Let's Encrypt) + all services.
+# Requires a real domain and DNS pointing to this host.
 #
-# Start everything:
-#   docker compose -f docker-compose.https-selfsigned.yml up -d
+# 1) Set in .env: DOMAIN=yourdomain.com, CERTBOT_EMAIL=you@example.com
+# 2) Obtain cert (port 80 must be free): docker compose -f docker-compose.https-selfsigned.yml run --rm certbot
+# 3) Start stack: docker compose -f docker-compose.https-selfsigned.yml up -d
 #
-# Access: https://<server-ip> or https://<hostname>
+# Access: https://<DOMAIN>
 #   - Frontend at /
 #   - API at /api/v1/*
-# Accept the browser certificate warning (self-signed).
+# Renew cert (e.g. cron; nginx keeps running): docker compose -f docker-compose.https-selfsigned.yml run --rm certbot renew --webroot -w /var/www/certbot
 
 version: "3.8"
 
@@ -75,16 +77,33 @@ services:
       ads-mrkt-network:
         ipv4_address: 172.32.0.9
 
-  caddy:
-    image: caddy:2-alpine
+  certbot:
+    image: certbot/certbot
+    ports:
+      - "80:80"
+    command: certonly --standalone -d ${DOMAIN} --non-interactive --agree-tos -m ${CERTBOT_EMAIL} --keep
+    volumes:
+      - certbot_letsencrypt:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    networks:
+      ads-mrkt-network:
+        ipv4_address: 172.32.0.14
+    # Run once to obtain cert: docker compose ... run --rm certbot
+    # Renew (webroot; nginx stays up): docker compose ... run --rm certbot renew --webroot -w /var/www/certbot
+
+  nginx:
+    build:
+      context: .
+      dockerfile: dockerfiles/nginx/Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
     volumes:
-      - ./caddy/Caddyfile.selfsigned:/etc/caddy/Caddyfile:ro
-      - caddy_data_selfsigned:/data
-      - caddy_config_selfsigned:/config
+      - certbot_letsencrypt:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.10
@@ -109,6 +128,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CLIENT_DOMAIN: ${CLIENT_DOMAIN:-https://localhost}
+      # For Certbot stack use: CLIENT_DOMAIN=https://${DOMAIN}
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.11
@@ -140,6 +160,9 @@ services:
       redis:
         condition: service_healthy
 
+  # Userbot needs one interactive login to create the session. Run once:
+  #   docker compose -f docker-compose.https-selfsigned.yml run --rm -it userbot
+  # Enter phone number and code when prompted. Session is saved in volume; after that "up" works.
   userbot:
     image: ads-mrkt-server
     restart: unless-stopped
@@ -164,8 +187,8 @@ services:
         condition: service_healthy
 
 volumes:
-  caddy_data_selfsigned:
-  caddy_config_selfsigned:
+  certbot_letsencrypt:
+  certbot_webroot:
   userbot_sessions:
 
 networks:
