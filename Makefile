@@ -1,4 +1,4 @@
-.PHONY: install_lint lint install_openapi swagger install_buf gen_proto
+.PHONY: install_lint lint install_openapi swagger install_buf gen_proto build_linux_bin docker_build_bin
 
 install_lint: ## Install linting tool
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.6
@@ -29,8 +29,8 @@ start: ## Start the server
 stop: ## Stop the server
 	docker compose -f docker-compose.https-selfsigned.yml down
 
-build_linux_bin: ## Can be used to build the binary and copy into image for 
-	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
+docker_build_bin: ## Build binary via Docker and save to ./build/server (requires BuildKit)
+	DOCKER_BUILDKIT=1 docker build --platform linux/amd64 --output type=local,dest=./build/bin/ --target=artifact -f Dockerfile .
 
 help: ## Show this help message
 	@echo "Platform Scripts"

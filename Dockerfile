@@ -1,6 +1,8 @@
 # Build stage
 FROM golang:1.24-alpine AS builder
 
+ARG TARGETARCH=amd64
+
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
@@ -19,8 +21,14 @@ COPY internal ./internal
 COPY pkg ./pkg
 
 # Build the application
-COPY build ./build
-# RUN env CGO_ENABLED=0 go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
+# COPY build/bin/server ./build/bin/server
+RUN env CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
+
+# Artifact stage: export binary to host with:
+#   DOCKER_BUILDKIT=1 docker build --output type=local,dest=./build --target=artifact .
+# Binary is written to ./build/server
+FROM scratch AS artifact
+COPY --from=builder /app/build/bin/server /server
 
 # Final stage
 FROM scratch

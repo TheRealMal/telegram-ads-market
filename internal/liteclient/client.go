@@ -2,8 +2,10 @@ package liteclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +16,14 @@ import (
 	"github.com/xssnick/tonutils-go/liteclient"
 	"github.com/xssnick/tonutils-go/tlb"
 	"github.com/xssnick/tonutils-go/ton"
+)
+
+const (
+	// Timeouts for fetching TON global config (avoids TLS handshake / context deadline errors on slow networks)
+	globalConfigTLSHandshakeTimeout = 45 * time.Second
+	globalConfigClientTimeout       = 90 * time.Second
+	globalConfigRetries             = 3
+	globalConfigRetryBackoff        = 5 * time.Second
 )
 
 const (
@@ -29,7 +39,7 @@ type client struct {
 
 func NewClient(ctx context.Context, cfg config.Config, isTestnet bool, public bool) (*client, error) {
 	pool := liteclient.NewConnectionPool()
-	globalConfig, err := liteclient.GetConfigFromUrl(ctx, config.GlobalConfigURL[isTestnet])
+	globalConfig, err := fetchGlobalConfig(ctx, config.GlobalConfigURL[isTestnet])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global config: %w", err)
 	}
@@ -56,6 +66,49 @@ func NewClient(ctx context.Context, cfg config.Config, isTestnet bool, public bo
 	return &client{
 		api: api,
 	}, nil
+}
+
+// fetchGlobalConfig fetches TON global config with long timeouts and retries to avoid TLS handshake
+// and context deadline errors on slow or restricted networks (e.g. in Docker).
+func fetchGlobalConfig(ctx context.Context, url string) (*liteclient.GlobalConfig, error) {
+	transport := &http.Transport{
+		TLSHandshakeTimeout:   globalConfigTLSHandshakeTimeout,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   globalConfigClientTimeout,
+	}
+	var lastErr error
+	for attempt := 0; attempt < globalConfigRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(globalConfigRetryBackoff):
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			slog.Debug("fetch global config attempt failed", "url", url, "attempt", attempt+1, "error", err)
+			continue
+		}
+		var config liteclient.GlobalConfig
+		if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+			resp.Body.Close()
+			lastErr = err
+			continue
+		}
+		resp.Body.Close()
+		return &config, nil
+	}
+	return nil, lastErr
 }
 
 func (c *client) Client() ton.APIClientWrapped {
