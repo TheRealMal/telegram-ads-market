@@ -7,7 +7,7 @@ import "time"
 type DealChat struct {
 	DealID           int64     `json:"deal_id"`
 	ReplyToChatID    int64     `json:"reply_to_chat_id"`
-	ReplyToMessageID int64     `json:"reply_to_message_id"`
+	ReplyToMessageID int64     `json:"-"`
 	RepliedMessage   *string   `json:"replied_message,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

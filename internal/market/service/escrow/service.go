@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/xssnick/tonutils-go/ton"
 	"github.com/xssnick/tonutils-go/ton/wallet"
@@ -12,7 +13,8 @@ import (
 
 type marketRepository interface {
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
-	SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string) error
+	ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error)
+	SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string, releaseTime time.Time) error
 }
 
 type liteclient interface {
@@ -52,11 +54,14 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 		return err
 	}
 
+	// Release time: now + deal duration (duration is in hours, e.g. 24 for 24hr)
+	releaseTime := time.Now().Add(time.Duration(deal.Duration) * time.Hour)
 	if err = s.marketRepository.SetDealEscrowAddress(
 		ctx,
 		dealID,
 		wallet.Address().StringRaw(),
-		strings.Join(seed, " "), // TODO: Add encryption
+		strings.Join(seed, " "),
+		releaseTime,
 	); err != nil {
 		return err
 	}

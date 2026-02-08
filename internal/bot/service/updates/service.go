@@ -140,7 +140,7 @@ func (s *Service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 		}
 
 		// Reply was saved; set a reaction on the user's message to acknowledge.
-		if err := s.telegramClient.SetMessageReaction(ctx, update.Message.Chat.ID, update.Message.MessageID, "👍"); err != nil {
+		if err := s.telegramClient.SetMessageReaction(ctx, update.Message.Chat.ID, update.Message.MessageID, "✉️"); err != nil {
 			slog.Debug("failed to set message reaction on saved reply", "error", err, "chat_id", update.Message.Chat.ID, "message_id", update.Message.MessageID)
 		}
 

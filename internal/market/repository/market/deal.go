@@ -110,6 +110,31 @@ func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, e
 	return dealRowToEntity(row), nil
 }
 
+// ListDealsApprovedWithoutEscrow returns deals with status approved and no escrow_address set (for escrow worker).
+func (r *repository) ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, listing_id, lessor_id, lessee_id, type, duration, price, details,
+		       lessor_signature, lessee_signature, status, escrow_address, escrow_private_key, escrow_release_time, created_at, updated_at
+		FROM market.deal
+		WHERE status = @status AND escrow_address IS NULL
+		ORDER BY id ASC`,
+		pgx.NamedArgs{"status": string(entity.DealStatusApproved)})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*entity.Deal, 0, len(slice))
+	for _, row := range slice {
+		list = append(list, dealRowToEntity(row))
+	}
+	return list, nil
+}
+
 func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, type, duration, price, details,

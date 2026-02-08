@@ -7,11 +7,13 @@ import (
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/config"
 	"ads-mrkt/internal/helpers/telegram"
+	"ads-mrkt/internal/liteclient"
 	"ads-mrkt/internal/market/application/market/http"
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
+	escrowservice "ads-mrkt/internal/market/service/escrow"
 	listingservice "ads-mrkt/internal/market/service/listing"
 	userservice "ads-mrkt/internal/market/service/user"
 	"ads-mrkt/internal/postgres"
@@ -71,6 +73,14 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealSvc := dealservice.NewDealService(repo)
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo)
+
+			lc, err := liteclient.NewClient(ctxRun, cfg.Liteclient, cfg.IsTestnet, cfg.IsPublic)
+			if err != nil {
+				return errors.Wrap(err, "create liteclient for escrow worker")
+			}
+			escrowSvc := escrowservice.NewService(repo, lc)
+
+			go escrowSvc.Worker(ctxRun)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)

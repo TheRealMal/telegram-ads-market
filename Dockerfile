@@ -19,8 +19,8 @@ COPY internal ./internal
 COPY pkg ./pkg
 
 # Build the application
-# COPY build ./build
-RUN env CGO_ENABLED=0 go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
+COPY build ./build
+# RUN env CGO_ENABLED=0 go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
 
 # Final stage
 FROM scratch

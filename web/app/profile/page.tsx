@@ -39,12 +39,21 @@ export default function ProfilePage() {
       setLoading(false);
       return;
     }
-    api<Channel[]>('/api/v1/market/my-channels')
-      .then((res) => {
-        if (res.ok && res.data) setChannels(res.data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let isMounted = true;
+    const fetchChannels = () => {
+      api<Channel[]>('/api/v1/market/my-channels')
+        .then((res) => {
+          if (isMounted && res.ok && res.data) setChannels(res.data);
+        })
+        .catch(() => {});
+    };
+    fetchChannels();
+    setLoading(false);
+    const interval = setInterval(fetchChannels, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [hasToken]);
 
   const displayName = tgUser

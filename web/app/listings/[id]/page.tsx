@@ -30,6 +30,7 @@ export default function ListingDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showCreateDealModal, setShowCreateDealModal] = useState(false);
   const [dealMessage, setDealMessage] = useState('');
+  const [dealPostedAt, setDealPostedAt] = useState('');
   const [createDealPriceIndex, setCreateDealPriceIndex] = useState(0);
   const [createDealSubmitting, setCreateDealSubmitting] = useState(false);
 
@@ -68,6 +69,7 @@ export default function ListingDetailPage() {
 
   const handleOpenCreateDeal = () => {
     setDealMessage('');
+    setDealPostedAt('');
     setCreateDealPriceIndex(0);
     setShowCreateDealModal(true);
   };
@@ -87,6 +89,17 @@ export default function ListingDetailPage() {
     const type = row.duration + 'hr';
     const duration = parseInt(row.duration, 10) || 24;
     setCreateDealSubmitting(true);
+    const details: { message?: string; posted_at?: string } = {
+      message: dealMessage.trim() || undefined,
+    };
+    if (dealPostedAt.trim()) {
+      try {
+        const d = new Date(dealPostedAt.trim());
+        if (!Number.isNaN(d.getTime())) details.posted_at = d.toISOString();
+      } catch {
+        /* ignore invalid date */
+      }
+    }
     const res = await api<Deal>('/api/v1/market/deals', {
       method: 'POST',
       body: JSON.stringify({
@@ -94,7 +107,7 @@ export default function ListingDetailPage() {
         type,
         duration,
         price: row.price,
-        details: { message: dealMessage.trim() || undefined },
+        details,
       }),
     });
     setCreateDealSubmitting(false);
@@ -353,14 +366,26 @@ export default function ListingDetailPage() {
               )}
               <div>
                 <Label htmlFor="deal-message" className="text-sm text-muted-foreground">
-                  Ads message
+                  Post text
                 </Label>
                 <textarea
                   id="deal-message"
                   value={dealMessage}
                   onChange={(e) => setDealMessage(e.target.value)}
-                  placeholder="Text of the ad to be posted..."
+                  placeholder="Text of the post..."
                   rows={4}
+                  className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="deal-posted-at" className="text-sm text-muted-foreground">
+                  Date and time of posting
+                </Label>
+                <input
+                  id="deal-posted-at"
+                  type="datetime-local"
+                  value={dealPostedAt}
+                  onChange={(e) => setDealPostedAt(e.target.value)}
                   className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                 />
               </div>

@@ -19,6 +19,34 @@ function getDealMessage(details: Record<string, unknown> | undefined): string {
   return details.message;
 }
 
+function getDealPostedAt(details: Record<string, unknown> | undefined): string {
+  if (!details || typeof details.posted_at !== 'string') return '';
+  return details.posted_at;
+}
+
+function formatPostedAt(iso: string): string {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
+}
+
+function isoToDatetimeLocal(iso: string): string {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return '';
+  }
+}
+
 export default function DealDetailPage() {
   const params = useParams();
   const id = Number(params?.id);
@@ -29,26 +57,46 @@ export default function DealDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState('');
+  const [draftPostedAt, setDraftPostedAt] = useState('');
   const [draftPriceIndex, setDraftPriceIndex] = useState(0);
   const [draftSaving, setDraftSaving] = useState(false);
+  const [draftPostedAtError, setDraftPostedAtError] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
+  // Initial fetch + polling for deal (status, escrow, etc.)
   useEffect(() => {
     if (!id || Number.isNaN(id)) {
       setError('Invalid deal ID');
       setLoading(false);
       return;
     }
-    api<Deal>(`/api/v1/market/deals/${id}`)
-      .then((res) => {
-        if (res.ok && res.data) {
-          setDeal(res.data);
-          setDraftMessage(getDealMessage(res.data.details as Record<string, unknown>));
-        } else setError(res.error_code || 'Not found');
-      })
-      .catch(() => setError('Network error'))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+    const fetchDeal = () => {
+      api<Deal>(`/api/v1/market/deals/${id}`)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res.ok && res.data) {
+            setDeal(res.data);
+            setError(null);
+            const d = res.data.details as Record<string, unknown>;
+            setDraftMessage(getDealMessage(d));
+            setDraftPostedAt(isoToDatetimeLocal(getDealPostedAt(d)));
+          } else setError(res.error_code || 'Not found');
+        })
+        .catch(() => {
+          if (isMounted) setError('Network error');
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
+    fetchDeal();
+    const interval = setInterval(fetchDeal, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [id]);
 
   useEffect(() => {
@@ -70,15 +118,25 @@ export default function DealDetailPage() {
     if (user?.id != null) setCurrentUserId(user.id);
   }, []);
 
+  // Chat messages: initial fetch when opening chat tab + polling every 3s while on chat tab
   useEffect(() => {
     if (tab !== 'chat' || !id || Number.isNaN(id)) return;
     const token = typeof window !== 'undefined' && localStorage.getItem('ads_mrkt_jwt');
     if (!token) return;
-    api<DealChat[]>(`/api/v1/market/deals/${id}/messages`)
-      .then((res) => {
-        if (res.ok && res.data) setMessages(res.data);
-      })
-      .catch(() => {});
+    let isMounted = true;
+    const fetchMessages = () => {
+      api<DealChat[]>(`/api/v1/market/deals/${id}/messages`)
+        .then((res) => {
+          if (isMounted && res.ok && res.data) setMessages(res.data);
+        })
+        .catch(() => {});
+    };
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [id, tab]);
 
   const handleSendChatMessage = async () => {
@@ -216,12 +274,19 @@ export default function DealDetailPage() {
                     <strong>Release:</strong> {new Date(deal.escrow_release_time).toLocaleString()}
                   </p>
                 )}
-                {getDealMessage(deal.details as Record<string, unknown>) && (
+                {(getDealMessage(deal.details as Record<string, unknown>) || getDealPostedAt(deal.details as Record<string, unknown>)) && (
                   <div className="mt-2">
-                    <strong className="text-sm">Ads message</strong>
-                    <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-muted/50 p-2 text-sm">
-                      {getDealMessage(deal.details as Record<string, unknown>)}
-                    </p>
+                    <strong className="text-sm">Post text</strong>
+                    {getDealMessage(deal.details as Record<string, unknown>) && (
+                      <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-muted/50 p-2 text-sm">
+                        {getDealMessage(deal.details as Record<string, unknown>)}
+                      </p>
+                    )}
+                    {getDealPostedAt(deal.details as Record<string, unknown>) && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Posted: {formatPostedAt(getDealPostedAt(deal.details as Record<string, unknown>))}
+                      </p>
+                    )}
                   </div>
                 )}
                 {deal.status === 'draft' && listing && (() => {
@@ -246,19 +311,49 @@ export default function DealDetailPage() {
                         </div>
                       )}
                       <div>
-                        <Label className="text-xs text-muted-foreground">Ads message</Label>
+                        <Label className="text-xs text-muted-foreground">Post text</Label>
                         <textarea
                           value={draftMessage}
                           onChange={(e) => setDraftMessage(e.target.value)}
-                          placeholder="Text of the ad..."
+                          placeholder="Text of the post..."
                           rows={3}
                           className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                         />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Date and time of posting</Label>
+                        <input
+                          type="datetime-local"
+                          value={draftPostedAt}
+                          onChange={(e) => {
+                            setDraftPostedAt(e.target.value);
+                            setDraftPostedAtError(null);
+                          }}
+                          className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                        />
+                        {draftPostedAtError && (
+                          <p className="mt-1 text-xs text-destructive">{draftPostedAtError}</p>
+                        )}
                       </div>
                       <Button
                         size="sm"
                         disabled={draftSaving}
                         onClick={async () => {
+                          let postedAtVal: string | undefined;
+                          if (draftPostedAt.trim()) {
+                            try {
+                              const d = new Date(draftPostedAt.trim());
+                              if (Number.isNaN(d.getTime())) {
+                                setDraftPostedAtError('Invalid date and time');
+                                return;
+                              }
+                              postedAtVal = d.toISOString();
+                            } catch {
+                              setDraftPostedAtError('Invalid date and time');
+                              return;
+                            }
+                          }
+                          setDraftPostedAtError(null);
                           const authRes = await auth();
                           if (!authRes.ok || !authRes.data) return;
                           setAuthToken(authRes.data);
@@ -272,7 +367,10 @@ export default function DealDetailPage() {
                               type,
                               duration,
                               price: r.price,
-                              details: { message: draftMessage.trim() || undefined },
+                              details: {
+                                message: draftMessage.trim() || undefined,
+                                posted_at: postedAtVal,
+                              },
                             }),
                           });
                           setDraftSaving(false);
@@ -297,18 +395,24 @@ export default function DealDetailPage() {
               {messages.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">No messages yet.</p>
               ) : (
-                messages.map((m, i) => (
-                  <Card key={i}>
-                    <CardContent className="p-3">
-                      {m.replied_message != null && (
-                        <p className="text-sm text-muted-foreground">{m.replied_message}</p>
-                      )}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {new Date(m.created_at).toLocaleString()}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))
+                messages.map((m, i) => {
+                  const isFromMe = currentUserId != null && m.reply_to_chat_id !== currentUserId;
+                  const otherLabel = isLessor ? 'Lessee' : isLessee ? 'Lessor' : 'Other';
+                  const authorLabel = isFromMe ? 'Me' : otherLabel;
+                  return (
+                    <Card key={i}>
+                      <CardContent className="p-3">
+                        <p className="text-xs font-medium text-muted-foreground">{authorLabel}</p>
+                        {m.replied_message != null && (
+                          <p className="mt-1 text-sm whitespace-pre-wrap">{m.replied_message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {new Date(m.created_at).toLocaleString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
             <Button className="mt-4 w-full" onClick={handleSendChatMessage}>
