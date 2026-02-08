@@ -20,6 +20,9 @@ init_userbot: ## Initialize the userbot session file
 	docker compose -f docker-compose.https-selfsigned.yml up -d postgres redis migrations
 	docker compose -f docker-compose.https-selfsigned.yml run --rm -it userbot
 
+init_certs: ## Initialize the certificates
+	docker compose -f docker-compose.https-selfsigned.yml run --rm certbot
+
 start: ## Start the server
 	docker compose -f docker-compose.https-selfsigned.yml up -d
 

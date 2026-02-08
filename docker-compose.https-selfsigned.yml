@@ -77,19 +77,19 @@ services:
       ads-mrkt-network:
         ipv4_address: 172.32.0.9
 
-  certbot:
-    image: certbot/certbot
-    ports:
-      - "80:80"
-    command: certonly --standalone -d ${DOMAIN} --non-interactive --agree-tos -m ${CERTBOT_EMAIL} --keep
-    volumes:
-      - certbot_letsencrypt:/etc/letsencrypt
-      - certbot_webroot:/var/www/certbot
-    networks:
-      ads-mrkt-network:
-        ipv4_address: 172.32.0.14
-    # Run once to obtain cert: docker compose ... run --rm certbot
-    # Renew (webroot; nginx stays up): docker compose ... run --rm certbot renew --webroot -w /var/www/certbot
+  # certbot:
+  #   image: certbot/certbot
+  #   ports:
+  #     - "80:80"
+  #   command: certonly --manual -d ${DOMAIN} --preferred-challenges dns --agree-tos -m ${CERTBOT_EMAIL} --keep
+  #   volumes:
+  #     - certbot_letsencrypt:/etc/letsencrypt
+  #     - certbot_webroot:/var/www/certbot
+  #   networks:
+  #     ads-mrkt-network:
+  #       ipv4_address: 172.32.0.14
+  # Run once to obtain cert: docker compose ... run --rm certbot
+  # Renew (webroot; nginx stays up): docker compose ... run --rm certbot renew --webroot -w /var/www/certbot
 
   nginx:
     build:
