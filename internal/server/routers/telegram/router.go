@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"ads-mrkt/internal/server"
-	serverconfig "ads-mrkt/internal/server/config"
 )
 
 type telegramMiddleware interface {
@@ -16,27 +15,18 @@ type webhookHandler interface {
 }
 
 type Router struct {
-	Config serverconfig.Config
-
 	webhookHandler     webhookHandler
 	telegramMiddleware telegramMiddleware
 }
 
-func NewRouter(config serverconfig.Config, webhookHandler webhookHandler, telegramMiddleware telegramMiddleware) *Router {
+func NewRouter(webhookHandler webhookHandler, telegramMiddleware telegramMiddleware) *Router {
 	return &Router{
-		Config:             config,
 		webhookHandler:     webhookHandler,
 		telegramMiddleware: telegramMiddleware,
 	}
 }
 
 func (r *Router) GetRoutes() http.Handler {
-	corsConfig := server.CORSConfig{
-		AllowOrigin:  []string{r.Config.ClientDomain},
-		AllowMethods: []string{http.MethodPost},
-		AllowHeaders: []string{"Content-Type", "Authorization"},
-	}
-
 	mux := http.NewServeMux()
 
 	// Telegram updates webhook
@@ -50,5 +40,5 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	return server.MuxWithCORS(mux, &corsConfig)
+	return mux
 }

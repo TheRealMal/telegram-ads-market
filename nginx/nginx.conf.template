@@ -1,5 +1,5 @@
 # HTTPS with Certbot (Let's Encrypt). DOMAIN substituted at runtime.
-# Path-based routing: /api/v1* -> api:8080, /* -> web:3000
+# Path-based: /api/v1/telegram/webhook -> bot:10080, /api/v1/* -> api:8080, /* -> web:3000
 
 events {
     worker_connections 1024;
@@ -25,6 +25,15 @@ http {
 
         ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
         ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+        location /api/v1/telegram/webhook {
+            proxy_pass http://bot:10080;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
 
         location /api/v1/ {
             proxy_pass http://api:8080;

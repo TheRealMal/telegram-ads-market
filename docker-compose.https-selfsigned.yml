@@ -110,6 +110,7 @@ services:
     depends_on:
       - web
       - api
+      - bot
 
   api:
     image: ads-mrkt-server

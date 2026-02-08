@@ -84,7 +84,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return nil
 			})
 
-			router := telegramrouter.NewRouter(cfg.Server, webhookHandler, telegramClient)
+			router := telegramrouter.NewRouter(webhookHandler, telegramClient)
 
 			go srv.Start(ctxRun, router.GetRoutes())
 
