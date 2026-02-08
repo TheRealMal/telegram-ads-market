@@ -25,6 +25,9 @@ RUN env CGO_ENABLED=0 go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
 # Final stage
 FROM scratch
 
+# CA bundle so outbound HTTPS (e.g. api.telegram.org) verifies TLS
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
 # Copy binary from builder
 COPY --from=builder /app/build/bin/server /go/bin/server
 
