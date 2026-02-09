@@ -4,10 +4,44 @@ const BASE_URL =
   typeof window !== 'undefined'
     ? (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')
     : '';
+const JWT_STORAGE_KEY = 'ads_mrkt_jwt';
+/** Consider token expired this many seconds before actual exp for safer refresh */
+const JWT_EXPIRY_BUFFER_SEC = 60;
 
 function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('ads_mrkt_jwt');
+  return localStorage.getItem(JWT_STORAGE_KEY);
+}
+
+/** Decode JWT payload and check exp (seconds since epoch). Returns true if missing or expired. */
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = parts[1];
+    const decoded = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    ) as { exp?: number };
+    const exp = decoded.exp;
+    if (typeof exp !== 'number') return false;
+    return Date.now() / 1000 >= exp - JWT_EXPIRY_BUFFER_SEC;
+  } catch {
+    return true;
+  }
+}
+
+/** Returns a valid token from storage or refreshes via auth() and stores it. */
+export async function ensureValidToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const token = getAuthToken();
+  if (token && !isJwtExpired(token)) return token;
+  const res = await auth();
+  if (res.ok && res.data) {
+    setAuthToken(res.data);
+    return res.data;
+  }
+  clearAuthToken();
+  return null;
 }
 
 export async function api<T>(
@@ -19,7 +53,7 @@ export async function api<T>(
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
-  const token = getAuthToken();
+  const token = await ensureValidToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(url, { ...options, headers });
@@ -34,11 +68,11 @@ export async function api<T>(
 }
 
 export function setAuthToken(token: string): void {
-  if (typeof window !== 'undefined') localStorage.setItem('ads_mrkt_jwt', token);
+  if (typeof window !== 'undefined') localStorage.setItem(JWT_STORAGE_KEY, token);
 }
 
 export function clearAuthToken(): void {
-  if (typeof window !== 'undefined') localStorage.removeItem('ads_mrkt_jwt');
+  if (typeof window !== 'undefined') localStorage.removeItem(JWT_STORAGE_KEY);
 }
 
 /** Telegram Mini App init data. In Telegram this comes from WebApp.initData; locally use NEXT_PUBLIC_TG_WEB_APP_DATA. */

@@ -21,7 +21,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=typeof window!=='undefined'&&window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.colorScheme?window.Telegram.WebApp.colorScheme:'light';document.documentElement.classList.toggle('dark',s==='dark');}catch(e){}})();`,
+            __html: `(function(){try{var stored=typeof window!=='undefined'&&localStorage.getItem('ads_mrkt_theme');var s=stored==='light'||stored==='dark'?stored:(typeof window!=='undefined'&&window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.colorScheme)||'light';document.documentElement.classList.toggle('dark',s==='dark');}catch(e){}})();`,
           }}
         />
       </head>

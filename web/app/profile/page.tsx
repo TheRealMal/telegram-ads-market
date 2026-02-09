@@ -5,7 +5,9 @@ import { api, auth, setAuthToken } from '@/lib/api';
 import { getTelegramUser } from '@/lib/initData';
 import type { Channel } from '@/types';
 import { ChannelCard } from '@/components/ChannelCard';
-import { User, HelpCircle, X } from 'lucide-react';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
+import { toggleTheme, getCurrentTheme } from '@/lib/theme';
+import { User, HelpCircle, X, Sun, Moon } from 'lucide-react';
 
 const ADD_CHANNEL_USERNAME =
   typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADD_CHANNEL_USERNAME || 'therealmal' : 'therealmal';
@@ -16,9 +18,13 @@ export default function ProfilePage() {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [tgUser, setTgUser] = useState<ReturnType<typeof getTelegramUser>>(null);
   const [showAddChannelModal, setShowAddChannelModal] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  );
 
   useEffect(() => {
     setTgUser(getTelegramUser());
+    setTheme(getCurrentTheme());
   }, []);
 
   useEffect(() => {
@@ -65,19 +71,34 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen pb-20">
+      <PageTopSpacer />
       <div className="bg-gradient-to-b from-primary/10 to-background pt-8 pb-4">
         <div className="mx-auto max-w-2xl px-4">
           <div className="flex flex-col items-center space-y-4 text-center">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-primary/20">
-              {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <User size={40} className="text-primary" />
-              )}
+            <div className="relative inline-block">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-primary/20">
+                {photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User size={40} className="text-primary" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setTheme(toggleTheme())}
+                className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-accent hover:text-accent-foreground"
+                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              >
+                {theme === 'dark' ? (
+                  <Sun size={16} className="text-foreground" />
+                ) : (
+                  <Moon size={16} className="text-foreground" />
+                )}
+              </button>
             </div>
             <div>
               <h1 className="text-2xl font-bold">{displayName}</h1>
