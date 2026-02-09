@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
