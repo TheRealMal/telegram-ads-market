@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { Listing } from '@/types';
 import { ListingCard } from '@/components/ListingCard';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 
 export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -22,12 +23,7 @@ export default function ListingsPage() {
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-4">
-          <h1 className="text-2xl font-bold">My Listings</h1>
-          <p className="text-sm text-muted-foreground">All listings (from API)</p>
-        </div>
-      </div>
+      <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {loading && (
           <div className="flex justify-center py-8">

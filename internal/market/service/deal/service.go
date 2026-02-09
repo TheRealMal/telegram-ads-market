@@ -10,6 +10,7 @@ type DealRepository interface {
 	CreateDeal(ctx context.Context, d *entity.Deal) error
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error)
+	ListDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error)
 	UpdateDealDraftFieldsAndClearSignatures(ctx context.Context, d *entity.Deal) error
 	SetDealLessorSignature(ctx context.Context, dealID int64, sig string) error
 	SetDealLesseeSignature(ctx context.Context, dealID int64, sig string) error

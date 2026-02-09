@@ -21,6 +21,10 @@ func (s *DealService) GetDealsByListingID(ctx context.Context, listingID int64) 
 	return s.dealRepo.GetDealsByListingID(ctx, listingID)
 }
 
+func (s *DealService) GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
+	return s.dealRepo.ListDealsByUserID(ctx, userID)
+}
+
 // UpdateDealDraft updates type, duration, price, details when status is draft. Clears both signatures.
 // Caller must be lessor or lessee.
 func (s *DealService) UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error {

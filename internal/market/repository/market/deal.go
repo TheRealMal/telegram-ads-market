@@ -157,6 +157,31 @@ func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) (
 	return list, nil
 }
 
+// ListDealsByUserID returns all deals where the user is lessor or lessee, ordered by updated_at DESC.
+func (r *repository) ListDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, listing_id, lessor_id, lessee_id, type, duration, price, details,
+		       lessor_signature, lessee_signature, status, escrow_address, escrow_private_key, escrow_release_time, created_at, updated_at
+		FROM market.deal
+		WHERE lessor_id = @user_id OR lessee_id = @user_id
+		ORDER BY updated_at DESC`,
+		pgx.NamedArgs{"user_id": userID})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*entity.Deal, 0, len(slice))
+	for _, row := range slice {
+		list = append(list, dealRowToEntity(row))
+	}
+	return list, nil
+}
+
 // UpdateDealDraftFields updates type, duration, price, details and sets both signatures to NULL.
 // Call only when status is draft. Status filter is from domain (entity.DealStatusDraft).
 func (r *repository) UpdateDealDraftFieldsAndClearSignatures(ctx context.Context, d *entity.Deal) error {

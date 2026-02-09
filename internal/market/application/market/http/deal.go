@@ -138,6 +138,25 @@ func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (
 	return list, nil
 }
 
+// @Security	JWT
+// @Tags		Market
+// @Summary	List deals for the current user (as lessor or lessee)
+// @Produce	json
+// @Success	200	{object}	response.Template{data=[]entity.Deal}	"List of user's deals"
+// @Failure	401	{object}	response.Template{data=string}			"Unauthorized"
+// @Router		/market/my-deals [get]
+func (h *Handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+	list, err := h.dealService.GetDealsByUserID(r.Context(), userID)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	return list, nil
+}
+
 // UpdateDealDraftRequest is the body for PATCH /api/v1/market/deals/:id (draft only)
 type UpdateDealDraftRequest struct {
 	Type     *string         `json:"type,omitempty"`

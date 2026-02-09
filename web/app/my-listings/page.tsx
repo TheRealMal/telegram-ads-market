@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { api, auth, setAuthToken } from '@/lib/api';
 import type { Listing } from '@/types';
 import { ListingCard } from '@/components/ListingCard';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MyListingsPage() {
@@ -40,22 +42,7 @@ export default function MyListingsPage() {
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">My Listings</h1>
-              <p className="text-sm text-muted-foreground">Manage your channel and advertiser listings</p>
-            </div>
-            <Link
-              href="/listings/create"
-              className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
-            >
-              Create listing
-            </Link>
-          </div>
-        </div>
-      </div>
+      <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {authed === false && (
           <p className="py-8 text-center text-muted-foreground">
@@ -90,6 +77,14 @@ export default function MyListingsPage() {
           </Tabs>
         )}
       </div>
+      {/* FAB: create listing, above tab bar */}
+      <Link
+        href="/listings/create"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Create listing"
+      >
+        <Plus size={24} strokeWidth={2} />
+      </Link>
     </div>
   );
 }

@@ -21,6 +21,7 @@ type handler interface {
 	CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -166,6 +167,15 @@ func (r *Router) GetRoutes() http.Handler {
 		server.WithMethod(
 			server.WithJSONResponse(r.handler.ListDealsByListingID),
 			http.MethodGet,
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("GET /api/v1/market/my-deals", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.ListMyDeals),
+				http.MethodGet,
+			),
 		),
 		"/api/v1",
 	))
