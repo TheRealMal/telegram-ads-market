@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import { api, auth, setAuthToken } from '@/lib/api';
+import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
 import type { Deal, DealChat, Listing } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Tab = 'details' | 'chat';
@@ -49,7 +50,9 @@ function isoToDatetimeLocal(iso: string): string {
 
 export default function DealDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params?.id);
+  useTelegramBackButton(() => router.back());
   const [deal, setDeal] = useState<Deal | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [messages, setMessages] = useState<DealChat[]>([]);
@@ -162,11 +165,11 @@ export default function DealDetailPage() {
     );
   if (error || !deal)
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-destructive">{error || 'Not found'}</p>
-        <Link href="/" className="mt-2 inline-block text-sm text-muted-foreground hover:text-foreground">
-          ← Back
-        </Link>
+      <div className="min-h-screen pb-20">
+        <PageTopSpacer />
+        <div className="mx-auto max-w-3xl px-4 py-8">
+          <p className="text-destructive">{error || 'Not found'}</p>
+        </div>
       </div>
     );
 
@@ -193,15 +196,7 @@ export default function DealDetailPage() {
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-4">
-          <Link href="/deals" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Deals
-          </Link>
-          <h1 className="mt-1 text-2xl font-bold">Deal #{deal.id}</h1>
-        </div>
-      </div>
-
+      <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="w-full">
           <TabsList className="mb-4 grid w-full grid-cols-2">

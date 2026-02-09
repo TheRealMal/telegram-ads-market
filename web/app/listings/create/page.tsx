@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { api, auth, setAuthToken } from '@/lib/api';
+import { useTelegramBackButton } from '@/lib/telegram';
 import { LISTING_CATEGORIES } from '@/lib/constants';
 import type { Channel, Listing } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 
 type ListingType = 'lessor' | 'lessee';
 type ListingStatus = 'active' | 'inactive';
@@ -22,6 +22,7 @@ interface PriceRow {
 
 export default function CreateListingPage() {
   const router = useRouter();
+  useTelegramBackButton(() => router.back());
   const [type, setType] = useState<ListingType>('lessor');
   const [status, setStatus] = useState<ListingStatus>('inactive');
   const [channelId, setChannelId] = useState<string>('');
@@ -130,33 +131,20 @@ export default function CreateListingPage() {
 
   if (authed === false) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <p className="text-center text-muted-foreground">
-          Open from Telegram to create a listing.
-        </p>
-        <Link href="/profile" className="mt-4 inline-block text-sm text-primary">
-          ← Back to profile
-        </Link>
+      <div className="min-h-screen pb-20">
+        <PageTopSpacer />
+        <div className="mx-auto max-w-2xl px-4 py-8">
+          <p className="text-center text-muted-foreground">
+            Open from Telegram to create a listing.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-2xl px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/profile"
-              className="inline-flex size-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-            >
-              <ArrowLeft size={20} />
-            </Link>
-            <h1 className="text-xl font-bold">Create listing</h1>
-          </div>
-        </div>
-      </div>
-
+      <PageTopSpacer />
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl px-4 py-4">
         {error && (
           <p className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">

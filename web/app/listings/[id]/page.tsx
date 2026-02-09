@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-react';
+import { MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-react';
 import { api, auth, setAuthToken } from '@/lib/api';
+import { useTelegramBackButton } from '@/lib/telegram';
 import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
 import type { Listing, Deal } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 
 function formatFollowers(n: number): string {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
@@ -22,6 +24,7 @@ export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = Number(params?.id);
+  useTelegramBackButton(() => router.back());
   const [listing, setListing] = useState<Listing | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,30 +130,17 @@ export default function ListingDetailPage() {
     );
   if (error || !listing)
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-destructive">{error || 'Not found'}</p>
-        <Link href="/" className="mt-2 inline-block text-sm text-muted-foreground hover:text-foreground">
-          ← Back to marketplace
-        </Link>
+      <div className="min-h-screen pb-20">
+        <PageTopSpacer />
+        <div className="mx-auto max-w-3xl px-4 py-8">
+          <p className="text-destructive">{error || 'Not found'}</p>
+        </div>
       </div>
     );
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="inline-flex size-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-            >
-              <ArrowLeft size={20} />
-            </Link>
-            <h1 className="text-2xl font-bold">Listing Details</h1>
-          </div>
-        </div>
-      </div>
-
+      <PageTopSpacer />
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-4">
         <Card>
           <CardHeader>

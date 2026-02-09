@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useTelegramBackButton } from '@/lib/telegram';
 import type { Channel } from '@/types';
 import type { ChannelStatsResponse } from '@/types/channelStats';
 import { parseGraphData, getGraphChartConfig, getGraphTitle } from '@/types/channelStats';
@@ -21,10 +20,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { PageTopSpacer } from '@/components/PageTopSpacer';
 
 export default function ChannelStatsPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
+  useTelegramBackButton(() => router.push('/profile'));
   const [channel, setChannel] = useState<Channel | null>(null);
   const [stats, setStats] = useState<ChannelStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,11 +70,11 @@ export default function ChannelStatsPage() {
 
   if (error && !stats) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <p className="text-destructive">{error}</p>
-        <Link href="/profile" className="mt-2 inline-block text-sm text-muted-foreground hover:text-foreground">
-          ← Back to profile
-        </Link>
+      <div className="min-h-screen pb-20">
+        <PageTopSpacer />
+        <div className="mx-auto max-w-2xl px-4 py-8">
+          <p className="text-destructive">{error}</p>
+        </div>
       </div>
     );
   }
@@ -157,25 +159,7 @@ export default function ChannelStatsPage() {
 
   return (
     <div className="min-h-screen pb-20">
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-2xl px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/profile"
-              className="inline-flex size-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-            >
-              <ArrowLeft size={20} />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold">{channel?.title ?? `Channel ${id}`}</h1>
-              {channel?.username && (
-                <p className="text-sm text-muted-foreground">@{channel.username}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
+      <PageTopSpacer />
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-5">
         {periodLabel && (
           <p className="text-center text-sm text-muted-foreground">Stats period: {periodLabel}</p>
