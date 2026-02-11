@@ -9,7 +9,7 @@ interface ChannelCardProps {
 export function ChannelCard({ channel }: ChannelCardProps) {
   return (
     <Link href={`/profile/channels/${channel.id}`}>
-      <Card className="my-1 cursor-pointer transition-shadow hover:shadow-lg">
+      <Card className="py-1 my-1 cursor-pointer transition-shadow hover:shadow-lg">
         <CardContent className="flex items-center gap-3 p-0">
           <div className="m-3 flex flex-1 items-center gap-3">
           {channel.photo ? (

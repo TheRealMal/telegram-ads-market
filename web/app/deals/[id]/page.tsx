@@ -566,7 +566,7 @@ export default function DealDetailPage() {
                   const otherLabel = isLessor ? 'Lessee' : isLessee ? 'Lessor' : 'Other';
                   const authorLabel = isFromMe ? 'Me' : otherLabel;
                   return (
-                    <Card key={i}>
+                    <Card key={i} className="py-0">
                       <CardContent className="p-3">
                         <p className="text-xs font-medium text-muted-foreground">{authorLabel}</p>
                         {m.replied_message != null && (

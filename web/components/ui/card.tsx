@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+/** Pass className (e.g. py-4, py-6) to override default padding; tailwind-merge ensures your class replaces the original. */
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       className={cn(
-        'bg-card text-card-foreground flex flex-col rounded-xl border py-4 shadow-sm',
+        'bg-card text-card-foreground flex flex-col rounded-xl border py-3 shadow-sm',
         className
       )}
       {...props}

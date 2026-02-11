@@ -11,7 +11,7 @@ interface DealCardProps {
 export function DealCard({ deal }: DealCardProps) {
   return (
     <Link href={`/deals/${deal.id}`}>
-      <Card className="cursor-pointer transition-shadow hover:shadow-lg">
+      <Card className="cursor-pointer transition-shadow hover:shadow-lg py-1">
         <CardContent className="flex items-center justify-between p-4">
           <div>
             <p className="font-medium">Deal #{deal.id}</p>

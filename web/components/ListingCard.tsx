@@ -26,7 +26,7 @@ export function ListingCard({ listing, showApply = false }: ListingCardProps) {
   return (
     <Card className="cursor-pointer transition-shadow hover:shadow-lg">
       <Link href={`/listings/${listing.id}`}>
-        <CardContent className="p-4">
+        <CardContent className="py-1 px-4">
           <div className="mb-3 flex items-start gap-3">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-muted text-lg text-muted-foreground">
               #
