@@ -33,7 +33,10 @@ services:
     ports:
       - "${REDIS_FORWARD_PORT:-6379}:6379"
     # notify-keyspace-events Egx: required for blockchain_observer (expire set + expired → deal expiry)
-    command: redis-server --save 20 1 --loglevel warning --notify-keyspace-events Egx
+    command: >
+      redis-server --save 20 1 --loglevel warning --notify-keyspace-events Egx > /dev/null 2>&1 &
+      redis-cli config set notify-keyspace-events Egx &
+      wait
     volumes:
       - ./data/redis:/data
     networks:
@@ -41,6 +44,9 @@ services:
         ipv4_address: 172.32.0.8
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   web:
     image: internal.web:latest
@@ -111,7 +117,6 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CLIENT_DOMAIN: ${CLIENT_DOMAIN:-https://localhost}
-      LITECLIENT_GLOBAL_CONFIG_DIR: /etc/ton
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.11
@@ -144,7 +149,6 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      LITECLIENT_GLOBAL_CONFIG_DIR: /etc/ton
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.14

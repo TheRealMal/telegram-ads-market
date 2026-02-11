@@ -14,25 +14,25 @@ import (
 )
 
 type dealRow struct {
-	ID                int64           `db:"id"`
-	ListingID         int64           `db:"listing_id"`
-	LessorID          int64           `db:"lessor_id"`
-	LesseeID          int64           `db:"lessee_id"`
-	Type              string          `db:"type"`
-	Duration          int64           `db:"duration"`
-	Price             int64           `db:"price"`
-	EscrowAmount      int64           `db:"escrow_amount"`
-	Details           json.RawMessage `db:"details"`
-	LessorSignature   *string         `db:"lessor_signature"`
-	LesseeSignature   *string         `db:"lessee_signature"`
-	Status            string          `db:"status"`
-	EscrowAddress        *string    `db:"escrow_address"`
-	EscrowPrivateKey     *string    `db:"escrow_private_key"`
-	EscrowReleaseTime    *time.Time `db:"escrow_release_time"`
-	LessorPayoutAddress  *string    `db:"lessor_payout_address"`
-	LesseePayoutAddress  *string    `db:"lessee_payout_address"`
-	CreatedAt            time.Time  `db:"created_at"`
-	UpdatedAt            time.Time  `db:"updated_at"`
+	ID                  int64           `db:"id"`
+	ListingID           int64           `db:"listing_id"`
+	LessorID            int64           `db:"lessor_id"`
+	LesseeID            int64           `db:"lessee_id"`
+	Type                string          `db:"type"`
+	Duration            int64           `db:"duration"`
+	Price               int64           `db:"price"`
+	EscrowAmount        int64           `db:"escrow_amount"`
+	Details             json.RawMessage `db:"details"`
+	LessorSignature     *string         `db:"lessor_signature"`
+	LesseeSignature     *string         `db:"lessee_signature"`
+	Status              string          `db:"status"`
+	EscrowAddress       *string         `db:"escrow_address"`
+	EscrowPrivateKey    *string         `db:"escrow_private_key"`
+	EscrowReleaseTime   *time.Time      `db:"escrow_release_time"`
+	LessorPayoutAddress *string         `db:"lessor_payout_address"`
+	LesseePayoutAddress *string         `db:"lessee_payout_address"`
+	CreatedAt           time.Time       `db:"created_at"`
+	UpdatedAt           time.Time       `db:"updated_at"`
 }
 
 type dealReturnRow struct {
@@ -43,25 +43,25 @@ type dealReturnRow struct {
 
 func dealRowToEntity(row dealRow) *entity.Deal {
 	return &entity.Deal{
-		ID:                row.ID,
-		ListingID:         row.ListingID,
-		LessorID:          row.LessorID,
-		LesseeID:          row.LesseeID,
-		Type:              row.Type,
-		Duration:          row.Duration,
-		Price:             row.Price,
-		EscrowAmount:      row.EscrowAmount,
-		Details:           row.Details,
-		LessorSignature:   row.LessorSignature,
-		LesseeSignature:   row.LesseeSignature,
-		Status:            entity.DealStatus(row.Status),
-		EscrowAddress:        row.EscrowAddress,
-		EscrowPrivateKey:     row.EscrowPrivateKey,
-		EscrowReleaseTime:    row.EscrowReleaseTime,
-		LessorPayoutAddress:  row.LessorPayoutAddress,
-		LesseePayoutAddress:  row.LesseePayoutAddress,
-		CreatedAt:            row.CreatedAt,
-		UpdatedAt:            row.UpdatedAt,
+		ID:                  row.ID,
+		ListingID:           row.ListingID,
+		LessorID:            row.LessorID,
+		LesseeID:            row.LesseeID,
+		Type:                row.Type,
+		Duration:            row.Duration,
+		Price:               row.Price,
+		EscrowAmount:        row.EscrowAmount,
+		Details:             row.Details,
+		LessorSignature:     row.LessorSignature,
+		LesseeSignature:     row.LesseeSignature,
+		Status:              entity.DealStatus(row.Status),
+		EscrowAddress:       row.EscrowAddress,
+		EscrowPrivateKey:    row.EscrowPrivateKey,
+		EscrowReleaseTime:   row.EscrowReleaseTime,
+		LessorPayoutAddress: row.LessorPayoutAddress,
+		LesseePayoutAddress: row.LesseePayoutAddress,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
 	}
 }
 
@@ -71,15 +71,15 @@ func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
 		VALUES (@listing_id, @lessor_id, @lessee_id, @type, @duration, @price, @escrow_amount, @details, @status)
 		RETURNING id, created_at, updated_at`,
 		pgx.NamedArgs{
-			"listing_id":   d.ListingID,
-			"lessor_id":    d.LessorID,
-			"lessee_id":    d.LesseeID,
-			"type":         d.Type,
-			"duration":    d.Duration,
-			"price":       d.Price,
+			"listing_id":    d.ListingID,
+			"lessor_id":     d.LessorID,
+			"lessee_id":     d.LesseeID,
+			"type":          d.Type,
+			"duration":      d.Duration,
+			"price":         d.Price,
 			"escrow_amount": d.EscrowAmount,
-			"details":     d.Details,
-			"status":      d.Status,
+			"details":       d.Details,
+			"status":        d.Status,
 		})
 	if err != nil {
 		return err

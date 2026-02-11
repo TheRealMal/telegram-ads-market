@@ -81,7 +81,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketReposito
 			NextCheck:   nextCheck,
 			UntilTs:     untilTs,
 		}
-		if err := repo.CreateDealPostMessage(ctx, m); err != nil {
+		if err := repo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
 			slog.Error("deal post sender: create deal_post_message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
 		} else {

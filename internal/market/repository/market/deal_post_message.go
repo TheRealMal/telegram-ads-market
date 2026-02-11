@@ -46,6 +46,60 @@ func (r *repository) CreateDealPostMessage(ctx context.Context, m *entity.DealPo
 	return nil
 }
 
+// CreateDealPostMessageAndSetDealInProgress inserts the deal_post_message and sets the deal status to in_progress
+// (when current status is escrow_deposit_confirmed) in a single transaction.
+func (r *repository) CreateDealPostMessageAndSetDealInProgress(ctx context.Context, m *entity.DealPostMessage) error {
+	txCtx, beginErr := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if beginErr != nil {
+		return beginErr
+	}
+	var err error
+	defer func() { _ = r.db.EndTx(txCtx, err, "CreateDealPostMessageAndSetDealInProgress") }()
+
+	rows, err := r.db.Query(txCtx, `
+		INSERT INTO market.deal_post_message (deal_id, channel_id, message_id, post_message, status, next_check, until_ts)
+		VALUES (@deal_id, @channel_id, @message_id, @post_message, @status, @next_check, @until_ts)
+		ON CONFLICT (deal_id) DO NOTHING
+		RETURNING id, created_at, updated_at`,
+		pgx.NamedArgs{
+			"deal_id":      m.DealID,
+			"channel_id":   m.ChannelID,
+			"message_id":   m.MessageID,
+			"post_message": m.PostMessage,
+			"status":       string(m.Status),
+			"next_check":   m.NextCheck,
+			"until_ts":     m.UntilTs,
+		})
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[struct {
+		ID        int64     `db:"id"`
+		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
+	}])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil // conflict, row already exists
+		}
+		return err
+	}
+	m.ID = row.ID
+	m.CreatedAt = row.CreatedAt
+	m.UpdatedAt = row.UpdatedAt
+
+	_, err = r.db.Exec(txCtx, `
+		UPDATE market.deal SET status = @status, updated_at = NOW()
+		WHERE id = @deal_id AND status = @status_escrow_deposit_confirmed`,
+		pgx.NamedArgs{
+			"status":                          string(entity.DealStatusInProgress),
+			"deal_id":                         m.DealID,
+			"status_escrow_deposit_confirmed": string(entity.DealStatusEscrowDepositConfirmed),
+		})
+	return err
+}
+
 func (r *repository) UpdateDealPostMessageStatus(ctx context.Context, id int64, status entity.DealPostMessageStatus) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal_post_message SET status = @status, updated_at = NOW() WHERE id = @id`,
@@ -128,7 +182,6 @@ func (r *repository) ListDealPostMessageByStatus(ctx context.Context, status ent
 	})
 }
 
-// CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease updates given deal_post_message rows to completed and their deals to waiting_escrow_release in one tx.
 func (r *repository) CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx context.Context, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
@@ -147,14 +200,14 @@ func (r *repository) CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx
 	}
 	_, err = r.db.Exec(txCtx, `
 		UPDATE market.deal SET status = 'waiting_escrow_release', updated_at = NOW()
-		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`)
+		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`,
+		pgx.NamedArgs{"ids": ids})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// FailDealPostMessagesAndSetDealsWaitingEscrowRefund updates given deal_post_message rows to failed and their deals to waiting_escrow_refund in one tx.
 func (r *repository) FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx context.Context, ids []int64) error {
 	if len(ids) == 0 {
 		return nil

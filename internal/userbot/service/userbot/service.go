@@ -27,7 +27,7 @@ type marketRepository interface {
 	// Deal post message workers
 	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
 	GetListingByID(ctx context.Context, id int64) (*marketentity.Listing, error)
-	CreateDealPostMessage(ctx context.Context, m *marketentity.DealPostMessage) error
+	CreateDealPostMessageAndSetDealInProgress(ctx context.Context, m *marketentity.DealPostMessage) error
 	UpdateDealPostMessageStatus(ctx context.Context, id int64, status marketentity.DealPostMessageStatus) error
 	UpdateDealPostMessageStatusAndNextCheck(ctx context.Context, id int64, status marketentity.DealPostMessageStatus, nextCheck time.Time) error
 	ListDealPostMessageExistsWithNextCheckBefore(ctx context.Context, before time.Time) ([]*marketentity.DealPostMessage, error)

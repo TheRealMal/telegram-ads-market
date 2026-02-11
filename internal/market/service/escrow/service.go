@@ -80,9 +80,8 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 	if err = s.marketRepository.SetDealEscrowAddress(ctx, dealID, rawAddr, strings.Join(seed, " ")); err != nil {
 		return err
 	}
-	// Add escrow wallet to Redis with TTL so blockchain observer watches it; when TTL expires deal is marked expired.
-	if s.redis != nil {
-		_ = s.redis.Set(ctx, rawAddr, "1", escrowRedisTTL)
+	if err = s.redis.Set(ctx, rawAddr, "1", escrowRedisTTL); err != nil {
+		slog.Error("failed to set escrow wallet for observer", "address", rawAddr, "deal_id", dealID)
 	}
 	return nil
 }
