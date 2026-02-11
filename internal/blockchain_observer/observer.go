@@ -65,8 +65,8 @@ func New(lt Liteclient, rdb *redis.Client, dealExpirer DealExpirer, dbIndex int)
 		dealExpirer: dealExpirer,
 		dbIndex:     dbIndex,
 
-		addresses:   make(map[WalletAddress]struct{}),
-		workchain:   &virtualWorkchain{ID: 0, Shards: make(map[int64]uint32)},
+		addresses:     make(map[WalletAddress]struct{}),
+		workchain:     &virtualWorkchain{ID: 0, Shards: make(map[int64]uint32)},
 		masterBlocks:  make(chan *ton.BlockIDExt),
 		shardBlocks:   make(chan *ton.BlockIDExt),
 		depositEvents: make(chan *depositEvent, 256),
@@ -127,6 +127,7 @@ func (o *Observer) loadAddresses(ctx context.Context) error {
 			o.log.Debug("skip non-address redis key", "key", k)
 			continue
 		}
+		o.log.Info("wallet loaded", "address", addr.StringRaw())
 		o.addresses[WalletAddress(addr.Data())] = struct{}{}
 	}
 	return nil

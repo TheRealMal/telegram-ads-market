@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -39,9 +41,22 @@ type client struct {
 
 func NewClient(ctx context.Context, cfg config.Config, isTestnet bool, public bool) (*client, error) {
 	pool := liteclient.NewConnectionPool()
-	globalConfig, err := fetchGlobalConfig(ctx, config.GlobalConfigURL[isTestnet])
-	if err != nil {
-		return nil, fmt.Errorf("failed to get global config: %w", err)
+	var globalConfig *liteclient.GlobalConfig
+	var err error
+	if cfg.GlobalConfigDir != "" {
+		filename := config.GlobalConfigFilename[isTestnet]
+		path := filepath.Join(cfg.GlobalConfigDir, filename)
+		slog.Info("loading TON global config from file")
+		globalConfig, err = loadGlobalConfigFromFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load global config from file %s: %w", path, err)
+		}
+		slog.Info("loaded TON global config from file", "path", path)
+	} else {
+		globalConfig, err = fetchGlobalConfig(ctx, config.GlobalConfigURL[isTestnet])
+		if err != nil {
+			return nil, fmt.Errorf("failed to get global config: %w", err)
+		}
 	}
 	if !public {
 		if err = pool.AddConnection(ctx, cfg.LiteserverHost, cfg.LiteserverKey); err != nil {
@@ -66,6 +81,19 @@ func NewClient(ctx context.Context, cfg config.Config, isTestnet bool, public bo
 	return &client{
 		api: api,
 	}, nil
+}
+
+// loadGlobalConfigFromFile reads TON global config from a JSON file (e.g. downloaded at build time).
+func loadGlobalConfigFromFile(path string) (*liteclient.GlobalConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg liteclient.GlobalConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
 
 // fetchGlobalConfig fetches TON global config with long timeouts and retries to avoid TLS handshake

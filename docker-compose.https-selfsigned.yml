@@ -111,7 +111,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CLIENT_DOMAIN: ${CLIENT_DOMAIN:-https://localhost}
-      # For Certbot stack use: CLIENT_DOMAIN=https://${DOMAIN}
+      LITECLIENT_GLOBAL_CONFIG_DIR: /etc/ton
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.11
@@ -144,6 +144,7 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      LITECLIENT_GLOBAL_CONFIG_DIR: /etc/ton
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.14
@@ -182,4 +183,4 @@ networks:
     ipam:
       config:
         - subnet: 172.32.0.0/16
-          gateway: 172.32.0.1
+          gateway: 172.32.1.1
