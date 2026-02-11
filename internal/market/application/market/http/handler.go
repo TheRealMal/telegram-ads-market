@@ -9,6 +9,7 @@ import (
 
 type UserService interface {
 	AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error)
+	SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error
 }
 
 type ListingService interface {
@@ -27,6 +28,8 @@ type DealService interface {
 	GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error)
 	UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error
 	SignDeal(ctx context.Context, userID int64, dealID int64) error
+	SetDealPayoutAddress(ctx context.Context, userID int64, dealID int64, payoutAddressRaw string) error
+	RejectDeal(ctx context.Context, userID int64, dealID int64) error
 }
 
 type DealChatService interface {

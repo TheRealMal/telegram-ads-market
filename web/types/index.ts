@@ -54,8 +54,11 @@ export interface Deal {
   details: Record<string, unknown>;
   lessor_signature?: string;
   lessee_signature?: string;
+  lessor_payout_address?: string;
+  lessee_payout_address?: string;
   status: DealStatus;
   escrow_address?: string;
+  escrow_amount?: number; // nanotons to deposit
   escrow_release_time?: string;
   created_at: string;
   updated_at: string;

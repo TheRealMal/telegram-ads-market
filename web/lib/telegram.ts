@@ -6,6 +6,11 @@ declare global {
         colorScheme: 'light' | 'dark';
         ready: () => void;
         expand: () => void;
+        isExpanded?: boolean;
+        viewportHeight?: number;
+        viewportStableHeight?: number;
+        onEvent?: (eventType: string, callback: () => void) => void;
+        offEvent?: (eventType: string, callback: () => void) => void;
         BackButton?: {
           show: () => void;
           hide: () => void;

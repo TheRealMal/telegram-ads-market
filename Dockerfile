@@ -21,8 +21,8 @@ COPY internal ./internal
 COPY pkg ./pkg
 
 # Build the application
-# COPY build/bin/server ./build/bin/server
-RUN env CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
+COPY build/bin/server ./build/bin/server
+# RUN env CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
 
 # Artifact stage: export binary to host with:
 #   DOCKER_BUILDKIT=1 docker build --output type=local,dest=./build --target=artifact .

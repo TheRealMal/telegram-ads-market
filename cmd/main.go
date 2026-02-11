@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"ads-mrkt/cmd/blockchain_observer"
 	"ads-mrkt/cmd/bot"
 	"ads-mrkt/cmd/market"
 	"ads-mrkt/cmd/userbot"
@@ -54,6 +55,7 @@ func main() {
 		market.ApiCmd(ctx, conf),
 		bot.BotCmd(ctx, conf),
 		userbot.UserbotCmd(ctx, conf),
+		blockchain_observer.Cmd(ctx, conf),
 	)
 
 	if err := errors.Wrap(rootCmd.ExecuteContext(ctx), "error executing root cmd"); err != nil {

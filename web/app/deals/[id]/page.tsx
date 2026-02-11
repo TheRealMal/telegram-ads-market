@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { TonConnectButton, useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
 import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
@@ -66,7 +67,51 @@ export default function DealDetailPage() {
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftPostedAtError, setDraftPostedAtError] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [depositing, setDepositing] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const walletSyncedRef = useRef(false);
+  const dealPayoutSyncedRef = useRef(false);
+
+  const wallet = useTonWallet();
+  const rawAddress = useTonAddress(false);
+  const [tonConnectUI] = useTonConnectUI();
+
+  // Sync connected wallet to backend (raw format) so user can sign deals.
+  useEffect(() => {
+    if (!rawAddress || walletSyncedRef.current) return;
+    (async () => {
+      const authRes = await auth();
+      if (!authRes.ok || !authRes.data) return;
+      setAuthToken(authRes.data);
+      const res = await api<{ status: string }>('/api/v1/market/me/wallet', {
+        method: 'PUT',
+        body: JSON.stringify({ wallet_address: rawAddress }),
+      });
+      if (res.ok) walletSyncedRef.current = true;
+    })();
+  }, [rawAddress]);
+
+  // Set this deal's payout address when wallet connected and user is lessor or lessee.
+  useEffect(() => {
+    if (!rawAddress || !deal || dealPayoutSyncedRef.current || !id) return;
+    const isSide = (currentUserId === deal.lessor_id || currentUserId === deal.lessee_id) && deal.status === 'draft';
+    if (!isSide) return;
+    (async () => {
+      const authRes = await auth();
+      if (!authRes.ok || !authRes.data) return;
+      setAuthToken(authRes.data);
+      const res = await api<Deal>(`/api/v1/market/deals/${id}/payout-address`, {
+        method: 'PUT',
+        body: JSON.stringify({ wallet_address: rawAddress }),
+      });
+      if (res.ok && res.data) {
+        dealPayoutSyncedRef.current = true;
+        setDeal(res.data);
+      }
+    })();
+  }, [rawAddress, deal, id, currentUserId]);
 
   // Initial fetch + polling for deal (status, escrow, etc.)
   useEffect(() => {
@@ -180,6 +225,9 @@ export default function DealDetailPage() {
   const lesseeSigned = Boolean(deal.lessee_signature);
   const canSignAsLessor = deal.status === 'draft' && isLessor && !lessorSigned;
   const canSignAsLessee = deal.status === 'draft' && isLessee && !lesseeSigned;
+  const bothPayoutsSet = Boolean(deal.lessor_payout_address && deal.lessee_payout_address);
+  const needsWalletToSign = (canSignAsLessor || canSignAsLessee) && !wallet;
+  const canSignNow = (canSignAsLessor || canSignAsLessee) && wallet && bothPayoutsSet;
 
   const handleSignDeal = async () => {
     const authRes = await auth();
@@ -193,6 +241,51 @@ export default function DealDetailPage() {
     setSigning(false);
     if (res.ok && res.data) setDeal(res.data);
     else alert(res.error_code || 'Failed to sign');
+  };
+
+  const handleRejectDeal = async () => {
+    const authRes = await auth();
+    if (!authRes.ok || !authRes.data) {
+      alert('Open from Telegram to reject.');
+      return;
+    }
+    setAuthToken(authRes.data);
+    if (!confirm('Reject this deal? This cannot be undone.')) return;
+    setRejecting(true);
+    const res = await api<Deal>(`/api/v1/market/deals/${id}/reject`, { method: 'POST' });
+    setRejecting(false);
+    if (res.ok && res.data) setDeal(res.data);
+    else alert(res.error_code || 'Failed to reject');
+  };
+
+  const handleDepositEscrow = async () => {
+    if (!deal.escrow_address || deal.escrow_amount == null || deal.escrow_amount <= 0) {
+      setDepositError('Escrow details not ready');
+      return;
+    }
+    if (!wallet) {
+      setDepositError('Connect your wallet first');
+      return;
+    }
+    setDepositError(null);
+    setDepositing(true);
+    try {
+      await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [
+          {
+            address: deal.escrow_address,
+            amount: String(deal.escrow_amount),
+          },
+        ],
+      });
+      setDeal((prev) => prev ? { ...prev } : null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Transaction failed';
+      setDepositError(msg);
+    } finally {
+      setDepositing(false);
+    }
   };
 
   return (
@@ -219,25 +312,69 @@ export default function DealDetailPage() {
                     Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
                   </span>
                 </div>
-                {(canSignAsLessor || canSignAsLessee) && (
-                  <Button
-                    size="sm"
-                    onClick={handleSignDeal}
-                    disabled={signing}
-                  >
-                    {signing ? 'Signing…' : canSignAsLessor ? 'Sign as lessor' : 'Sign as lessee'}
-                  </Button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {(canSignAsLessor || canSignAsLessee) && (
+                    <>
+                      {needsWalletToSign && (
+                        <>
+                          <span className="text-sm text-muted-foreground">Connect wallet to sign:</span>
+                          <TonConnectButton className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent" />
+                        </>
+                      )}
+                      {!needsWalletToSign && !bothPayoutsSet && (
+                        <span className="text-sm text-muted-foreground">Waiting for both parties to set payout address.</span>
+                      )}
+                      {canSignNow && (
+                        <Button
+                          size="sm"
+                          onClick={handleSignDeal}
+                          disabled={signing || rejecting}
+                        >
+                          {signing ? 'Signing…' : canSignAsLessor ? 'Sign as lessor' : 'Sign as lessee'}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {deal.status === 'draft' && (isLessor || isLessee) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={handleRejectDeal}
+                      disabled={signing || rejecting}
+                    >
+                      {rejecting ? 'Rejecting…' : 'Reject deal'}
+                    </Button>
+                  )}
+                </div>
                 {deal.status === 'waiting_escrow_deposit' && (
                   <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
                     {isLessor && (
                       <p className="text-muted-foreground">Waiting for lessee escrow deposit.</p>
                     )}
                     {isLessee && deal.escrow_address != null && (
-                      <div>
-                        <p className="font-medium mb-1">Deposit to escrow</p>
-                        <p className="text-muted-foreground">Amount: {formatPriceValue(deal.price)}</p>
-                        <p className="mt-1 break-all font-mono text-xs">{deal.escrow_address}</p>
+                      <div className="space-y-2">
+                        <p className="font-medium">Deposit to escrow</p>
+                        <p className="text-muted-foreground">
+                          Amount: {deal.escrow_amount != null
+                            ? `${(deal.escrow_amount / 1e9).toFixed(4)} TON`
+                            : formatPriceValue(deal.price)}
+                        </p>
+                        <p className="break-all font-mono text-xs">{deal.escrow_address}</p>
+                        {!wallet ? (
+                          <TonConnectButton className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent" />
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={handleDepositEscrow}
+                            disabled={depositing || !deal.escrow_amount || deal.escrow_amount <= 0}
+                          >
+                            {depositing ? 'Opening wallet…' : 'Deposit via wallet'}
+                          </Button>
+                        )}
+                        {depositError && (
+                          <p className="text-xs text-destructive">{depositError}</p>
+                        )}
                       </div>
                     )}
                   </div>

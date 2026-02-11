@@ -9,10 +9,12 @@ import (
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/liteclient"
 	"ads-mrkt/internal/market/application/market/http"
+	"ads-mrkt/internal/market/domain"
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
+	dealpostmessage "ads-mrkt/internal/market/service/deal_post_message"
 	escrowservice "ads-mrkt/internal/market/service/escrow"
 	listingservice "ads-mrkt/internal/market/service/listing"
 	userservice "ads-mrkt/internal/market/service/user"
@@ -20,6 +22,7 @@ import (
 	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
 	marketrouter "ads-mrkt/internal/server/routers/market"
+	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/pkg/auth"
 	"ads-mrkt/pkg/health"
 
@@ -70,7 +73,10 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			repo := marketrepo.New(pg)
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
-			dealSvc := dealservice.NewDealService(repo)
+			dealSvc := dealservice.NewDealService(repo, repo, domain.EscrowConfig{
+				TransactionGasTON: cfg.Market.Escrow.TransactionGasTON,
+				CommissionPercent:  cfg.Market.Escrow.CommissionPercent,
+			})
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo)
 
@@ -78,9 +84,13 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			if err != nil {
 				return errors.Wrap(err, "create liteclient for escrow worker")
 			}
-			escrowSvc := escrowservice.NewService(repo, lc)
+			escrowSvc := escrowservice.NewService(repo, lc, redisClient)
+			eventRepo := eventredis.New(redisClient)
 
 			go escrowSvc.Worker(ctxRun)
+			go escrowSvc.DepositStreamWorker(ctxRun, eventRepo)
+			go escrowSvc.ReleaseRefundWorker(ctxRun)
+			go dealpostmessage.RunPassedWorker(ctxRun, repo)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)

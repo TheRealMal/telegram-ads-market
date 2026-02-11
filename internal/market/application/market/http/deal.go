@@ -254,6 +254,78 @@ func (h *Handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{},
 	return updated, nil
 }
 
+// SetDealPayoutRequest is the body for PUT /api/v1/market/deals/{id}/payout-address.
+type SetDealPayoutRequest struct {
+	WalletAddress string `json:"wallet_address"` // TON address in raw format
+}
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	Set your payout address on the deal (lessor or lessee). Required before signing. Draft only.
+// @Accept		json
+// @Produce	json
+// @Param		id	path		int									true	"Deal ID"
+// @Param		request	body		SetDealPayoutRequest				true	"wallet_address (raw)"
+// @Success	200	{object}	response.Template{data=entity.Deal}	"Updated deal"
+// @Failure	400	{object}	response.Template{data=string}		"Bad request"
+// @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
+// @Failure	404	{object}	response.Template{data=string}		"Not found"
+// @Router		/market/deals/{id}/payout-address [put]
+func (h *Handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	var req SetDealPayoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
+	}
+	if req.WalletAddress == "" {
+		return nil, apperrors.ServiceError{Err: nil, Message: "wallet_address is required", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	if err := h.dealService.SetDealPayoutAddress(r.Context(), userID, id, req.WalletAddress); err != nil {
+		return nil, toServiceError(err)
+	}
+	updated, _ := h.dealService.GetDeal(r.Context(), id)
+	return updated, nil
+}
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	Reject deal. Only allowed when deal status is draft; caller must be lessor or lessee.
+// @Produce	json
+// @Param		id	path		int									true	"Deal ID"
+// @Success	200	{object}	response.Template{data=entity.Deal}	"Updated deal"
+// @Failure	400	{object}	response.Template{data=string}		"Bad request"
+// @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}		"Forbidden (deal not draft or not a side)"
+// @Failure	404	{object}	response.Template{data=string}		"Not found"
+// @Router		/market/deals/{id}/reject [post]
+func (h *Handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	if err := h.dealService.RejectDeal(r.Context(), userID, id); err != nil {
+		return nil, toServiceError(err)
+	}
+	updated, _ := h.dealService.GetDeal(r.Context(), id)
+	return updated, nil
+}
+
 // @Security	JWT
 // @Tags		Market
 // @Summary	Send deal chat invite message to the current user. Sends "Reply to this message to chat with the other side." and stores the message for reply tracking.

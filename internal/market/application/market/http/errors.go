@@ -17,7 +17,7 @@ func toServiceError(err error) apperrors.ServiceError {
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeNotFound}
 	case errors.Is(err, marketerrors.ErrNotChannelAdmin), errors.Is(err, marketerrors.ErrUnauthorizedSide), errors.Is(err, marketerrors.ErrChannelStatsDenied):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeForbidden}
-	case errors.Is(err, marketerrors.ErrDealNotDraft):
+	case errors.Is(err, marketerrors.ErrDealNotDraft), errors.Is(err, marketerrors.ErrWalletNotSet), errors.Is(err, marketerrors.ErrPayoutNotSet):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
 	case errors.Is(err, deal_chat.ErrTelegramSenderNil):
 		return apperrors.ServiceError{Err: err, Message: "telegram not configured", Code: apperrors.ErrorCodeInternalServerError}

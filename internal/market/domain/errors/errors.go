@@ -8,4 +8,6 @@ var (
 	ErrChannelStatsDenied  = errors.New("market: channel stats only for admins or users who listed this channel")
 	ErrDealNotDraft        = errors.New("market: deal is not in draft status")
 	ErrUnauthorizedSide    = errors.New("market: user is not lessor or lessee of this deal")
+	ErrWalletNotSet        = errors.New("market: connect wallet before signing")
+	ErrPayoutNotSet        = errors.New("market: both parties must set payout address before signing")
 )

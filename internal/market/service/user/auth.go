@@ -32,3 +32,11 @@ func (s *UserService) AuthUser(ctx context.Context, initDataStr string, referrer
 	}
 	return u, nil
 }
+
+// SetWallet stores the user's TON wallet address (raw format) for deal payouts.
+func (s *UserService) SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
+	if walletAddressRaw == "" {
+		return fmt.Errorf("wallet address is required")
+	}
+	return s.userRepo.SetUserWallet(ctx, userID, walletAddressRaw)
+}

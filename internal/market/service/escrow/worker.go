@@ -2,8 +2,11 @@ package escrow
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
+
+	"ads-mrkt/internal/market/domain/entity"
 )
 
 const (
@@ -35,6 +38,52 @@ func (s *service) Worker(ctx context.Context) {
 	}
 
 	// Run once immediately, then on ticker
+	run(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			run(ctx)
+		}
+	}
+}
+
+const releaseRefundWorkerInterval = 1 * time.Minute
+
+// ReleaseRefundWorker runs a loop that processes deals in waiting_escrow_release (release to lessor)
+// and waiting_escrow_refund (refund to lessee), using locks and sending TON from escrow.
+func (s *service) ReleaseRefundWorker(ctx context.Context) {
+	ticker := time.NewTicker(releaseRefundWorkerInterval)
+	defer ticker.Stop()
+	run := func(ctx context.Context) {
+		for _, release := range []bool{true, false} {
+			var deals []*entity.Deal
+			var err error
+			if release {
+				deals, err = s.marketRepository.ListDealsWaitingEscrowRelease(ctx)
+			} else {
+				deals, err = s.marketRepository.ListDealsWaitingEscrowRefund(ctx)
+			}
+			if err != nil {
+				slog.Error("escrow release/refund worker: list deals", "release", release, "error", err)
+				continue
+			}
+			for _, d := range deals {
+				if ctx.Err() != nil {
+					return
+				}
+				if err := s.ReleaseOrRefundEscrow(ctx, d.ID, release); err != nil {
+					if errors.Is(err, ErrPayoutAddressNotSet) {
+						slog.Debug("escrow release/refund worker: skip deal, payout address not set", "deal_id", d.ID, "release", release)
+					} else {
+						slog.Error("escrow release/refund worker: failed", "deal_id", d.ID, "release", release, "error", err)
+					}
+					continue
+				}
+			}
+		}
+	}
 	run(ctx)
 	for {
 		select {

@@ -12,6 +12,7 @@ import (
 
 type telegramClient interface {
 	SendMessage(ctx context.Context, chatID int64, text string) (*telegram.SentMessage, error)
+	SendMessageWithForceReply(ctx context.Context, chatID int64, text string, placeholder string) (*telegram.SentMessage, error)
 }
 
 type marketRepository interface {
@@ -29,6 +30,7 @@ type Service struct {
 }
 
 const dealChatInviteText = "Reply to this message to chat with the other side."
+const dealChatForceReplyPlaceholder = "Type your message here..."
 
 func NewService(marketRepo marketRepository, telegramClient telegramClient) *Service {
 	return &Service{
@@ -60,7 +62,7 @@ func (s *Service) SendDealChatMessage(ctx context.Context, dealID, userID int64)
 	if hasActive {
 		return nil, ErrActiveDealChatExists
 	}
-	sent, err := s.telegramClient.SendMessage(ctx, userID, dealChatInviteText)
+	sent, err := s.telegramClient.SendMessageWithForceReply(ctx, userID, dealChatInviteText, dealChatForceReplyPlaceholder)
 	if err != nil {
 		return nil, fmt.Errorf("send telegram message: %w", err)
 	}

@@ -53,3 +53,20 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 	}
 	return json.Marshal(canon)
 }
+
+// GetMessageFromDetails returns the "message" field from deal details JSON, or empty string.
+func GetMessageFromDetails(details json.RawMessage) string {
+	if len(details) == 0 || string(details) == "null" {
+		return ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return ""
+	}
+	if msg, ok := m["message"]; ok && msg != nil {
+		if s, ok := msg.(string); ok {
+			return s
+		}
+	}
+	return ""
+}

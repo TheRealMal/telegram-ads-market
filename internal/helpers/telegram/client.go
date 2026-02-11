@@ -302,3 +302,55 @@ func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string) 
 	}
 	return result.Result, nil
 }
+
+// ForceReplyMarkup is the reply_markup for "Reply to this message" (Bot API ForceReply).
+// See https://core.telegram.org/bots/api#forcereply and https://core.telegram.org/constructor/replyKeyboardForceReply.
+type ForceReplyMarkup struct {
+	ForceReply            bool   `json:"force_reply"`
+	InputFieldPlaceholder string `json:"input_field_placeholder,omitempty"` // 1-64 characters
+	Selective             bool   `json:"selective,omitempty"`
+}
+
+// SendMessageWithForceReply sends a text message with reply_markup force_reply so the user is asked to reply.
+// placeholder is optional (1-64 chars); use "" to omit.
+func (c *APIClient) SendMessageWithForceReply(ctx context.Context, chatID int64, text string, placeholder string) (*SentMessage, error) {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return nil, fmt.Errorf("too many requests to send message in telegram")
+	}
+
+	url := c.buildTelegramURL(telegramPathSendMessage)
+	payload := struct {
+		ChatID      int64             `json:"chat_id"`
+		Text        string            `json:"text"`
+		ReplyMarkup ForceReplyMarkup  `json:"reply_markup"`
+	}{
+		ChatID: chatID,
+		Text:   text,
+		ReplyMarkup: ForceReplyMarkup{
+			ForceReply:            true,
+			InputFieldPlaceholder: placeholder,
+		},
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf(errorMarshallingJson, err)
+	}
+
+	body, err := c.sendRequest(ctx, url, jsonData)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SendMessageResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal sendMessage response: %w", err)
+	}
+	if !result.OK || result.Result == nil {
+		return nil, fmt.Errorf("sendMessage returned ok=false or empty result")
+	}
+	return result.Result, nil
+}

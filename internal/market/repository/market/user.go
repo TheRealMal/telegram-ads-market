@@ -10,14 +10,15 @@ import (
 )
 
 type userRow struct {
-	ID         int64  `db:"id"`
-	Username   string `db:"username"`
-	Photo      string `db:"photo"`
-	FirstName  string `db:"first_name"`
-	LastName   string `db:"last_name"`
-	Locale     string `db:"locale"`
-	ReferrerID int64  `db:"referrer_id"`
-	AllowsPM   bool   `db:"allows_pm"`
+	ID            int64   `db:"id"`
+	Username      string  `db:"username"`
+	Photo         string  `db:"photo"`
+	FirstName     string  `db:"first_name"`
+	LastName      string  `db:"last_name"`
+	Locale        string  `db:"locale"`
+	ReferrerID    int64   `db:"referrer_id"`
+	AllowsPM      bool    `db:"allows_pm"`
+	WalletAddress *string `db:"wallet_address"`
 }
 
 func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
@@ -48,7 +49,7 @@ func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
 
 func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, username, photo, first_name, last_name, locale, referrer_id, allows_pm
+		SELECT id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, wallet_address
 		FROM market.user WHERE id = @id`,
 		pgx.NamedArgs{"id": id})
 	if err != nil {
@@ -65,13 +66,21 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 	}
 
 	return &entity.User{
-		ID:         row.ID,
-		Username:   row.Username,
-		Photo:      row.Photo,
-		FirstName:  row.FirstName,
-		LastName:   row.LastName,
-		Locale:     row.Locale,
-		ReferrerID: row.ReferrerID,
-		AllowsPM:   row.AllowsPM,
+		ID:            row.ID,
+		Username:      row.Username,
+		Photo:         row.Photo,
+		FirstName:     row.FirstName,
+		LastName:      row.LastName,
+		Locale:        row.Locale,
+		ReferrerID:    row.ReferrerID,
+		AllowsPM:      row.AllowsPM,
+		WalletAddress: row.WalletAddress,
 	}, nil
+}
+
+func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE market.user SET wallet_address = @wallet_address, updated_at = NOW() WHERE id = @id`,
+		pgx.NamedArgs{"wallet_address": walletAddressRaw, "id": userID})
+	return err
 }

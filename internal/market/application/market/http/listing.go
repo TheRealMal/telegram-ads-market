@@ -173,11 +173,9 @@ func (h *Handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interf
 }
 
 // UpdateListingRequest is the body for PATCH /api/v1/market/listings/:id.
-// Prices if set must be [["<number_of_hours>hr", <price>], ...].
-// Categories if set must be from the predefined set.
+// Channel cannot be changed after creation. Prices if set must be [["<number_of_hours>hr", <price>], ...].
 type UpdateListingRequest struct {
 	Status      *string         `json:"status,omitempty"`
-	ChannelID   *int64          `json:"channel_id,omitempty"`
 	Type        *string         `json:"type,omitempty"`
 	Prices      json.RawMessage `json:"prices,omitempty"`
 	Categories  *[]string       `json:"categories,omitempty"`
@@ -233,9 +231,7 @@ func (h *Handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if req.Status != nil {
 		l.Status = entity.ListingStatus(*req.Status)
 	}
-	if req.ChannelID != nil {
-		l.ChannelID = req.ChannelID
-	}
+	// Channel cannot be changed after creation (keep existing)
 	if req.Type != nil {
 		l.Type = entity.ListingType(*req.Type)
 	}

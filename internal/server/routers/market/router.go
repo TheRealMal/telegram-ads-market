@@ -9,6 +9,7 @@ import (
 
 type handler interface {
 	AuthUser(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -24,6 +25,8 @@ type handler interface {
 	ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
@@ -50,7 +53,7 @@ func NewRouter(config serverconfig.Config, handler handler, authMiddleware authM
 func (r *Router) GetRoutes() http.Handler {
 	corsConfig := server.CORSConfig{
 		AllowOrigin:  []string{r.Config.ClientDomain},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut},
 		AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
 	}
 
@@ -61,6 +64,15 @@ func (r *Router) GetRoutes() http.Handler {
 		server.WithMethod(
 			server.WithJSONResponse(r.handler.AuthUser),
 			http.MethodPost,
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("PUT /api/v1/market/me/wallet", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.SetWallet),
+				http.MethodPut,
+			),
 		),
 		"/api/v1",
 	))
@@ -192,6 +204,24 @@ func (r *Router) GetRoutes() http.Handler {
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
 				server.WithJSONResponse(r.handler.SignDeal),
+				http.MethodPost,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("PUT /api/v1/market/deals/{id}/payout-address", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.SetDealPayoutAddress),
+				http.MethodPut,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("POST /api/v1/market/deals/{id}/reject", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.RejectDeal),
 				http.MethodPost,
 			),
 		),

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/userbot/config"
@@ -23,6 +24,15 @@ type marketRepository interface {
 	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
 	DeleteChannelAdmins(ctx context.Context, channelID int64) error
 	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error
+	// Deal post message workers
+	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
+	GetListingByID(ctx context.Context, id int64) (*marketentity.Listing, error)
+	CreateDealPostMessage(ctx context.Context, m *marketentity.DealPostMessage) error
+	UpdateDealPostMessageStatus(ctx context.Context, id int64, status marketentity.DealPostMessageStatus) error
+	UpdateDealPostMessageStatusAndNextCheck(ctx context.Context, id int64, status marketentity.DealPostMessageStatus, nextCheck time.Time) error
+	ListDealPostMessageExistsWithNextCheckBefore(ctx context.Context, before time.Time) ([]*marketentity.DealPostMessage, error)
+	TakeDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (string, error)
+	ReleaseDealActionLock(ctx context.Context, lockID string, status marketentity.DealActionLockStatus) error
 }
 
 type service struct {
@@ -122,6 +132,9 @@ func (s *service) run(ctx context.Context) error {
 	}
 
 	s.userID = user.ID
+
+	go s.RunDealPostSenderWorker(ctx, s.marketRepository)
+	go s.RunDealPostCheckerWorker(ctx, s.marketRepository)
 
 	slog.Debug("getting current state")
 	if err := s.getCurrentState(ctx); err != nil {
