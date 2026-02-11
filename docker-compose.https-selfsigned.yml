@@ -68,6 +68,7 @@ services:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
 
   web:
+    image: internal.web:latest
     build:
       context: .
       dockerfile: dockerfiles/web/Dockerfile
@@ -99,6 +100,7 @@ services:
   # Renew (webroot; nginx stays up): docker compose ... run --rm certbot renew --webroot -w /var/www/certbot
 
   nginx:
+    image: internal.nginx:latest
     build:
       context: .
       dockerfile: dockerfiles/nginx/Dockerfile
@@ -120,7 +122,7 @@ services:
       - bot
 
   api:
-    image: ads-mrkt-server
+    image: internal.server:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -147,7 +149,7 @@ services:
         condition: service_healthy
 
   bot:
-    image: ads-mrkt-server
+    image: internal.server:latest
     restart: unless-stopped
     command: ["bot", "http"]
     env_file:
@@ -172,7 +174,7 @@ services:
   #   docker compose -f docker-compose.https-selfsigned.yml run --rm -it userbot
   # Enter phone number and code when prompted. Session is saved in volume; after that "up" works.
   userbot:
-    image: ads-mrkt-server
+    image: internal.server:latest
     restart: unless-stopped
     command: ["userbot", "run"]
     env_file:
