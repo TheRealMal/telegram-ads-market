@@ -1,30 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isTelegramPhone } from '@/lib/initData';
 
 /**
- * Blank sticky top spacer for Telegram mini app (reserves space for app buttons).
- * Renders nothing when the app is already in fullscreen (isExpanded) so the empty header is hidden.
+ * Blank sticky top spacer for Telegram mini app. Shown only on Telegram for Android/iOS
+ * (same condition as fullscreen request), so we don't add an empty header on desktop/web.
  */
 export function PageTopSpacer() {
-  const [hide, setHide] = useState(false);
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const tw = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
-    if (!tw) return;
-    const update = () => setHide(Boolean(tw?.isExpanded));
-    update();
-    tw?.onEvent?.('viewportChanged', update);
-    const id = setInterval(update, 400);
-    const t = setTimeout(() => clearInterval(id), 3000);
-    return () => {
-      tw?.offEvent?.('viewportChanged', update);
-      clearInterval(id);
-      clearTimeout(t);
-    };
+    setShow(isTelegramPhone());
   }, []);
 
-  if (hide) return null;
+  if (!show) return null;
 
   return (
     <div className="sticky top-0 z-30 shrink-0 bg-background" style={{ minHeight: '5rem' }}>

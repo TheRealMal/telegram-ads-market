@@ -5,6 +5,8 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData: string;
+        /** Platform: android | ios | macos | tdesktop | weba | web */
+        platform?: string;
         colorScheme: 'light' | 'dark';
         ready: () => void;
         expand: () => void;
