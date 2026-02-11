@@ -272,7 +272,7 @@ export default function DealDetailPage() {
     setDepositError(null);
     setDepositing(true);
     try {
-      const escrowFriendly = toFriendlyAddress(deal.escrow_address);
+      const escrowFriendly = toFriendlyAddress(deal.escrow_address, false);
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
         messages: [

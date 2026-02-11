@@ -4,11 +4,11 @@ import { Address } from '@ton/core';
  * Converts a TON address (raw "workchain:hex" or user-friendly base64) to user-friendly format
  * suitable for display and for TON Connect sendTransaction.
  */
-export function toFriendlyAddress(addr: string): string {
+export function toFriendlyAddress(addr: string, bounceable: boolean = true): string {
   if (!addr || typeof addr !== 'string') return addr;
   try {
     const a = Address.parse(addr);
-    return a.toString({ bounceable: true, urlSafe: true });
+    return a.toString({ bounceable: bounceable, urlSafe: true });
   } catch {
     return addr;
   }
