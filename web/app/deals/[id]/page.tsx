@@ -50,6 +50,11 @@ function isoToDatetimeLocal(iso: string): string {
   }
 }
 
+function truncateAddress(addr: string): string {
+  if (!addr || addr.length <= 8) return addr;
+  return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+}
+
 export default function DealDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -299,6 +304,29 @@ export default function DealDetailPage() {
           </TabsList>
 
           <TabsContent value="details">
+            {/* Wallet: above details card, minimal UI */}
+            {(isLessor || isLessee) && (
+              <div className="mb-4 space-y-1">
+                {!wallet ? (
+                  <>
+                    <TonConnectButton />
+                    <p className="text-sm text-muted-foreground">You need to connect wallet to make a deal.</p>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm tabular-nums">{truncateAddress(rawAddress || '')}</span>
+                    <button
+                      type="button"
+                      onClick={() => tonConnectUI.disconnect()}
+                      className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <Card>
               <CardContent className="space-y-2 p-4">
                 <p className="text-sm">
@@ -315,13 +343,7 @@ export default function DealDetailPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {(canSignAsLessor || canSignAsLessee) && (
                     <>
-                      {needsWalletToSign && (
-                        <>
-                          <span className="text-sm text-muted-foreground">Connect wallet to sign:</span>
-                          <TonConnectButton className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent" />
-                        </>
-                      )}
-                      {!needsWalletToSign && !bothPayoutsSet && (
+                      {!bothPayoutsSet && (
                         <span className="text-sm text-muted-foreground">Waiting for both parties to set payout address.</span>
                       )}
                       {canSignNow && (
@@ -334,17 +356,6 @@ export default function DealDetailPage() {
                         </Button>
                       )}
                     </>
-                  )}
-                  {deal.status === 'draft' && (isLessor || isLessee) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={handleRejectDeal}
-                      disabled={signing || rejecting}
-                    >
-                      {rejecting ? 'Rejecting…' : 'Reject deal'}
-                    </Button>
                   )}
                 </div>
                 {deal.status === 'waiting_escrow_deposit' && (
@@ -468,51 +479,62 @@ export default function DealDetailPage() {
                           <p className="mt-1 text-xs text-destructive">{draftPostedAtError}</p>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        disabled={draftSaving}
-                        onClick={async () => {
-                          let postedAtVal: string | undefined;
-                          if (draftPostedAt.trim()) {
-                            try {
-                              const d = new Date(draftPostedAt.trim());
-                              if (Number.isNaN(d.getTime())) {
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          disabled={draftSaving}
+                          onClick={async () => {
+                            let postedAtVal: string | undefined;
+                            if (draftPostedAt.trim()) {
+                              try {
+                                const d = new Date(draftPostedAt.trim());
+                                if (Number.isNaN(d.getTime())) {
+                                  setDraftPostedAtError('Invalid date and time');
+                                  return;
+                                }
+                                postedAtVal = d.toISOString();
+                              } catch {
                                 setDraftPostedAtError('Invalid date and time');
                                 return;
                               }
-                              postedAtVal = d.toISOString();
-                            } catch {
-                              setDraftPostedAtError('Invalid date and time');
-                              return;
                             }
-                          }
-                          setDraftPostedAtError(null);
-                          const authRes = await auth();
-                          if (!authRes.ok || !authRes.data) return;
-                          setAuthToken(authRes.data);
-                          const r = priceRows[draftPriceIndex] ?? priceRows[0];
-                          const type = r.duration + 'hr';
-                          const duration = parseInt(r.duration, 10) || 24;
-                          setDraftSaving(true);
-                          const res = await api<Deal>(`/api/v1/market/deals/${id}`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({
-                              type,
-                              duration,
-                              price: r.price,
-                              details: {
-                                message: draftMessage.trim() || undefined,
-                                posted_at: postedAtVal,
-                              },
-                            }),
-                          });
-                          setDraftSaving(false);
-                          if (res.ok && res.data) setDeal(res.data);
-                          else alert(res.error_code || 'Failed to update');
-                        }}
-                      >
-                        {draftSaving ? 'Saving…' : 'Save draft'}
-                      </Button>
+                            setDraftPostedAtError(null);
+                            const authRes = await auth();
+                            if (!authRes.ok || !authRes.data) return;
+                            setAuthToken(authRes.data);
+                            const r = priceRows[draftPriceIndex] ?? priceRows[0];
+                            const type = r.duration + 'hr';
+                            const duration = parseInt(r.duration, 10) || 24;
+                            setDraftSaving(true);
+                            const res = await api<Deal>(`/api/v1/market/deals/${id}`, {
+                              method: 'PATCH',
+                              body: JSON.stringify({
+                                type,
+                                duration,
+                                price: r.price,
+                                details: {
+                                  message: draftMessage.trim() || undefined,
+                                  posted_at: postedAtVal,
+                                },
+                              }),
+                            });
+                            setDraftSaving(false);
+                            if (res.ok && res.data) setDeal(res.data);
+                            else alert(res.error_code || 'Failed to update');
+                          }}
+                        >
+                          {draftSaving ? 'Saving…' : 'Save draft'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={handleRejectDeal}
+                          disabled={signing || rejecting || draftSaving}
+                        >
+                          {rejecting ? 'Rejecting…' : 'Reject deal'}
+                        </Button>
+                      </div>
                     </div>
                   );
                 })()}
