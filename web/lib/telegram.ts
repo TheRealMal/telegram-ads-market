@@ -8,6 +8,7 @@ declare global {
         colorScheme: 'light' | 'dark';
         ready: () => void;
         expand: () => void;
+        requestFullscreen?: () => void;
         isExpanded?: boolean;
         viewportHeight?: number;
         viewportStableHeight?: number;
@@ -25,25 +26,25 @@ declare global {
 }
 
 /**
- * Calls the web_app_expand method to expand the Mini App to fullscreen.
- * Uses the official method name so it works in Web (iframe), Desktop and Mobile.
- * @see https://docs.telegram-mini-apps.com/platform/methods#web-app-expand
+ * Calls the web_app_request_fullscreen method to request fullscreen for the Mini App (since v8.0).
+ * Uses the official method so it works in Web (iframe), Desktop and Mobile.
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web-app-request-fullscreen
  */
-export function expandMiniApp(): void {
+export function requestFullscreenMiniApp(): void {
   if (typeof window === 'undefined') return;
   const proxy = window.TelegramWebviewProxy;
   if (proxy?.postEvent) {
-    proxy.postEvent('web_app_expand', '{}');
+    proxy.postEvent('web_app_request_fullscreen', '{}');
     return;
   }
   const tw = window.Telegram?.WebApp;
-  if (tw?.expand) {
-    tw.expand();
+  if (tw?.requestFullscreen) {
+    tw.requestFullscreen();
     return;
   }
   try {
     window.parent.postMessage(
-      JSON.stringify({ eventType: 'web_app_expand', eventData: {} }),
+      JSON.stringify({ eventType: 'web_app_request_fullscreen', eventData: {} }),
       'https://web.telegram.org'
     );
   } catch {
