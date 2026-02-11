@@ -4,11 +4,70 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 )
 
 // ListingPricesFormat is the required JSON format: array of [duration_string, price_number].
 // Example: [["24hr", 100], ["48hr", 200]]. Duration must match \<number_of_hours>hr (e.g. "24hr", "1hr").
 var durationRegex = regexp.MustCompile(`^\d+hr$`)
+
+// DealPriceMatchesListing checks that the deal's type, duration, and price correspond to an option in the listing's prices.
+// listingPrices must be a JSON array of [durationStr, price] pairs (e.g. [["24hr", 100]]). Returns false if no match.
+func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dealDuration int64, dealPrice int64) bool {
+	if len(listingPrices) == 0 {
+		return false
+	}
+	var slots []json.RawMessage
+	if err := json.Unmarshal(listingPrices, &slots); err != nil {
+		return false
+	}
+	dealTypeNorm := normalizeDurationType(dealType)
+	for _, slot := range slots {
+		var pair []interface{}
+		if err := json.Unmarshal(slot, &pair); err != nil || len(pair) != 2 {
+			continue
+		}
+		durStr, ok := pair[0].(string)
+		if !ok || !durationRegex.MatchString(durStr) {
+			continue
+		}
+		var price int64
+		switch v := pair[1].(type) {
+		case float64:
+			price = int64(v)
+		case json.Number:
+			price, _ = v.Int64()
+		default:
+			continue
+		}
+		if normalizeDurationType(durStr) != dealTypeNorm || price != dealPrice {
+			continue
+		}
+		entryHours := parseDurationHours(durStr)
+		if entryHours >= 0 && entryHours != dealDuration {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func normalizeDurationType(s string) string {
+	s = durationRegex.FindString(s)
+	if s == "" {
+		return ""
+	}
+	return s
+}
+
+func parseDurationHours(durStr string) int64 {
+	n := durationRegex.FindString(durStr)
+	if n == "" || len(n) < 3 {
+		return -1
+	}
+	h, _ := strconv.ParseInt(n[:len(n)-2], 10, 64)
+	return h
+}
 
 // ValidateListingPrices checks that raw is a JSON array of pairs [["<n>hr", price], ...].
 func ValidateListingPrices(raw json.RawMessage) error {

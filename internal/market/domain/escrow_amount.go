@@ -11,6 +11,7 @@ type EscrowConfig struct {
 // ComputeEscrowAmount returns price + (transactionGasTON * 1e9 nanoton) + (price * commissionPercent / 100).
 // Price and result are in nanoton.
 func ComputeEscrowAmount(price int64, cfg EscrowConfig) int64 {
+	price = price * 1e9
 	gasNanoton := int64(cfg.TransactionGasTON * 1e9)
 	commission := int64(math.Round(float64(price) * cfg.CommissionPercent / 100))
 	return price + gasNanoton + commission

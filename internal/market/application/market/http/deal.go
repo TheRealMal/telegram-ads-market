@@ -54,6 +54,9 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if listing.UserID == userID {
 		return nil, apperrors.ServiceError{Err: nil, Message: "cannot create deal on your own listing", Code: apperrors.ErrorCodeForbidden}
 	}
+	if !domain.DealPriceMatchesListing(listing.Prices, req.Type, req.Duration, req.Price) {
+		return nil, apperrors.ServiceError{Err: nil, Message: "type, duration and price must match one of the listing's price options", Code: apperrors.ErrorCodeBadRequest}
+	}
 
 	var lessorID, lesseeID int64
 	switch listing.Type {
@@ -216,6 +219,19 @@ func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
 		}
 		d.Details = canonDetails
+	}
+
+	if req.Type != nil || req.Duration != nil || req.Price != nil {
+		listing, listErr := h.listingService.GetListing(r.Context(), existing.ListingID)
+		if listErr != nil {
+			return nil, toServiceError(listErr)
+		}
+		if listing == nil {
+			return nil, apperrors.ServiceError{Err: nil, Message: "listing not found", Code: apperrors.ErrorCodeNotFound}
+		}
+		if !domain.DealPriceMatchesListing(listing.Prices, d.Type, d.Duration, d.Price) {
+			return nil, apperrors.ServiceError{Err: nil, Message: "type, duration and price must match one of the listing's price options", Code: apperrors.ErrorCodeBadRequest}
+		}
 	}
 
 	if err := h.dealService.UpdateDealDraft(r.Context(), userID, &d); err != nil {
