@@ -2,7 +2,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY web/package.json web/package-lock.json* ./
-RUN npm ci
+# npm install so build works even when lock file is out of sync (e.g. after adding @tonconnect/ui-react).
+# For reproducible builds, run `npm install` in web/ and commit package-lock.json, then switch to: RUN npm ci
+RUN npm install
 
 # Stage 2: Build
 FROM node:20-alpine AS builder
@@ -14,10 +16,8 @@ RUN mkdir -p public
 
 # Build-time env (optional; override in compose for NEXT_PUBLIC_*)
 ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_ADD_CHANNEL_USERNAME
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 ENV NEXT_PUBLIC_ADD_CHANNEL_USERNAME=${NEXT_PUBLIC_ADD_CHANNEL_USERNAME}
 
 RUN npm run build

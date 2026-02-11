@@ -25,10 +25,10 @@ COPY pkg ./pkg
 RUN env CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -o ./build/bin/server -ldflags '-s' ./cmd/main.go
 
 # Artifact stage: export binary to host with:
-#   DOCKER_BUILDKIT=1 docker build --output type=local,dest=./build --target=artifact .
+#   DOCKER_BUILDKIT=1 docker build --output type=local,dest=./build/bin/ --target=artifact .
 # Binary is written to ./build/server
 FROM scratch AS artifact
-COPY --from=builder /app/build/bin/server /server
+COPY --from=builder /app/build/bin/server /server/bin
 
 # Final stage
 FROM scratch

@@ -61,7 +61,6 @@ services:
       dockerfile: dockerfiles/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
         NEXT_PUBLIC_ADD_CHANNEL_USERNAME: ${NEXT_PUBLIC_ADD_CHANNEL_USERNAME:-}
     env_file:
       - .env
