@@ -53,7 +53,7 @@ export default function CreateListingPage() {
   }, [authed]);
 
   const addPriceRow = () => {
-    setPrices((prev) => [...prev, { duration: '24', price: '' }]);
+    setPrices((prev) => [...prev, { duration: '', price: '' }]);
   };
 
   const removePriceRow = (index: number) => {
