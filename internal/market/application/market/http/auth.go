@@ -94,3 +94,21 @@ func (h *Handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}
 	}
 	return map[string]string{"status": "ok"}, nil
 }
+
+// @Security	JWT
+// @Tags		Market
+// @Summary	Disconnect wallet (clear linked TON wallet for current user).
+// @Produce	json
+// @Success	200	{object}	response.Template{data=object}	"ok"
+// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
+// @Router		/market/me/wallet [delete]
+func (h *Handler) DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+	if err := h.userService.ClearWallet(r.Context(), userID); err != nil {
+		return nil, toServiceError(err)
+	}
+	return map[string]string{"status": "ok"}, nil
+}

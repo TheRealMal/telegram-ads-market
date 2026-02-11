@@ -10,6 +10,7 @@ import (
 type UserService interface {
 	AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error)
 	SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error
+	ClearWallet(ctx context.Context, userID int64) error
 }
 
 type ListingService interface {

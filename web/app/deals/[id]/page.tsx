@@ -8,6 +8,7 @@ import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
+import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
 import type { Deal, DealChat, Listing } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,10 +51,6 @@ function isoToDatetimeLocal(iso: string): string {
   }
 }
 
-function truncateAddress(addr: string): string {
-  if (!addr || addr.length <= 8) return addr;
-  return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-}
 
 export default function DealDetailPage() {
   const params = useParams();
@@ -275,11 +272,12 @@ export default function DealDetailPage() {
     setDepositError(null);
     setDepositing(true);
     try {
+      const escrowFriendly = toFriendlyAddress(deal.escrow_address);
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
         messages: [
           {
-            address: deal.escrow_address,
+            address: escrowFriendly,
             amount: String(deal.escrow_amount),
           },
         ],
@@ -306,18 +304,29 @@ export default function DealDetailPage() {
           <TabsContent value="details">
             {/* Wallet: above details card, minimal UI */}
             {(isLessor || isLessee) && (
-              <div className="mb-4 space-y-1">
+              <div className="mb-4 flex flex-col items-center justify-center space-y-1 text-center">
                 {!wallet ? (
                   <>
                     <TonConnectButton />
-                    <p className="text-sm text-muted-foreground">You need to connect wallet to make a deal.</p>
+                    {deal.status === 'draft' && (
+                      <p className="text-sm text-muted-foreground">You need to connect wallet to make a deal.</p>
+                    )}
                   </>
                 ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-sm tabular-nums">{truncateAddress(rawAddress || '')}</span>
+                  <div className="flex w-full max-w-md items-center justify-between gap-2">
+                    <span className="font-mono text-sm tabular-nums">{truncateAddressDisplay(rawAddress || '')}</span>
                     <button
                       type="button"
-                      onClick={() => tonConnectUI.disconnect()}
+                      onClick={async () => {
+                        const authRes = await auth();
+                        if (authRes.ok && authRes.data) {
+                          setAuthToken(authRes.data);
+                          await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
+                        }
+                        walletSyncedRef.current = false;
+                        dealPayoutSyncedRef.current = false;
+                        tonConnectUI.disconnect();
+                      }}
                       className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
                     >
                       Disconnect
@@ -371,9 +380,11 @@ export default function DealDetailPage() {
                             ? `${(deal.escrow_amount / 1e9).toFixed(4)} TON`
                             : formatPriceValue(deal.price)}
                         </p>
-                        <p className="break-all font-mono text-xs">{deal.escrow_address}</p>
+                        <p className="break-all font-mono text-xs">{formatAddressForDisplay(deal.escrow_address)}</p>
                         {!wallet ? (
-                          <TonConnectButton className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent" />
+                          <p className="py-3 text-center text-sm text-muted-foreground">Connect wallet to proceed.</p>
+                        ) : !deal.lessee_payout_address || !addressesEqual(rawAddress ?? '', deal.lessee_payout_address) ? (
+                          <p className="py-3 text-center text-sm text-muted-foreground">Connect original wallet to proceed.</p>
                         ) : (
                           <Button
                             size="sm"
@@ -410,7 +421,7 @@ export default function DealDetailPage() {
                 </p>
                 {deal.status !== 'waiting_escrow_deposit' && deal.escrow_address && (
                   <p className="text-sm">
-                    <strong>Escrow:</strong> {deal.escrow_address}
+                    <strong>Escrow:</strong> {formatAddressForDisplay(deal.escrow_address)}
                   </p>
                 )}
                 {deal.escrow_release_time && (

@@ -84,3 +84,11 @@ func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddr
 		pgx.NamedArgs{"wallet_address": walletAddressRaw, "id": userID})
 	return err
 }
+
+// ClearUserWallet removes the user's linked wallet (disconnect).
+func (r *repository) ClearUserWallet(ctx context.Context, userID int64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE market.user SET wallet_address = NULL, updated_at = NOW() WHERE id = @id`,
+		pgx.NamedArgs{"id": userID})
+	return err
+}

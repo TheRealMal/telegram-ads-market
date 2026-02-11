@@ -10,6 +10,7 @@ import (
 type handler interface {
 	AuthUser(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -53,7 +54,7 @@ func NewRouter(config serverconfig.Config, handler handler, authMiddleware authM
 func (r *Router) GetRoutes() http.Handler {
 	corsConfig := server.CORSConfig{
 		AllowOrigin:  []string{r.Config.ClientDomain},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete},
 		AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
 	}
 
@@ -72,6 +73,15 @@ func (r *Router) GetRoutes() http.Handler {
 			server.WithMethod(
 				server.WithJSONResponse(r.handler.SetWallet),
 				http.MethodPut,
+			),
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("DELETE /api/v1/market/me/wallet", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.DisconnectWallet),
+				http.MethodDelete,
 			),
 		),
 		"/api/v1",

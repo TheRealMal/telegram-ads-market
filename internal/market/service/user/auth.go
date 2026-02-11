@@ -40,3 +40,8 @@ func (s *UserService) SetWallet(ctx context.Context, userID int64, walletAddress
 	}
 	return s.userRepo.SetUserWallet(ctx, userID, walletAddressRaw)
 }
+
+// ClearWallet removes the user's linked wallet (disconnect).
+func (s *UserService) ClearWallet(ctx context.Context, userID int64) error {
+	return s.userRepo.ClearUserWallet(ctx, userID)
+}
