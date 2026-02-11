@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS market.deal_action_lock (
 
 CREATE INDEX IF NOT EXISTS idx_deal_action_lock_deal_action_active
 ON market.deal_action_lock (deal_id, action_type)
-WHERE status = 'locked' AND expire_at > NOW();
+WHERE status = 'locked';
 
 -- +goose Down
 DROP INDEX IF EXISTS market.idx_deal_action_lock_deal_action_active;
