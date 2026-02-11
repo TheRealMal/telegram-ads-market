@@ -1,5 +1,7 @@
 declare global {
   interface Window {
+    /** Desktop/mobile: native app exposes this to receive method calls (e.g. web_app_expand) */
+    TelegramWebviewProxy?: { postEvent: (event: string, data: string) => void };
     Telegram?: {
       WebApp?: {
         initData: string;
@@ -19,6 +21,33 @@ declare global {
         };
       };
     };
+  }
+}
+
+/**
+ * Calls the web_app_expand method to expand the Mini App to fullscreen.
+ * Uses the official method name so it works in Web (iframe), Desktop and Mobile.
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web-app-expand
+ */
+export function expandMiniApp(): void {
+  if (typeof window === 'undefined') return;
+  const proxy = window.TelegramWebviewProxy;
+  if (proxy?.postEvent) {
+    proxy.postEvent('web_app_expand', '{}');
+    return;
+  }
+  const tw = window.Telegram?.WebApp;
+  if (tw?.expand) {
+    tw.expand();
+    return;
+  }
+  try {
+    window.parent.postMessage(
+      JSON.stringify({ eventType: 'web_app_expand', eventData: {} }),
+      'https://web.telegram.org'
+    );
+  } catch {
+    // not in iframe or same-origin
   }
 }
 
