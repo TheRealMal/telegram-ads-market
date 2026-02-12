@@ -56,7 +56,7 @@
 }
 .recharts-brush > rect:first-of-type {
   stroke: var(--brush-border);
-  stroke-width: 2px;
+  stroke-width: 1px;
   rx: 8;
   ry: 8;
 }
