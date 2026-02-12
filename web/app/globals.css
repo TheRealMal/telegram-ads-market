@@ -24,6 +24,7 @@
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #a3a3a3;
+  --brush-border: #525252;
 }
 
 .dark {
@@ -46,19 +47,28 @@
   --border: #262626;
   --input: rgba(255, 255, 255, 0.15);
   --ring: #737373;
+  --brush-border: #a3a3a3;
 }
 
-/* Brush: tick labels, visible border, darker selected area */
+/* Brush: tick labels, dark gray border, rounded, travellers darker (same as border) */
 .recharts-brush text {
   fill: var(--foreground);
 }
 .recharts-brush > rect:first-of-type {
-  stroke: var(--border);
+  stroke: var(--brush-border);
   stroke-width: 2px;
+  rx: 8;
+  ry: 8;
 }
 .recharts-brush-slide {
   fill: var(--muted-foreground);
   fill-opacity: 0.4;
+}
+.recharts-brush-traveller rect {
+  fill: var(--brush-border);
+}
+.recharts-brush-traveller line {
+  stroke: var(--background);
 }
 
 @layer base {

@@ -376,11 +376,12 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={38}
+                            travellerWidth={14}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--border)"
+                            stroke="var(--brush-border)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
@@ -417,11 +418,12 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={38}
+                            travellerWidth={14}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--border)"
+                            stroke="var(--brush-border)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
@@ -464,11 +466,12 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={38}
+                            travellerWidth={14}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--border)"
+                            stroke="var(--brush-border)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
