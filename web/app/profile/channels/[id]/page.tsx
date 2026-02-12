@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
@@ -46,6 +46,9 @@ export default function ChannelStatsPage() {
   const [brushRangeByGraph, setBrushRangeByGraph] = useState<Record<string, { startIndex: number; endIndex: number }>>({});
   /** Brush track bounds per graph key (for custom traveller: left vs right). */
   const [brushBoundsByKey, setBrushBoundsByKey] = useState<Record<string, { x: number; width: number }>>({});
+  /** Per graph key: x positions of both travellers from current render (so we can round by position: smaller x = left corners). */
+  const travellerXsRef = useRef<Record<string, number[]>>({});
+  travellerXsRef.current = {};
 
   /** Recharts Brush: set rx/ry on background rect in DOM; compute brush bounds per graph key for custom traveller. */
   useEffect(() => {
@@ -115,8 +118,10 @@ export default function ChannelStatsPage() {
 
   const createBrushTraveller = (graphKey: string) => (props: { x: number; y: number; width: number; height: number; stroke?: string }) => {
     const { x, y, width, height } = props;
-    const bounds = brushBoundsByKey[graphKey];
-    const isLeft = bounds ? props.x <= bounds.x + 8 : props.x < 200;
+    const xs = (travellerXsRef.current[graphKey] ??= []);
+    xs.push(props.x);
+    const both = xs.length >= 2 ? xs.slice(-2) : xs;
+    const isLeft = props.x <= Math.min(...both);
     const corners = isLeft ? { tl: TRAVELLER_R, bl: TRAVELLER_R } : { tr: TRAVELLER_R, br: TRAVELLER_R };
     const d = roundRectPath(x, y, width, height, corners);
     const fill = 'var(--brush-border)';
