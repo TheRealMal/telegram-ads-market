@@ -48,6 +48,11 @@
   --ring: #737373;
 }
 
+/* Brush tick labels: use theme foreground so they are visible on muted background */
+.recharts-brush text {
+  fill: var(--foreground);
+}
+
 @layer base {
   * {
     @apply border-border;

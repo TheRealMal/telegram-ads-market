@@ -376,6 +376,8 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={30}
+                            startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
+                            endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
@@ -414,6 +416,8 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={30}
+                            startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
+                            endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
@@ -458,6 +462,8 @@ export default function ChannelStatsPage() {
                           <Brush
                             dataKey="x"
                             height={30}
+                            startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
+                            endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
