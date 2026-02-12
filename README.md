@@ -14,6 +14,7 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 - Deal approvement when both sides sign a deal, automatic escrow wallet generation and deposit monitoring
 - Automatic advertisment post message sending into a channel, every hour check that post is not deleted
 - Automatic escrow release if advertisment conditions are met otherwise escrow refund to a lessee
+- Send message to second side of a deal via native telegram messages, view history inside a deal
 
 # User flow
 ## Lessor flow
@@ -63,3 +64,50 @@ docker compose -f docker-compose.https-selfsigned.yml up -d
 ## Frontend
 
 Frontend sources are placed into `web` directory, fully written with AI on React + Next.js
+
+# Preview
+
+## Stats
+
+<div style="display: flex; flex-direction: row; justify-content: center; align-items: center;">
+    <div style="width: 90%; max-width: 90%; margin: 0 auto; display: flex; justify-content: center; align-items: center; overflow: hidden;">
+        <img
+            title="Stats"
+            alt="Stats"
+            src="/assets/stats.gif"
+            style="
+                width: 100%;
+                max-width: 100%;
+                display: block;
+                object-fit: cover;
+                object-position: center;
+                /* Show only 20% vertical slice in the center */
+                clip-path: inset(0 37% 0 37%);
+            "
+        />
+    </div>
+</div>
+
+
+## Tabs
+<div style="display: flex; flex-direction: row; gap: 8px; justify-content: center; align-items: center;">
+    <img title="Market" alt="Market" src="/assets/page_market.png" style="width: 25%; max-width: 25%;" />
+    <img title="Listings" alt="Listings" src="/assets/page_listings.png" style="width: 25%; max-width: 25%;" />
+    <img title="Deals" alt="Deals" src="/assets/page_deals.png" style="width: 25%; max-width: 25%;" />
+    <img title="Profile" alt="Profile" src="/assets/page_profile.png" style="width: 25%; max-width: 25%;" />
+</div>
+
+## Listing details & creation
+
+<div style="display: flex; flex-direction: row; gap: 8px; justify-content: center; align-items: center;">
+    <img title="Listing details" alt="Listing details" src="/assets/page_listing-details.png" style="width: 25%; max-width: 25%;" />
+    <img title="Listing creation 1" alt="Listing creation 1" src="/assets/page_create-listing_1.png" style="width: 25%; max-width: 25%; margin-left: 5%;" />
+    <img title="Listing creation 2" alt="Listing creation 2" src="/assets/page_create-listing_2.png" style="width: 25%; max-width: 25%;" />
+</div>
+
+## Deal details 
+
+<div style="display: flex; flex-direction: row; gap: 8px; justify-content: center; align-items: center;">
+    <img title="Deal details" alt="Deal details" src="/assets/page_deal-details.png" style="width: 25%; max-width: 25%; margin-left: 5%;" />
+    <img title="Deal chat" alt="Deal chat" src="/assets/page_deal-chat.png" style="width: 25%; max-width: 25%;" />
+</div>
