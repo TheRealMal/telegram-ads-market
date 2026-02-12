@@ -45,6 +45,27 @@ export default function ChannelStatsPage() {
   /** Brush range per graph key (startIndex, endIndex). When set, card header shows this range. */
   const [brushRangeByGraph, setBrushRangeByGraph] = useState<Record<string, { startIndex: number; endIndex: number }>>({});
 
+  /** Recharts Brush does not pass rx/ry to the background rect; set them in the DOM so the brush track has rounded corners. */
+  useEffect(() => {
+    const patchBrushRectCorners = () => {
+      document.querySelectorAll('.recharts-brush').forEach((g) => {
+        const rect = g.querySelector('rect:first-of-type');
+        if (rect) {
+          rect.setAttribute('rx', '5');
+          rect.setAttribute('ry', '5');
+        }
+      });
+    };
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(patchBrushRectCorners);
+    });
+    const t = setTimeout(patchBrushRectCorners, 150);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+  }, [stats, brushRangeByGraph]);
+
   useEffect(() => {
     if (!id) return;
     const numId = parseInt(id, 10);
@@ -381,7 +402,7 @@ export default function ChannelStatsPage() {
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--brush-border)"
+                            stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
@@ -423,7 +444,7 @@ export default function ChannelStatsPage() {
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--brush-border)"
+                            stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
@@ -471,7 +492,7 @@ export default function ChannelStatsPage() {
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
-                            stroke="var(--brush-border)"
+                            stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />

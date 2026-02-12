@@ -55,8 +55,7 @@
   fill: var(--foreground);
 }
 .recharts-brush > rect:first-of-type {
-  rx: 8;
-  ry: 8;
+  stroke: var(--muted);
 }
 .recharts-brush-slide {
   fill: var(--muted-foreground);
