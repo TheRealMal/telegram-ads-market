@@ -109,7 +109,7 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, dealID int64, relea
 	}
 	releaseLockFailed := func() { _ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, entity.DealActionLockStatusFailed) }
 
-	toAddr, err := address.ParseAddr(destAddr)
+	toAddr, err := address.ParseRawAddr(destAddr)
 	if err != nil {
 		releaseLockFailed()
 		return fmt.Errorf("failed to parse payout address: %w", err)
