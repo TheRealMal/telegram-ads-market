@@ -273,7 +273,9 @@ export default function ChannelStatsPage() {
               ? new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
               : String(ts);
           const tooltipLabel = (ts: number) =>
-            ts > 1e10 ? new Date(ts).toLocaleString() : String(ts);
+            ts > 1e10
+              ? new Date(ts).toLocaleDateString('en-US', dateFormatEn)
+              : String(ts);
 
           // Period label from this graph's data range (start date – end date)
           const xValues = rows.map((r) => r.x);
@@ -335,50 +337,13 @@ export default function ChannelStatsPage() {
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
-                          contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+                          contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.75rem',
+                          }}
                         />
-                        <Legend
-                          wrapperStyle={{ paddingTop: 8 }}
-                          content={
-                            hasMultipleSeries
-                              ? () => (
-                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
-                                    {yColumns.map((col, i) => {
-                                      const hidden = hiddenSet?.has(col.key) ?? false;
-                                      const color = getSeriesColor(key, i, col.key, col.name);
-                                      return (
-                                        <button
-                                          key={col.key}
-                                          type="button"
-                                          onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
-                                          style={{
-                                            backgroundColor: hidden ? 'transparent' : color,
-                                            borderColor: color,
-                                            color: hidden ? color : 'white',
-                                            transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
-                                          }}
-                                        >
-                                          <span
-                                            className="flex shrink-0 items-center justify-center overflow-hidden"
-                                            style={{
-                                              width: hidden ? 0 : 16,
-                                              minWidth: hidden ? 0 : 16,
-                                              opacity: hidden ? 0 : 1,
-                                              transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
-                                            }}
-                                          >
-                                            ✓
-                                          </span>
-                                          <span>{col.name}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )
-                              : undefined
-                          }
-                        />
+                        {hasMultipleSeries && <Legend wrapperStyle={{ paddingTop: 0 }} content={() => null} />}
                         {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Area
                             key={col.key}
@@ -403,50 +368,13 @@ export default function ChannelStatsPage() {
                         <YAxis mirror className="text-xs" />
                         <Tooltip
                           labelFormatter={tooltipLabel}
-                          contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+                          contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.75rem',
+                          }}
                         />
-                        <Legend
-                          wrapperStyle={{ paddingTop: 8 }}
-                          content={
-                            hasMultipleSeries
-                              ? () => (
-                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
-                                    {yColumns.map((col, i) => {
-                                      const hidden = hiddenSet?.has(col.key) ?? false;
-                                      const color = getSeriesColor(key, i, col.key, col.name);
-                                      return (
-                                        <button
-                                          key={col.key}
-                                          type="button"
-                                          onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
-                                          style={{
-                                            backgroundColor: hidden ? 'transparent' : color,
-                                            borderColor: color,
-                                            color: hidden ? color : 'white',
-                                            transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
-                                          }}
-                                        >
-                                          <span
-                                            className="flex shrink-0 items-center justify-center overflow-hidden"
-                                            style={{
-                                              width: hidden ? 0 : 16,
-                                              minWidth: hidden ? 0 : 16,
-                                              opacity: hidden ? 0 : 1,
-                                              transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
-                                            }}
-                                          >
-                                            ✓
-                                          </span>
-                                          <span>{col.name}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )
-                              : undefined
-                          }
-                        />
+                        {hasMultipleSeries && <Legend wrapperStyle={{ paddingTop: 0 }} content={() => null} />}
                         {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Bar
                             key={col.key}
@@ -472,52 +400,13 @@ export default function ChannelStatsPage() {
                         />
                         <Tooltip
                           labelFormatter={tooltipLabel}
-                          contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+                          contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.75rem',
+                          }}
                         />
-                        {key !== 'GrowthGraph' && (
-                          <Legend
-                            wrapperStyle={{ paddingTop: 8 }}
-                            content={
-                              hasMultipleSeries
-                                ? () => (
-                                    <div className="flex flex-wrap justify-center gap-2 pt-2">
-                                      {yColumns.map((col, i) => {
-                                        const hidden = hiddenSet?.has(col.key) ?? false;
-                                        const color = getSeriesColor(key, i, col.key, col.name);
-                                        return (
-                                          <button
-                                            key={col.key}
-                                            type="button"
-                                            onClick={() => toggleGraphSeries(key, col.key)}
-                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
-                                            style={{
-                                              backgroundColor: hidden ? 'transparent' : color,
-                                              borderColor: color,
-                                              color: hidden ? color : 'white',
-                                              transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
-                                            }}
-                                          >
-                                            <span
-                                              className="flex shrink-0 items-center justify-center overflow-hidden"
-                                              style={{
-                                                width: hidden ? 0 : 16,
-                                                minWidth: hidden ? 0 : 16,
-                                                opacity: hidden ? 0 : 1,
-                                                transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
-                                              }}
-                                            >
-                                              ✓
-                                            </span>
-                                            <span>{col.name}</span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )
-                                : undefined
-                            }
-                          />
-                        )}
+                        {key !== 'GrowthGraph' && hasMultipleSeries && <Legend wrapperStyle={{ paddingTop: 0 }} content={() => null} />}
                         {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Line
                             key={col.key}
@@ -533,6 +422,39 @@ export default function ChannelStatsPage() {
                     )}
                   </ResponsiveContainer>
                 </div>
+                {hasMultipleSeries && (
+                  <div className="flex flex-wrap justify-center gap-2 pt-2">
+                    {yColumns.map((col, i) => {
+                      const hidden = hiddenSet?.has(col.key) ?? false;
+                      const color = getSeriesColor(key, i, col.key, col.name);
+                      return (
+                        <button
+                          key={col.key}
+                          type="button"
+                          onClick={() => toggleGraphSeries(key, col.key)}
+                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
+                          style={{
+                            backgroundColor: hidden ? 'transparent' : color,
+                            borderColor: color,
+                            color: hidden ? color : 'white',
+                            transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
+                          }}
+                        >
+                          <span
+                            className="flex h-4 w-4 shrink-0 items-center justify-center"
+                            style={{
+                              opacity: hidden ? 0 : 1,
+                              transition: 'opacity 0.3s ease-out',
+                            }}
+                          >
+                            ✓
+                          </span>
+                          <span>{col.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
