@@ -337,7 +337,7 @@ export default function ChannelStatsPage() {
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
-                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 32 : 25 }}>
+                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 42 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -375,18 +375,19 @@ export default function ChannelStatsPage() {
                         {isDateGraph && (
                           <Brush
                             dataKey="x"
-                            height={30}
+                            height={38}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
+                            strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
                         )}
                       </AreaChart>
                     ) : chartType === 'bar' ? (
-                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 32 : 25 }}>
+                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 42 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -415,18 +416,19 @@ export default function ChannelStatsPage() {
                         {isDateGraph && (
                           <Brush
                             dataKey="x"
-                            height={30}
+                            height={38}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
+                            strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
                         )}
                       </BarChart>
                     ) : (
-                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 32 : 25 }}>
+                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 42 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -461,12 +463,13 @@ export default function ChannelStatsPage() {
                         {isDateGraph && (
                           <Brush
                             dataKey="x"
-                            height={30}
+                            height={38}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
                             fill="var(--muted)"
                             stroke="var(--border)"
+                            strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
                           />
                         )}

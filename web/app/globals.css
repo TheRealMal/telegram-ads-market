@@ -48,9 +48,17 @@
   --ring: #737373;
 }
 
-/* Brush tick labels: use theme foreground so they are visible on muted background */
+/* Brush: tick labels, visible border, darker selected area */
 .recharts-brush text {
   fill: var(--foreground);
+}
+.recharts-brush > rect:first-of-type {
+  stroke: var(--border);
+  stroke-width: 2px;
+}
+.recharts-brush-slide {
+  fill: var(--muted-foreground);
+  fill-opacity: 0.4;
 }
 
 @layer base {
