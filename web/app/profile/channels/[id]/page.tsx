@@ -39,6 +39,8 @@ export default function ChannelStatsPage() {
   const [stats, setStats] = useState<ChannelStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Hidden series per graph key (only for graphs with multiple series). Tapping legend toggles. */
+  const [hiddenSeriesByGraph, setHiddenSeriesByGraph] = useState<Record<string, Set<string>>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -102,7 +104,7 @@ export default function ChannelStatsPage() {
       ? `${new Date(period.MinDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(period.MaxDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
       : null;
 
-  /** Single stat row: label, current value, optional red/green delta (%). Hide delta when value and delta are both 0. */
+  /** Overview stat: value (left) and delta on the right, name under them. Delta = absolute and (%). */
   function StatWithDelta({
     label,
     current,
@@ -113,21 +115,36 @@ export default function ChannelStatsPage() {
     previous: number | undefined;
   }) {
     const c = current ?? 0;
+    const prev = previous ?? 0;
     const { deltaPercent, showDelta } = getStatsDelta(current, previous);
+    const deltaAbs = c - prev;
     return (
-      <div className="flex items-baseline justify-between gap-2 py-1">
-        <span className="text-sm text-muted-foreground">{label}</span>
-        <span className="flex items-baseline gap-1.5">
+      <div className="py-2">
+        <div className="flex items-baseline justify-between gap-2">
           <span className="font-semibold">{c}</span>
           {showDelta && (
-            <span className={deltaPercent > 0 ? 'text-green-600' : deltaPercent < 0 ? 'text-red-600' : 'text-muted-foreground'}>
-              {deltaPercent > 0 ? '+' : ''}{deltaPercent.toFixed(1)}%
+            <span
+              className={
+                deltaPercent > 0 ? 'text-green-600' : deltaPercent < 0 ? 'text-red-600' : 'text-muted-foreground'
+              }
+            >
+              {deltaAbs >= 0 ? '+' : ''}{deltaAbs} ({deltaPercent > 0 ? '+' : ''}{deltaPercent.toFixed(1)}%)
             </span>
           )}
-        </span>
+        </div>
+        <p className="text-sm text-muted-foreground">{label}</p>
       </div>
     );
   }
+
+  const toggleGraphSeries = (graphKey: string, dataKey: string) => {
+    setHiddenSeriesByGraph((prev) => {
+      const set = new Set(prev[graphKey]);
+      if (set.has(dataKey)) set.delete(dataKey);
+      else set.add(dataKey);
+      return { ...prev, [graphKey]: set };
+    });
+  };
 
   const GREEN = '#22c55e';
   const RED = '#ef4444';
@@ -224,13 +241,15 @@ export default function ChannelStatsPage() {
               </div>
               <div className="space-y-0">
                 {enabledNotifications != null && (
-                  <div className="flex items-baseline justify-between gap-2 py-1">
-                    <span className="text-sm text-muted-foreground">Enabled notifications</span>
-                    <span className="font-semibold">
-                      {enabledNotifications.Total
-                        ? Math.round(((enabledNotifications.Part ?? 0) / enabledNotifications.Total) * 100)
-                        : 0}%
-                    </span>
+                  <div className="py-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-semibold">
+                        {enabledNotifications.Total
+                          ? Math.round(((enabledNotifications.Part ?? 0) / enabledNotifications.Total) * 100)
+                          : 0}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Enabled notifications</p>
                   </div>
                 )}
                 {viewsPerStory != null && (
@@ -257,6 +276,19 @@ export default function ChannelStatsPage() {
           const tooltipLabel = (ts: number) =>
             ts > 1e10 ? new Date(ts).toLocaleString() : String(ts);
 
+          // Period label from this graph's data range (start date – end date)
+          const xValues = rows.map((r) => r.x);
+          const minX = xValues.length ? Math.min(...xValues) : 0;
+          const maxX = xValues.length ? Math.max(...xValues) : 0;
+          const graphPeriodLabel =
+            minX > 1e10 && maxX > 1e10
+              ? `${new Date(minX).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(maxX).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : periodLabel;
+
+          const hasMultipleSeries = yColumns.length > 1;
+          const hiddenSet = hiddenSeriesByGraph[key];
+          const isSeriesVisible = (dataKey: string) => !hasMultipleSeries || !hiddenSet?.has(dataKey);
+
           // 100% stacked area for Languages
           const isLanguages = key === 'LanguagesGraph';
           const chartRows = isLanguages
@@ -274,8 +306,8 @@ export default function ChannelStatsPage() {
             <Card key={key}>
               <CardHeader>
                 <CardTitle className="text-base">{title}</CardTitle>
-                {periodLabel && (
-                  <p className="text-sm text-muted-foreground">{periodLabel}</p>
+                {graphPeriodLabel && (
+                  <p className="text-sm text-muted-foreground">{graphPeriodLabel}</p>
                 )}
               </CardHeader>
               <CardContent className="px-3 pb-0 pt-0">
@@ -301,8 +333,40 @@ export default function ChannelStatsPage() {
                           formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
-                        <Legend wrapperStyle={{ paddingTop: 8 }} />
-                        {yColumns.map((col, i) => (
+                        <Legend
+                          wrapperStyle={{ paddingTop: 8 }}
+                          content={
+                            hasMultipleSeries
+                              ? () => (
+                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
+                                    {yColumns.map((col, i) => {
+                                      const hidden = hiddenSet?.has(col.key) ?? false;
+                                      return (
+                                        <button
+                                          key={col.key}
+                                          type="button"
+                                          onClick={() => toggleGraphSeries(key, col.key)}
+                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
+                                        >
+                                          <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                            style={{
+                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
+                                              opacity: hidden ? 0.4 : 1,
+                                            }}
+                                          />
+                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
+                                            {col.name}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              : undefined
+                          }
+                        />
+                        {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Area
                             key={col.key}
                             type="monotone"
@@ -332,8 +396,40 @@ export default function ChannelStatsPage() {
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
-                        <Legend wrapperStyle={{ paddingTop: 8 }} />
-                        {yColumns.map((col, i) => (
+                        <Legend
+                          wrapperStyle={{ paddingTop: 8 }}
+                          content={
+                            hasMultipleSeries
+                              ? () => (
+                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
+                                    {yColumns.map((col, i) => {
+                                      const hidden = hiddenSet?.has(col.key) ?? false;
+                                      return (
+                                        <button
+                                          key={col.key}
+                                          type="button"
+                                          onClick={() => toggleGraphSeries(key, col.key)}
+                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
+                                        >
+                                          <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                            style={{
+                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
+                                              opacity: hidden ? 0.4 : 1,
+                                            }}
+                                          />
+                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
+                                            {col.name}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              : undefined
+                          }
+                        />
+                        {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Bar
                             key={col.key}
                             dataKey={col.key}
@@ -360,8 +456,40 @@ export default function ChannelStatsPage() {
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
-                        <Legend wrapperStyle={{ paddingTop: 8 }} />
-                        {yColumns.map((col, i) => (
+                        <Legend
+                          wrapperStyle={{ paddingTop: 8 }}
+                          content={
+                            hasMultipleSeries
+                              ? () => (
+                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
+                                    {yColumns.map((col, i) => {
+                                      const hidden = hiddenSet?.has(col.key) ?? false;
+                                      return (
+                                        <button
+                                          key={col.key}
+                                          type="button"
+                                          onClick={() => toggleGraphSeries(key, col.key)}
+                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
+                                        >
+                                          <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                            style={{
+                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
+                                              opacity: hidden ? 0.4 : 1,
+                                            }}
+                                          />
+                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
+                                            {col.name}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              : undefined
+                          }
+                        />
+                        {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Line
                             key={col.key}
                             type={col.type === 'step' ? 'step' : 'monotone'}
