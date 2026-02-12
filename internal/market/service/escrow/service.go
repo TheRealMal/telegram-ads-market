@@ -103,48 +103,61 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 		return err
 	}
 
-	lockID, err := s.marketRepository.TakeDealActionLock(ctx, dealID, actionType)
-	if err != nil {
-		return err
-	}
-	releaseLockFailed := func() { _ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, entity.DealActionLockStatusFailed) }
-
 	toAddr, err := address.ParseRawAddr(destAddr)
 	if err != nil {
-		releaseLockFailed()
 		return fmt.Errorf("failed to parse payout address: %w", err)
 	}
-	seed := strings.Split(strings.TrimSpace(*deal.EscrowPrivateKey), " ")
-	key, err := wallet.SeedToPrivateKeyWithOptions(seed)
+
+	key, err := wallet.SeedToPrivateKeyWithOptions(
+		strings.Split(
+			strings.TrimSpace(*deal.EscrowPrivateKey),
+			" ",
+		),
+	)
 	if err != nil {
-		releaseLockFailed()
 		return fmt.Errorf("failed to parse escrow private key: %w", err)
 	}
 	w, err := wallet.FromPrivateKey(s.liteclient.Client(), key, wallet.ConfigV5R1Final{
 		NetworkGlobalID: wallet.MainnetGlobalID,
 	})
 	if err != nil {
-		releaseLockFailed()
 		return fmt.Errorf("failed to create wallet from private key: %w", err)
 	}
+
 	amount := tlb.FromNanoTONU(uint64(deal.EscrowAmount))
-	if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
-		logger.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
-		releaseLockFailed()
+
+	err = func() error {
+		lockID, err := s.marketRepository.TakeDealActionLock(ctx, dealID, actionType)
+		if err != nil {
+			return err
+		}
+		dealACtionLockStatus := entity.DealActionLockStatusFailed
+		defer func() {
+			_ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, dealACtionLockStatus)
+		}()
+
+		if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
+			logger.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
+			return err
+		}
+
+		if release {
+			if err = s.marketRepository.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
+				return err
+			}
+		} else {
+			if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
+				return err
+			}
+
+		}
+		dealACtionLockStatus = entity.DealActionLockStatusCompleted
+		return nil
+	}()
+	if err != nil {
 		return err
 	}
-	if release {
-		if err = s.marketRepository.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
-			releaseLockFailed()
-			return err
-		}
-	} else {
-		if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
-			releaseLockFailed()
-			return err
-		}
-	}
-	_ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, entity.DealActionLockStatusCompleted)
+
 	logger.Info("escrow release/refund completed", "deal_id", dealID, "release", release)
 	return nil
 }

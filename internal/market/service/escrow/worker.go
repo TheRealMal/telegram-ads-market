@@ -68,7 +68,7 @@ func (s *service) ReleaseRefundWorker(ctx context.Context) {
 				deals, err = s.marketRepository.ListDealsWaitingEscrowRefund(ctx)
 			}
 			if err != nil {
-				logger.Error("escrow release/refund worker: list deals", "release", release, "error", err)
+				logger.Error("list deals", "release", release, "error", err)
 				continue
 			}
 			for _, d := range deals {
@@ -77,9 +77,9 @@ func (s *service) ReleaseRefundWorker(ctx context.Context) {
 				}
 				if err := s.ReleaseOrRefundEscrow(ctx, logger, d.ID, release); err != nil {
 					if errors.Is(err, ErrPayoutAddressNotSet) {
-						logger.Debug("escrow release/refund worker: skip deal, payout address not set", "deal_id", d.ID, "release", release)
+						logger.Debug("skip deal, payout address not set", "deal_id", d.ID, "release", release)
 					} else {
-						logger.Error("escrow release/refund worker: failed", "deal_id", d.ID, "release", release, "error", err)
+						logger.Error("release/refund failed", "deal_id", d.ID, "release", release, "error", err)
 					}
 					continue
 				}

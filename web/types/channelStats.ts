@@ -128,16 +128,43 @@ export function getGraphChartConfig(data: StatsGraphData | null): GraphChartConf
 }
 
 const graphTitleMap: Record<string, string> = {
-  GrowthGraph: 'Followers growth',
-  MuteGraph: 'Mutes',
-  TopHoursGraph: 'Top hours',
+  GrowthGraph: 'Growth',
+  MuteGraph: 'Notifications',
+  TopHoursGraph: 'View by hours (UTC)',
   FollowersGraph: 'Followers',
   LanguagesGraph: 'Languages',
   InteractionsGraph: 'Interactions',
   ViewsBySourceGraph: 'Views by source',
-  ReactionsByEmotionGraph: 'Reactions by emotion',
+  NewFollowersBySourceGraph: 'New followers by source',
+  ReactionsByEmotionGraph: 'Reactions',
 };
+
+/** Order in which stats graphs are displayed. */
+export const STATS_GRAPH_ORDER: string[] = [
+  'GrowthGraph',
+  'FollowersGraph',
+  'MuteGraph',
+  'TopHoursGraph',
+  'ViewsBySourceGraph',
+  'NewFollowersBySourceGraph',
+  'LanguagesGraph',
+  'InteractionsGraph',
+  'ReactionsByEmotionGraph',
+];
 
 export function getGraphTitle(key: string): string {
   return graphTitleMap[key] ?? (key.replace(/Graph$/, '').replace(/([A-Z])/g, ' $1').trim() || key);
+}
+
+/** Delta from previous to current. showDelta is false when both are 0 (display only "0"). */
+export function getStatsDelta(
+  current: number | undefined,
+  previous: number | undefined
+): { deltaPercent: number; showDelta: boolean } {
+  const c = current ?? 0;
+  const p = previous ?? 0;
+  if (c === 0 && p === 0) return { deltaPercent: 0, showDelta: false };
+  if (p === 0) return { deltaPercent: c > 0 ? 100 : 0, showDelta: true };
+  const deltaPercent = ((c - p) / p) * 100;
+  return { deltaPercent, showDelta: true };
 }
