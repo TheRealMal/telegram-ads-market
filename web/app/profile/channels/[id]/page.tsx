@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
@@ -44,87 +44,26 @@ export default function ChannelStatsPage() {
   const [hiddenSeriesByGraph, setHiddenSeriesByGraph] = useState<Record<string, Set<string>>>({});
   /** Brush range per graph key (startIndex, endIndex). When set, card header shows this range. */
   const [brushRangeByGraph, setBrushRangeByGraph] = useState<Record<string, { startIndex: number; endIndex: number }>>({});
+  /** Brush track bounds per graph key (for custom traveller: left vs right). */
+  const [brushBoundsByKey, setBrushBoundsByKey] = useState<Record<string, { x: number; width: number }>>({});
 
-  /** Recharts Brush: (1) set rx/ry on background rect; (2) replace traveller rects with paths that round only outer corners (left: top-left, bottom-left; right: top-right, bottom-right). */
+  /** Recharts Brush: set rx/ry on background rect in DOM; compute brush bounds per graph key for custom traveller. */
   useEffect(() => {
     const R = 5;
-
-    const roundRectPath = (x: number, y: number, w: number, h: number, corners: { tl?: number; tr?: number; br?: number; bl?: number }) => {
-      const tl = corners.tl ?? 0;
-      const tr = corners.tr ?? 0;
-      const br = corners.br ?? 0;
-      const bl = corners.bl ?? 0;
-      if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
-        return `M ${x} ${y} h ${w} v ${h} H ${x} Z`;
-      }
-      const parts: string[] = [];
-      parts.push(`M ${x + tl} ${y}`);
-      if (tr > 0) {
-        parts.push(`H ${x + w - tr}`);
-        parts.push(`Q ${x + w} ${y} ${x + w} ${y + tr}`);
-      } else {
-        parts.push(`H ${x + w}`);
-      }
-      parts.push(`V ${y + h - br}`);
-      if (br > 0) {
-        parts.push(`Q ${x + w} ${y + h} ${x + w - br} ${y + h}`);
-      } else {
-        parts.push(`V ${y + h}`);
-      }
-      parts.push(`H ${x + bl}`);
-      if (bl > 0) {
-        parts.push(`Q ${x} ${y + h} ${x} ${y + h - bl}`);
-      } else {
-        parts.push(`H ${x}`);
-      }
-      parts.push(`V ${y + tl}`);
-      if (tl > 0) {
-        parts.push(`Q ${x} ${y} ${x + tl} ${y}`);
-      } else {
-        parts.push(`V ${y}`);
-      }
-      return parts.join(' ');
-    };
-
     const patchBrushRectCorners = () => {
-      document.querySelectorAll('.recharts-brush').forEach((g) => {
-        const rect = g.querySelector('rect:first-of-type');
-        if (rect) {
+      const nextBounds: Record<string, { x: number; width: number }> = {};
+      document.querySelectorAll('[data-graph-key]').forEach((wrapper) => {
+        const graphKey = wrapper.getAttribute('data-graph-key');
+        const brush = wrapper.querySelector('.recharts-brush');
+        const rect = brush?.querySelector('rect:first-of-type');
+        if (rect && graphKey) {
           rect.setAttribute('rx', String(R));
           rect.setAttribute('ry', String(R));
+          const bbox = (rect as SVGRectElement).getBBox();
+          nextBounds[graphKey] = { x: bbox.x, width: bbox.width };
         }
-
-        const travellers = g.querySelectorAll('.recharts-brush-traveller');
-        const rects = Array.from(travellers)
-          .map((t) => t.querySelector('rect'))
-          .filter((r): r is SVGRectElement => r != null)
-          .map((r) => ({
-            el: r,
-            x: parseFloat(r.getAttribute('x') ?? '0'),
-            y: parseFloat(r.getAttribute('y') ?? '0'),
-            w: parseFloat(r.getAttribute('width') ?? '0'),
-            h: parseFloat(r.getAttribute('height') ?? '0'),
-          }))
-          .filter(({ w, h }) => w > 0 && h > 0);
-        if (rects.length < 2) return;
-        rects.sort((a, b) => a.x - b.x);
-        const [left, right] = rects;
-        const fill = left.el.getAttribute('fill') ?? 'var(--brush-border)';
-        const leftPath = roundRectPath(left.x, left.y, left.w, left.h, { tl: R, bl: R });
-        const rightPath = roundRectPath(right.x, right.y, right.w, right.h, { tr: R, br: R });
-        const pathLeft = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        pathLeft.setAttribute('d', leftPath);
-        pathLeft.setAttribute('fill', fill);
-        pathLeft.setAttribute('stroke', fill);
-        pathLeft.setAttribute('class', left.el.getAttribute('class') ?? '');
-        left.el.parentNode?.replaceChild(pathLeft, left.el);
-        const pathRight = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        pathRight.setAttribute('d', rightPath);
-        pathRight.setAttribute('fill', fill);
-        pathRight.setAttribute('stroke', fill);
-        pathRight.setAttribute('class', right.el.getAttribute('class') ?? '');
-        right.el.parentNode?.replaceChild(pathRight, right.el);
       });
+      setBrushBoundsByKey((prev) => (Object.keys(nextBounds).length ? { ...prev, ...nextBounds } : prev));
     };
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(patchBrushRectCorners);
@@ -135,6 +74,61 @@ export default function ChannelStatsPage() {
       clearTimeout(t);
     };
   }, [stats, brushRangeByGraph]);
+
+  const TRAVELLER_R = 5;
+  const roundRectPath = (x: number, y: number, w: number, h: number, corners: { tl?: number; tr?: number; br?: number; bl?: number }) => {
+    const tl = corners.tl ?? 0;
+    const tr = corners.tr ?? 0;
+    const br = corners.br ?? 0;
+    const bl = corners.bl ?? 0;
+    if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
+      return `M ${x} ${y} h ${w} v ${h} H ${x} Z`;
+    }
+    const parts: string[] = [];
+    parts.push(`M ${x + tl} ${y}`);
+    if (tr > 0) {
+      parts.push(`H ${x + w - tr}`);
+      parts.push(`Q ${x + w} ${y} ${x + w} ${y + tr}`);
+    } else {
+      parts.push(`H ${x + w}`);
+    }
+    parts.push(`V ${y + h - br}`);
+    if (br > 0) {
+      parts.push(`Q ${x + w} ${y + h} ${x + w - br} ${y + h}`);
+    } else {
+      parts.push(`V ${y + h}`);
+    }
+    parts.push(`H ${x + bl}`);
+    if (bl > 0) {
+      parts.push(`Q ${x} ${y + h} ${x} ${y + h - bl}`);
+    } else {
+      parts.push(`H ${x}`);
+    }
+    parts.push(`V ${y + tl}`);
+    if (tl > 0) {
+      parts.push(`Q ${x} ${y} ${x + tl} ${y}`);
+    } else {
+      parts.push(`V ${y}`);
+    }
+    return parts.join(' ');
+  };
+
+  const createBrushTraveller = (graphKey: string) => (props: { x: number; y: number; width: number; height: number; stroke?: string }) => {
+    const { x, y, width, height } = props;
+    const bounds = brushBoundsByKey[graphKey];
+    const isLeft = bounds ? props.x <= bounds.x + 8 : props.x < 200;
+    const corners = isLeft ? { tl: TRAVELLER_R, bl: TRAVELLER_R } : { tr: TRAVELLER_R, br: TRAVELLER_R };
+    const d = roundRectPath(x, y, width, height, corners);
+    const fill = 'var(--brush-border)';
+    const lineY = Math.floor(y + height / 2) - 1;
+    return (
+      <>
+        <path d={d} fill={fill} stroke="none" />
+        <line x1={x + 1} y1={lineY} x2={x + width - 1} y2={lineY} fill="none" stroke="var(--background)" />
+        <line x1={x + 1} y1={lineY + 2} x2={x + width - 1} y2={lineY + 2} fill="none" stroke="var(--background)" />
+      </>
+    );
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -425,7 +419,7 @@ export default function ChannelStatsPage() {
                 )}
               </CardHeader>
               <CardContent className="px-3 pb-0 pt-0">
-                <div className="h-72 w-full">
+                <div className="h-72 w-full" data-graph-key={key}>
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
                       <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 42 : 25 }}>
@@ -468,6 +462,7 @@ export default function ChannelStatsPage() {
                             dataKey="x"
                             height={38}
                             travellerWidth={14}
+                            traveller={createBrushTraveller(key)}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
@@ -510,6 +505,7 @@ export default function ChannelStatsPage() {
                             dataKey="x"
                             height={38}
                             travellerWidth={14}
+                            traveller={createBrushTraveller(key)}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
@@ -558,6 +554,7 @@ export default function ChannelStatsPage() {
                             dataKey="x"
                             height={38}
                             travellerWidth={14}
+                            traveller={createBrushTraveller(key)}
                             startIndex={brushRangeByGraph[key]?.startIndex ?? 0}
                             endIndex={brushRangeByGraph[key]?.endIndex ?? chartRows.length - 1}
                             tickFormatter={formatX}
