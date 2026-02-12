@@ -319,7 +319,7 @@ export default function ChannelStatsPage() {
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
-                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 0, bottom: 25 }}>
+                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -327,9 +327,9 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
-                          orientation="right"
                           domain={[0, 100]}
                           tickFormatter={(v) => `${Math.round(Number(v))}%`}
+                          tick={{ dx: 8 }}
                           className="text-xs"
                         />
                         <Tooltip
@@ -351,21 +351,29 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
                                             color: hidden ? color : 'white',
+                                            transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
-                                            style={{ opacity: hidden ? 0 : 1 }}
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                            style={{
+                                              opacity: hidden ? 0 : 1,
+                                              transition: 'opacity 0.3s ease-out',
+                                            }}
                                           >
                                             ✓
                                           </span>
                                           <span
-                                            className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
+                                            className="inline-block"
+                                            style={{
+                                              transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
+                                              transition: 'transform 0.3s ease-out',
+                                            }}
                                           >
                                             {col.name}
                                           </span>
@@ -391,14 +399,14 @@ export default function ChannelStatsPage() {
                         ))}
                       </AreaChart>
                     ) : chartType === 'bar' ? (
-                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 0, bottom: 25 }}>
+                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
                           tickFormatter={formatX}
                           className="text-xs"
                         />
-                        <YAxis orientation="right" className="text-xs" />
+                        <YAxis tick={{ dx: 8 }} className="text-xs" />
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
@@ -417,21 +425,29 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
                                             color: hidden ? color : 'white',
+                                            transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
-                                            style={{ opacity: hidden ? 0 : 1 }}
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                            style={{
+                                              opacity: hidden ? 0 : 1,
+                                              transition: 'opacity 0.3s ease-out',
+                                            }}
                                           >
                                             ✓
                                           </span>
                                           <span
-                                            className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
+                                            className="inline-block"
+                                            style={{
+                                              transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
+                                              transition: 'transform 0.3s ease-out',
+                                            }}
                                           >
                                             {col.name}
                                           </span>
@@ -454,7 +470,7 @@ export default function ChannelStatsPage() {
                         ))}
                       </BarChart>
                     ) : (
-                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 0, bottom: 25 }}>
+                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -462,9 +478,9 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
-                          orientation="right"
                           className="text-xs"
                           domain={key === 'GrowthGraph' ? ['dataMin', 'dataMax'] : undefined}
+                          tick={{ dx: 8 }}
                         />
                         <Tooltip
                           labelFormatter={tooltipLabel}
@@ -485,21 +501,29 @@ export default function ChannelStatsPage() {
                                             key={col.key}
                                             type="button"
                                             onClick={() => toggleGraphSeries(key, col.key)}
-                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
+                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs hover:opacity-90"
                                             style={{
                                               backgroundColor: hidden ? 'transparent' : color,
                                               borderColor: color,
                                               color: hidden ? color : 'white',
+                                              transition: 'background-color 0.3s ease-out, color 0.3s ease-out',
                                             }}
                                           >
                                             <span
-                                              className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
-                                              style={{ opacity: hidden ? 0 : 1 }}
+                                              className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                              style={{
+                                                opacity: hidden ? 0 : 1,
+                                                transition: 'opacity 0.3s ease-out',
+                                              }}
                                             >
                                               ✓
                                             </span>
                                             <span
-                                              className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
+                                              className="inline-block"
+                                              style={{
+                                                transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
+                                                transition: 'transform 0.3s ease-out',
+                                              }}
                                             >
                                               {col.name}
                                             </span>
