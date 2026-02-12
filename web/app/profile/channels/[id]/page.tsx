@@ -316,7 +316,7 @@ export default function ChannelStatsPage() {
                 )}
               </CardHeader>
               <CardContent className="px-3 pb-0 pt-0">
-                <div className="relative h-72 w-full">
+                <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
                       <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 0, bottom: 25 }}>
@@ -327,6 +327,7 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
+                          orientation="right"
                           domain={[0, 100]}
                           tickFormatter={(v) => `${Math.round(Number(v))}%`}
                           className="text-xs"
@@ -337,11 +338,11 @@ export default function ChannelStatsPage() {
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
                         <Legend
-                          wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
+                          wrapperStyle={{ paddingTop: 8 }}
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-end gap-2">
+                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
                                       const color = getSeriesColor(key, i, col.key, col.name);
@@ -350,7 +351,7 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
@@ -358,13 +359,13 @@ export default function ChannelStatsPage() {
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
                                             style={{ opacity: hidden ? 0 : 1 }}
                                           >
                                             ✓
                                           </span>
                                           <span
-                                            className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                            className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
                                           >
                                             {col.name}
                                           </span>
@@ -397,17 +398,17 @@ export default function ChannelStatsPage() {
                           tickFormatter={formatX}
                           className="text-xs"
                         />
-                        <YAxis className="text-xs" />
+                        <YAxis orientation="right" className="text-xs" />
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
                         <Legend
-                          wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
+                          wrapperStyle={{ paddingTop: 8 }}
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-end gap-2">
+                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
                                       const color = getSeriesColor(key, i, col.key, col.name);
@@ -416,7 +417,7 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
@@ -424,13 +425,13 @@ export default function ChannelStatsPage() {
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
                                             style={{ opacity: hidden ? 0 : 1 }}
                                           >
                                             ✓
                                           </span>
                                           <span
-                                            className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                            className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
                                           >
                                             {col.name}
                                           </span>
@@ -461,6 +462,7 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
+                          orientation="right"
                           className="text-xs"
                           domain={key === 'GrowthGraph' ? ['dataMin', 'dataMax'] : undefined}
                         />
@@ -470,11 +472,11 @@ export default function ChannelStatsPage() {
                         />
                         {key !== 'GrowthGraph' && (
                           <Legend
-                            wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
+                            wrapperStyle={{ paddingTop: 8 }}
                             content={
                               hasMultipleSeries
                                 ? () => (
-                                    <div className="flex flex-wrap justify-end gap-2">
+                                    <div className="flex flex-wrap justify-center gap-2 pt-2">
                                       {yColumns.map((col, i) => {
                                         const hidden = hiddenSet?.has(col.key) ?? false;
                                         const color = getSeriesColor(key, i, col.key, col.name);
@@ -483,7 +485,7 @@ export default function ChannelStatsPage() {
                                             key={col.key}
                                             type="button"
                                             onClick={() => toggleGraphSeries(key, col.key)}
-                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
+                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 ease-in-out hover:opacity-90"
                                             style={{
                                               backgroundColor: hidden ? 'transparent' : color,
                                               borderColor: color,
@@ -491,13 +493,13 @@ export default function ChannelStatsPage() {
                                             }}
                                           >
                                             <span
-                                              className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                              className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200 ease-in-out"
                                               style={{ opacity: hidden ? 0 : 1 }}
                                             >
                                               ✓
                                             </span>
                                             <span
-                                              className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                              className={`inline-block transition-transform duration-200 ease-in-out ${hidden ? '-translate-x-1' : ''}`}
                                             >
                                               {col.name}
                                             </span>
