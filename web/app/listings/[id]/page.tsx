@@ -7,7 +7,7 @@ import { MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-rea
 import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
-import type { Listing, Deal } from '@/types';
+import type { Listing, Deal, Channel } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ export default function ListingDetailPage() {
   const [dealMessage, setDealMessage] = useState('');
   const [dealPostedAt, setDealPostedAt] = useState('');
   const [createDealPriceIndex, setCreateDealPriceIndex] = useState(0);
+  const [createDealChannelId, setCreateDealChannelId] = useState<number | null>(null);
+  const [myChannels, setMyChannels] = useState<Channel[]>([]);
   const [createDealSubmitting, setCreateDealSubmitting] = useState(false);
 
   useEffect(() => {
@@ -70,11 +72,23 @@ export default function ListingDetailPage() {
   const priceRowsForListing = parseListingPrices(listing?.prices ?? null);
   const selectedPriceRow = priceRowsForListing[createDealPriceIndex];
 
-  const handleOpenCreateDeal = () => {
+  const handleOpenCreateDeal = async () => {
     setDealMessage('');
     setDealPostedAt('');
     setCreateDealPriceIndex(0);
+    setCreateDealChannelId(null);
     setShowCreateDealModal(true);
+    if (listing?.type === 'lessee') {
+      const authRes = await auth();
+      if (authRes.ok && authRes.data) {
+        setAuthToken(authRes.data);
+        const res = await api<Channel[]>('/api/v1/market/my-channels');
+        if (res.ok && res.data) setMyChannels(res.data);
+        else setMyChannels([]);
+      }
+    } else {
+      setMyChannels([]);
+    }
   };
 
   const handleCreateDeal = async () => {
@@ -103,15 +117,24 @@ export default function ListingDetailPage() {
         /* ignore invalid date */
       }
     }
+    if (listing.type === 'lessee' && !createDealChannelId) {
+      alert('Please select a channel for your ad.');
+      setCreateDealSubmitting(false);
+      return;
+    }
+    const body: { listing_id: number; channel_id?: number; type: string; duration: number; price: number; details: object } = {
+      listing_id: id,
+      type,
+      duration,
+      price: row.price,
+      details,
+    };
+    if (listing.type === 'lessee' && createDealChannelId != null) {
+      body.channel_id = createDealChannelId;
+    }
     const res = await api<Deal>('/api/v1/market/deals', {
       method: 'POST',
-      body: JSON.stringify({
-        listing_id: id,
-        type,
-        duration,
-        price: row.price,
-        details,
-      }),
+      body: JSON.stringify(body),
     });
     setCreateDealSubmitting(false);
     if (res.ok && res.data) {
@@ -338,6 +361,27 @@ export default function ListingDetailPage() {
               </button>
             </div>
             <div className="mt-4 space-y-3">
+              {listing?.type === 'lessee' && (
+                <div>
+                  <Label className="text-sm text-muted-foreground">Your channel (where the ad will be posted)</Label>
+                  <select
+                    value={createDealChannelId ?? ''}
+                    onChange={(e) => setCreateDealChannelId(e.target.value ? Number(e.target.value) : null)}
+                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                    required
+                  >
+                    <option value="">Select a channel</option>
+                    {myChannels.map((ch) => (
+                      <option key={ch.id} value={ch.id}>
+                        {ch.title ?? ch.username ?? `Channel #${ch.id}`}
+                      </option>
+                    ))}
+                  </select>
+                  {myChannels.length === 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">Add a channel in Profile to use it here.</p>
+                  )}
+                </div>
+              )}
               {priceRowsForListing.length > 1 && (
                 <div>
                   <Label className="text-sm text-muted-foreground">Price option</Label>

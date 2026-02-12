@@ -13,8 +13,10 @@ import (
 )
 
 // CreateDealRequest is the body for POST /api/v1/market/deals. LessorID/LesseeID are derived from listing + token.
+// For lessee-type listings, channel_id is required (channel where ad will be posted; must be owned by the deal creator).
 type CreateDealRequest struct {
 	ListingID int64           `json:"listing_id"`
+	ChannelID *int64          `json:"channel_id,omitempty"` // Required when listing type is lessee; ignored when lessor (taken from listing).
 	Type      string          `json:"type"`
 	Duration  int64           `json:"duration"`
 	Price     int64           `json:"price"`
@@ -70,6 +72,28 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, apperrors.ServiceError{Err: nil, Message: "invalid listing type", Code: apperrors.ErrorCodeBadRequest}
 	}
 
+	// Deal channel: lessor listing → from listing (listing owner = lessor = channel owner); lessee listing → from request (deal creator = lessor = channel owner).
+	var dealChannelID *int64
+	switch listing.Type {
+	case entity.ListingTypeLessor:
+		if listing.ChannelID != nil {
+			_, err = h.channelService.RefreshChannel(r.Context(), *listing.ChannelID, listing.UserID)
+			if err != nil {
+				return nil, apperrors.ServiceError{Err: err, Message: "listing channel is not authorized for the listing owner", Code: apperrors.ErrorCodeForbidden}
+			}
+			dealChannelID = listing.ChannelID
+		}
+	case entity.ListingTypeLessee:
+		if req.ChannelID == nil {
+			return nil, apperrors.ServiceError{Err: nil, Message: "channel_id is required when applying to a lessee listing", Code: apperrors.ErrorCodeBadRequest}
+		}
+		_, err = h.channelService.RefreshChannel(r.Context(), *req.ChannelID, userID)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: "you must be an admin of the channel to use it for this deal", Code: apperrors.ErrorCodeForbidden}
+		}
+		dealChannelID = req.ChannelID
+	}
+
 	details := req.Details
 	if details == nil {
 		details = json.RawMessage("{}")
@@ -82,6 +106,7 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		ListingID: req.ListingID,
 		LessorID:  lessorID,
 		LesseeID:  lesseeID,
+		ChannelID: dealChannelID,
 		Type:      req.Type,
 		Duration:  req.Duration,
 		Price:     req.Price,

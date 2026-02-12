@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart3 } from 'lucide-react';
 
 type Tab = 'details' | 'chat';
 
@@ -419,6 +420,15 @@ export default function DealDetailPage() {
                     #{deal.listing_id}
                   </Link>
                 </p>
+                {deal.status === 'draft' && isLessee && (deal.channel_id ?? listing?.channel_id) != null && (
+                  <Link
+                    href={`/profile/channels/${deal.channel_id ?? listing?.channel_id}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
+                  >
+                    <BarChart3 size={18} />
+                    View channel stats
+                  </Link>
+                )}
                 {deal.status !== 'waiting_escrow_deposit' && deal.escrow_address && (
                   <p className="text-sm">
                     <strong>Escrow:</strong> {formatAddressForDisplay(deal.escrow_address)}

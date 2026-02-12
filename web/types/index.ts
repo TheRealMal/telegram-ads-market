@@ -48,6 +48,7 @@ export interface Deal {
   listing_id: number;
   lessor_id: number;
   lessee_id: number;
+  channel_id?: number | null;
   type: string;
   duration: number;
   price: number;

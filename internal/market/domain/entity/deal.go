@@ -26,23 +26,24 @@ const (
 // any edit clears both signatures. When both signatures are valid for current [type, duration, price, details],
 // status becomes approved.
 type Deal struct {
-	ID                int64           `json:"id"`
-	ListingID         int64           `json:"listing_id"`
-	LessorID          int64           `json:"lessor_id"`
-	LesseeID          int64           `json:"lessee_id"`
-	Type              string          `json:"type"`
-	Duration          int64           `json:"duration"`
-	Price             int64           `json:"price"`
-	EscrowAmount      int64           `json:"escrow_amount"` // price + transaction gas + commission
-	Details           json.RawMessage `json:"details"`
-	LessorSignature   *string         `json:"lessor_signature,omitempty"`
-	LesseeSignature   *string         `json:"lessee_signature,omitempty"`
-	Status            DealStatus      `json:"status"`
-	EscrowAddress        *string    `json:"escrow_address,omitempty"`
-	EscrowPrivateKey     *string    `json:"-"` // never expose
-	EscrowReleaseTime    *time.Time `json:"escrow_release_time,omitempty"`
-	LessorPayoutAddress  *string    `json:"lessor_payout_address,omitempty"`
-	LesseePayoutAddress  *string    `json:"lessee_payout_address,omitempty"`
-	CreatedAt         time.Time       `json:"created_at,omitempty"`
-	UpdatedAt         time.Time       `json:"updated_at,omitempty"`
+	ID                   int64           `json:"id"`
+	ListingID            int64           `json:"listing_id"`
+	LessorID             int64           `json:"lessor_id"`
+	LesseeID             int64           `json:"lessee_id"`
+	ChannelID            *int64          `json:"channel_id,omitempty"` // from listing; channel where ad is posted (validated at deal creation)
+	Type                 string          `json:"type"`
+	Duration             int64           `json:"duration"`
+	Price                int64           `json:"price"`
+	EscrowAmount         int64           `json:"escrow_amount"` // price + transaction gas + commission
+	Details              json.RawMessage `json:"details"`
+	LessorSignature     *string         `json:"lessor_signature,omitempty"`
+	LesseeSignature     *string         `json:"lessee_signature,omitempty"`
+	Status               DealStatus      `json:"status"`
+	EscrowAddress       *string         `json:"escrow_address,omitempty"`
+	EscrowPrivateKey    *string         `json:"-"` // never expose
+	EscrowReleaseTime   *time.Time      `json:"escrow_release_time,omitempty"`
+	LessorPayoutAddress *string         `json:"lessor_payout_address,omitempty"`
+	LesseePayoutAddress *string         `json:"lessee_payout_address,omitempty"`
+	CreatedAt           time.Time       `json:"created_at,omitempty"`
+	UpdatedAt           time.Time       `json:"updated_at,omitempty"`
 }
