@@ -99,9 +99,10 @@ export default function ChannelStatsPage() {
   const enabledNotifications = stats?.EnabledNotifications;
   const recentPosts = stats?.RecentPostsInteractions ?? [];
   const period = stats?.Period;
+  const dateFormatEn = { month: 'short' as const, day: 'numeric' as const, year: 'numeric' as const };
   const periodLabel =
     period?.MinDate != null && period?.MaxDate != null
-      ? `${new Date(period.MinDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(period.MaxDate * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+      ? `${new Date(period.MinDate * 1000).toLocaleDateString('en-US', dateFormatEn)} – ${new Date(period.MaxDate * 1000).toLocaleDateString('en-US', dateFormatEn)}`
       : null;
 
   /** Overview stat: value (left) and delta on the right, name under them. Delta = absolute and (%). */
@@ -120,7 +121,7 @@ export default function ChannelStatsPage() {
     const deltaAbs = c - prev;
     return (
       <div className="py-2">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="font-semibold">{c}</span>
           {showDelta && (
             <span
@@ -282,21 +283,27 @@ export default function ChannelStatsPage() {
           const maxX = xValues.length ? Math.max(...xValues) : 0;
           const graphPeriodLabel =
             minX > 1e10 && maxX > 1e10
-              ? `${new Date(minX).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(maxX).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+              ? `${new Date(minX).toLocaleDateString('en-US', dateFormatEn)} – ${new Date(maxX).toLocaleDateString('en-US', dateFormatEn)}`
               : periodLabel;
 
           const hasMultipleSeries = yColumns.length > 1;
           const hiddenSet = hiddenSeriesByGraph[key];
           const isSeriesVisible = (dataKey: string) => !hasMultipleSeries || !hiddenSet?.has(dataKey);
 
-          // 100% stacked area for Languages
+          // 100% stacked area for Languages: normalize so visible series always sum to 100%
           const isLanguages = key === 'LanguagesGraph';
           const chartRows = isLanguages
             ? rows.map((row) => {
-                const sum = yColumns.reduce((s, col) => s + (Number(row[col.key]) || 0), 0);
+                const visibleSum = yColumns
+                  .filter((col) => isSeriesVisible(col.key))
+                  .reduce((s, col) => s + (Number(row[col.key]) || 0), 0);
                 const out: Record<string, number> = { x: row.x };
                 for (const col of yColumns) {
-                  out[col.key] = sum > 0 ? (Number(row[col.key]) || 0) / sum * 100 : 0;
+                  if (!isSeriesVisible(col.key)) {
+                    out[col.key] = 0;
+                  } else {
+                    out[col.key] = visibleSum > 0 ? ((Number(row[col.key]) || 0) / visibleSum) * 100 : 0;
+                  }
                 }
                 return out;
               })
@@ -319,14 +326,12 @@ export default function ChannelStatsPage() {
                         <XAxis
                           dataKey="x"
                           tickFormatter={formatX}
-                          label={{ value: xLabel, position: 'insideBottom', offset: -5 }}
                           className="text-xs"
                         />
                         <YAxis
                           domain={[0, 100]}
-                          tickFormatter={(v) => `${v}%`}
+                          tickFormatter={(v) => `${Math.round(Number(v))}%`}
                           className="text-xs"
-                          label={{ value: '%', angle: -90, position: 'insideLeft' }}
                         />
                         <Tooltip
                           labelFormatter={tooltipLabel}
@@ -338,26 +343,24 @@ export default function ChannelStatsPage() {
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
+                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
+                                      const color = getSeriesColor(key, i, col.key, col.name);
                                       return (
                                         <button
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                                          style={{
+                                            backgroundColor: hidden ? 'transparent' : color,
+                                            borderColor: color,
+                                            color: hidden ? color : 'white',
+                                          }}
                                         >
-                                          <span
-                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                                            style={{
-                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
-                                              opacity: hidden ? 0.4 : 1,
-                                            }}
-                                          />
-                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
-                                            {col.name}
-                                          </span>
+                                          {!hidden && <span className="shrink-0">✓</span>}
+                                          <span>{col.name}</span>
                                         </button>
                                       );
                                     })}
@@ -385,13 +388,9 @@ export default function ChannelStatsPage() {
                         <XAxis
                           dataKey="x"
                           tickFormatter={formatX}
-                          label={{ value: xLabel, position: 'insideBottom', offset: -5 }}
                           className="text-xs"
                         />
-                        <YAxis
-                          className="text-xs"
-                          label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
-                        />
+                        <YAxis className="text-xs" />
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
@@ -401,26 +400,24 @@ export default function ChannelStatsPage() {
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
+                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
+                                      const color = getSeriesColor(key, i, col.key, col.name);
                                       return (
                                         <button
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                                          style={{
+                                            backgroundColor: hidden ? 'transparent' : color,
+                                            borderColor: color,
+                                            color: hidden ? color : 'white',
+                                          }}
                                         >
-                                          <span
-                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                                            style={{
-                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
-                                              opacity: hidden ? 0.4 : 1,
-                                            }}
-                                          />
-                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
-                                            {col.name}
-                                          </span>
+                                          {!hidden && <span className="shrink-0">✓</span>}
+                                          <span>{col.name}</span>
                                         </button>
                                       );
                                     })}
@@ -445,50 +442,49 @@ export default function ChannelStatsPage() {
                         <XAxis
                           dataKey="x"
                           tickFormatter={formatX}
-                          label={{ value: xLabel, position: 'insideBottom', offset: -5 }}
                           className="text-xs"
                         />
                         <YAxis
                           className="text-xs"
-                          label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
+                          domain={key === 'GrowthGraph' ? ['dataMin', 'dataMax'] : undefined}
                         />
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
-                        <Legend
-                          wrapperStyle={{ paddingTop: 8 }}
-                          content={
-                            hasMultipleSeries
-                              ? () => (
-                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2">
-                                    {yColumns.map((col, i) => {
-                                      const hidden = hiddenSet?.has(col.key) ?? false;
-                                      return (
-                                        <button
-                                          key={col.key}
-                                          type="button"
-                                          onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="flex items-center gap-1.5 text-xs hover:opacity-80"
-                                        >
-                                          <span
-                                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                        {key !== 'GrowthGraph' && (
+                          <Legend
+                            wrapperStyle={{ paddingTop: 8 }}
+                            content={
+                              hasMultipleSeries
+                                ? () => (
+                                    <div className="flex flex-wrap justify-center gap-2 pt-2">
+                                      {yColumns.map((col, i) => {
+                                        const hidden = hiddenSet?.has(col.key) ?? false;
+                                        const color = getSeriesColor(key, i, col.key, col.name);
+                                        return (
+                                          <button
+                                            key={col.key}
+                                            type="button"
+                                            onClick={() => toggleGraphSeries(key, col.key)}
+                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
                                             style={{
-                                              backgroundColor: getSeriesColor(key, i, col.key, col.name),
-                                              opacity: hidden ? 0.4 : 1,
+                                              backgroundColor: hidden ? 'transparent' : color,
+                                              borderColor: color,
+                                              color: hidden ? color : 'white',
                                             }}
-                                          />
-                                          <span className={hidden ? 'text-muted-foreground line-through' : ''}>
-                                            {col.name}
-                                          </span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )
-                              : undefined
-                          }
-                        />
+                                          >
+                                            {!hidden && <span className="shrink-0">✓</span>}
+                                            <span>{col.name}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )
+                                : undefined
+                            }
+                          />
+                        )}
                         {yColumns.filter((col) => isSeriesVisible(col.key)).map((col, i) => (
                           <Line
                             key={col.key}
