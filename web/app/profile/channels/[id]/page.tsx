@@ -42,6 +42,8 @@ export default function ChannelStatsPage() {
   const [error, setError] = useState<string | null>(null);
   /** Hidden series per graph key (only for graphs with multiple series). Tapping legend toggles. */
   const [hiddenSeriesByGraph, setHiddenSeriesByGraph] = useState<Record<string, Set<string>>>({});
+  /** Brush range per graph key (startIndex, endIndex). When set, card header shows this range. */
+  const [brushRangeByGraph, setBrushRangeByGraph] = useState<Record<string, { startIndex: number; endIndex: number }>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -292,6 +294,12 @@ export default function ChannelStatsPage() {
           const hiddenSet = hiddenSeriesByGraph[key];
           const isSeriesVisible = (dataKey: string) => !hasMultipleSeries || !hiddenSet?.has(dataKey);
 
+          const handleBrushChange = (e: { startIndex?: number; endIndex?: number }) => {
+            if (e?.startIndex != null && e?.endIndex != null) {
+              setBrushRangeByGraph((prev) => ({ ...prev, [key]: { startIndex: e.startIndex!, endIndex: e.endIndex! } }));
+            }
+          };
+
           // 100% stacked area for Languages: normalize so visible series always sum to 100%
           const isLanguages = key === 'LanguagesGraph';
           const chartRows = isLanguages
@@ -311,19 +319,25 @@ export default function ChannelStatsPage() {
               })
             : rows;
 
+          const brushRange = brushRangeByGraph[key];
+          const displayedPeriodLabel =
+            isDateGraph && brushRange && chartRows.length > 0 && brushRange.startIndex <= brushRange.endIndex
+              ? `${new Date(chartRows[brushRange.startIndex].x).toLocaleDateString('en-US', dateFormatEn)} – ${new Date(chartRows[brushRange.endIndex].x).toLocaleDateString('en-US', dateFormatEn)}`
+              : graphPeriodLabel;
+
           return (
             <Card key={key}>
               <CardHeader>
                 <CardTitle className="text-base">{title}</CardTitle>
-                {graphPeriodLabel && (
-                  <p className="text-sm text-muted-foreground">{graphPeriodLabel}</p>
+                {displayedPeriodLabel && (
+                  <p className="text-sm text-muted-foreground">{displayedPeriodLabel}</p>
                 )}
               </CardHeader>
               <CardContent className="px-3 pb-0 pt-0">
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
-                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 60 : 25 }}>
+                      <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 48 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -359,11 +373,18 @@ export default function ChannelStatsPage() {
                           />
                         ))}
                         {isDateGraph && (
-                          <Brush dataKey="x" height={30} tickFormatter={formatX} stroke="var(--muted-foreground)" />
+                          <Brush
+                            dataKey="x"
+                            height={24}
+                            tickFormatter={formatX}
+                            fill="var(--muted)"
+                            stroke="var(--border)"
+                            onChange={handleBrushChange}
+                          />
                         )}
                       </AreaChart>
                     ) : chartType === 'bar' ? (
-                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 60 : 25 }}>
+                      <BarChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 48 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -390,11 +411,18 @@ export default function ChannelStatsPage() {
                           />
                         ))}
                         {isDateGraph && (
-                          <Brush dataKey="x" height={30} tickFormatter={formatX} stroke="var(--muted-foreground)" />
+                          <Brush
+                            dataKey="x"
+                            height={24}
+                            tickFormatter={formatX}
+                            fill="var(--muted)"
+                            stroke="var(--border)"
+                            onChange={handleBrushChange}
+                          />
                         )}
                       </BarChart>
                     ) : (
-                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 60 : 25 }}>
+                      <LineChart data={chartRows} margin={{ top: 5, right: 5, left: 2, bottom: isDateGraph ? 48 : 25 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis
                           dataKey="x"
@@ -427,14 +455,21 @@ export default function ChannelStatsPage() {
                           />
                         ))}
                         {isDateGraph && (
-                          <Brush dataKey="x" height={30} tickFormatter={formatX} stroke="var(--muted-foreground)" />
+                          <Brush
+                            dataKey="x"
+                            height={24}
+                            tickFormatter={formatX}
+                            fill="var(--muted)"
+                            stroke="var(--border)"
+                            onChange={handleBrushChange}
+                          />
                         )}
                       </LineChart>
                     )}
                   </ResponsiveContainer>
                 </div>
                 {hasMultipleSeries && (
-                  <div className="flex flex-wrap justify-center gap-2 pt-2">
+                  <div className="flex flex-wrap justify-center gap-2 pt-1">
                     {yColumns.map((col, i) => {
                       const hidden = hiddenSet?.has(col.key) ?? false;
                       const color = getSeriesColor(key, i, col.key, col.name);
