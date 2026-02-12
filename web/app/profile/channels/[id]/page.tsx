@@ -125,15 +125,13 @@ export default function ChannelStatsPage() {
           <span className="font-semibold">{c}</span>
           {showDelta && (
             <span
-              className={
-                deltaPercent > 0 ? 'text-green-600' : deltaPercent < 0 ? 'text-red-600' : 'text-muted-foreground'
-              }
+              className={`text-xs ${deltaPercent > 0 ? 'text-green-600' : deltaPercent < 0 ? 'text-red-600' : 'text-muted-foreground'}`}
             >
               {deltaAbs >= 0 ? '+' : ''}{deltaAbs} ({deltaPercent > 0 ? '+' : ''}{deltaPercent.toFixed(1)}%)
             </span>
           )}
         </div>
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
       </div>
     );
   }
@@ -250,7 +248,7 @@ export default function ChannelStatsPage() {
                           : 0}%
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">Enabled notifications</p>
+                    <p className="text-xs text-muted-foreground">Enabled notifications</p>
                   </div>
                 )}
                 {viewsPerStory != null && (
@@ -318,7 +316,7 @@ export default function ChannelStatsPage() {
                 )}
               </CardHeader>
               <CardContent className="px-3 pb-0 pt-0">
-                <div className="h-72 w-full">
+                <div className="relative h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {isLanguages ? (
                       <AreaChart data={chartRows} margin={{ top: 5, right: 5, left: 0, bottom: 25 }}>
@@ -339,11 +337,11 @@ export default function ChannelStatsPage() {
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
                         <Legend
-                          wrapperStyle={{ paddingTop: 8 }}
+                          wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
+                                  <div className="flex flex-wrap justify-end gap-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
                                       const color = getSeriesColor(key, i, col.key, col.name);
@@ -352,15 +350,24 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
                                             color: hidden ? color : 'white',
                                           }}
                                         >
-                                          {!hidden && <span className="shrink-0">✓</span>}
-                                          <span>{col.name}</span>
+                                          <span
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                            style={{ opacity: hidden ? 0 : 1 }}
+                                          >
+                                            ✓
+                                          </span>
+                                          <span
+                                            className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                          >
+                                            {col.name}
+                                          </span>
                                         </button>
                                       );
                                     })}
@@ -396,11 +403,11 @@ export default function ChannelStatsPage() {
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
                         />
                         <Legend
-                          wrapperStyle={{ paddingTop: 8 }}
+                          wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
                           content={
                             hasMultipleSeries
                               ? () => (
-                                  <div className="flex flex-wrap justify-center gap-2 pt-2">
+                                  <div className="flex flex-wrap justify-end gap-2">
                                     {yColumns.map((col, i) => {
                                       const hidden = hiddenSet?.has(col.key) ?? false;
                                       const color = getSeriesColor(key, i, col.key, col.name);
@@ -409,15 +416,24 @@ export default function ChannelStatsPage() {
                                           key={col.key}
                                           type="button"
                                           onClick={() => toggleGraphSeries(key, col.key)}
-                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                                          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
                                           style={{
                                             backgroundColor: hidden ? 'transparent' : color,
                                             borderColor: color,
                                             color: hidden ? color : 'white',
                                           }}
                                         >
-                                          {!hidden && <span className="shrink-0">✓</span>}
-                                          <span>{col.name}</span>
+                                          <span
+                                            className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                            style={{ opacity: hidden ? 0 : 1 }}
+                                          >
+                                            ✓
+                                          </span>
+                                          <span
+                                            className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                          >
+                                            {col.name}
+                                          </span>
                                         </button>
                                       );
                                     })}
@@ -454,11 +470,11 @@ export default function ChannelStatsPage() {
                         />
                         {key !== 'GrowthGraph' && (
                           <Legend
-                            wrapperStyle={{ paddingTop: 8 }}
+                            wrapperStyle={{ position: 'absolute', top: 8, right: 8, margin: 0 }}
                             content={
                               hasMultipleSeries
                                 ? () => (
-                                    <div className="flex flex-wrap justify-center gap-2 pt-2">
+                                    <div className="flex flex-wrap justify-end gap-2">
                                       {yColumns.map((col, i) => {
                                         const hidden = hiddenSet?.has(col.key) ?? false;
                                         const color = getSeriesColor(key, i, col.key, col.name);
@@ -467,15 +483,24 @@ export default function ChannelStatsPage() {
                                             key={col.key}
                                             type="button"
                                             onClick={() => toggleGraphSeries(key, col.key)}
-                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-[background-color,color,transform] duration-200 hover:opacity-90"
                                             style={{
                                               backgroundColor: hidden ? 'transparent' : color,
                                               borderColor: color,
                                               color: hidden ? color : 'white',
                                             }}
                                           >
-                                            {!hidden && <span className="shrink-0">✓</span>}
-                                            <span>{col.name}</span>
+                                            <span
+                                              className="flex min-w-[1rem] shrink-0 items-center justify-center transition-opacity duration-200"
+                                              style={{ opacity: hidden ? 0 : 1 }}
+                                            >
+                                              ✓
+                                            </span>
+                                            <span
+                                              className={`inline-block transition-transform duration-200 ${hidden ? '-translate-x-1' : ''}`}
+                                            >
+                                              {col.name}
+                                            </span>
                                           </button>
                                         );
                                       })}
