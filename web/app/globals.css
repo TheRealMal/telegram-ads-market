@@ -50,22 +50,26 @@
   --brush-border: #a3a3a3;
 }
 
-/* Brush: tick labels, dark gray border, rounded, travellers darker (same as border) */
+/* Brush: tick labels, rounded track, border only on travellers */
 .recharts-brush text {
   fill: var(--foreground);
 }
 .recharts-brush > rect:first-of-type {
-  stroke: var(--brush-border);
-  stroke-width: 1px;
   rx: 8;
   ry: 8;
 }
 .recharts-brush-slide {
   fill: var(--muted-foreground);
   fill-opacity: 0.4;
+  rx: 6;
+  ry: 6;
 }
 .recharts-brush-traveller rect {
-  fill: var(--brush-border);
+  fill: var(--muted);
+  stroke: var(--brush-border);
+  stroke-width: 1px;
+  rx: 6;
+  ry: 6;
 }
 .recharts-brush-traveller line {
   stroke: var(--background);
