@@ -327,9 +327,9 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
+                          mirror
                           domain={[0, 100]}
                           tickFormatter={(v) => `${Math.round(Number(v))}%`}
-                          tick={{ dx: 8 }}
                           className="text-xs"
                         />
                         <Tooltip
@@ -360,23 +360,17 @@ export default function ChannelStatsPage() {
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                            className="flex shrink-0 items-center justify-center overflow-hidden"
                                             style={{
+                                              width: hidden ? 0 : 16,
+                                              minWidth: hidden ? 0 : 16,
                                               opacity: hidden ? 0 : 1,
-                                              transition: 'opacity 0.3s ease-out',
+                                              transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
                                             }}
                                           >
                                             ✓
                                           </span>
-                                          <span
-                                            className="inline-block"
-                                            style={{
-                                              transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
-                                              transition: 'transform 0.3s ease-out',
-                                            }}
-                                          >
-                                            {col.name}
-                                          </span>
+                                          <span>{col.name}</span>
                                         </button>
                                       );
                                     })}
@@ -406,7 +400,7 @@ export default function ChannelStatsPage() {
                           tickFormatter={formatX}
                           className="text-xs"
                         />
-                        <YAxis tick={{ dx: 8 }} className="text-xs" />
+                        <YAxis mirror className="text-xs" />
                         <Tooltip
                           labelFormatter={tooltipLabel}
                           contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
@@ -434,23 +428,17 @@ export default function ChannelStatsPage() {
                                           }}
                                         >
                                           <span
-                                            className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                            className="flex shrink-0 items-center justify-center overflow-hidden"
                                             style={{
+                                              width: hidden ? 0 : 16,
+                                              minWidth: hidden ? 0 : 16,
                                               opacity: hidden ? 0 : 1,
-                                              transition: 'opacity 0.3s ease-out',
+                                              transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
                                             }}
                                           >
                                             ✓
                                           </span>
-                                          <span
-                                            className="inline-block"
-                                            style={{
-                                              transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
-                                              transition: 'transform 0.3s ease-out',
-                                            }}
-                                          >
-                                            {col.name}
-                                          </span>
+                                          <span>{col.name}</span>
                                         </button>
                                       );
                                     })}
@@ -478,9 +466,9 @@ export default function ChannelStatsPage() {
                           className="text-xs"
                         />
                         <YAxis
+                          mirror
                           className="text-xs"
                           domain={key === 'GrowthGraph' ? ['dataMin', 'dataMax'] : undefined}
-                          tick={{ dx: 8 }}
                         />
                         <Tooltip
                           labelFormatter={tooltipLabel}
@@ -510,23 +498,17 @@ export default function ChannelStatsPage() {
                                             }}
                                           >
                                             <span
-                                              className="flex min-w-[1rem] shrink-0 items-center justify-center"
+                                              className="flex shrink-0 items-center justify-center overflow-hidden"
                                               style={{
+                                                width: hidden ? 0 : 16,
+                                                minWidth: hidden ? 0 : 16,
                                                 opacity: hidden ? 0 : 1,
-                                                transition: 'opacity 0.3s ease-out',
+                                                transition: 'width 0.3s ease-out, min-width 0.3s ease-out, opacity 0.3s ease-out',
                                               }}
                                             >
                                               ✓
                                             </span>
-                                            <span
-                                              className="inline-block"
-                                              style={{
-                                                transform: hidden ? 'translateX(-6px)' : 'translateX(0)',
-                                                transition: 'transform 0.3s ease-out',
-                                              }}
-                                            >
-                                              {col.name}
-                                            </span>
+                                            <span>{col.name}</span>
                                           </button>
                                         );
                                       })}
