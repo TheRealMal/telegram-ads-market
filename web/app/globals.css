@@ -50,7 +50,7 @@
   --brush-border: #a3a3a3;
 }
 
-/* Brush: tick labels, rounded track, border only on travellers */
+/* Brush: outer rect rounded, no border; inner rect (slide) has border; travellers = border color, rounded */
 .recharts-brush text {
   fill: var(--foreground);
 }
@@ -61,13 +61,13 @@
 .recharts-brush-slide {
   fill: var(--muted-foreground);
   fill-opacity: 0.4;
+  stroke: var(--brush-border);
+  stroke-width: 1px;
   rx: 6;
   ry: 6;
 }
 .recharts-brush-traveller rect {
-  fill: var(--muted);
-  stroke: var(--brush-border);
-  stroke-width: 1px;
+  fill: var(--brush-border);
   rx: 6;
   ry: 6;
 }
