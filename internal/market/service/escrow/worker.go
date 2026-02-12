@@ -16,13 +16,14 @@ const (
 // Worker runs a loop that fetches all deals in status approved without escrow and creates escrow for each.
 // Interval is the delay between runs. Run blocks until ctx is cancelled.
 func (s *service) Worker(ctx context.Context) {
+	logger := slog.With("component", "escrow_creator_worker")
 	ticker := time.NewTicker(escrowWorkerInterval)
 	defer ticker.Stop()
 
 	run := func(ctx context.Context) {
 		deals, err := s.marketRepository.ListDealsApprovedWithoutEscrow(ctx)
 		if err != nil {
-			slog.Error("escrow worker: list approved deals without escrow", "error", err)
+			logger.Error("escrow worker: list approved deals without escrow", "error", err)
 			return
 		}
 		for _, d := range deals {
@@ -30,10 +31,10 @@ func (s *service) Worker(ctx context.Context) {
 				return
 			}
 			if err := s.CreateEscrow(ctx, d.ID); err != nil {
-				slog.Error("escrow worker: create escrow for deal", "deal_id", d.ID, "error", err)
+				logger.Error("escrow worker: create escrow for deal", "deal_id", d.ID, "error", err)
 				continue
 			}
-			slog.Info("escrow worker: created escrow for deal", "deal_id", d.ID)
+			logger.Info("escrow worker: created escrow for deal", "deal_id", d.ID)
 		}
 	}
 
@@ -54,6 +55,7 @@ const releaseRefundWorkerInterval = 1 * time.Minute
 // ReleaseRefundWorker runs a loop that processes deals in waiting_escrow_release (release to lessor)
 // and waiting_escrow_refund (refund to lessee), using locks and sending TON from escrow.
 func (s *service) ReleaseRefundWorker(ctx context.Context) {
+	logger := slog.With("component", "escrow_manager_worker")
 	ticker := time.NewTicker(releaseRefundWorkerInterval)
 	defer ticker.Stop()
 	run := func(ctx context.Context) {
@@ -66,18 +68,18 @@ func (s *service) ReleaseRefundWorker(ctx context.Context) {
 				deals, err = s.marketRepository.ListDealsWaitingEscrowRefund(ctx)
 			}
 			if err != nil {
-				slog.Error("escrow release/refund worker: list deals", "release", release, "error", err)
+				logger.Error("escrow release/refund worker: list deals", "release", release, "error", err)
 				continue
 			}
 			for _, d := range deals {
 				if ctx.Err() != nil {
 					return
 				}
-				if err := s.ReleaseOrRefundEscrow(ctx, d.ID, release); err != nil {
+				if err := s.ReleaseOrRefundEscrow(ctx, logger, d.ID, release); err != nil {
 					if errors.Is(err, ErrPayoutAddressNotSet) {
-						slog.Debug("escrow release/refund worker: skip deal, payout address not set", "deal_id", d.ID, "release", release)
+						logger.Debug("escrow release/refund worker: skip deal, payout address not set", "deal_id", d.ID, "release", release)
 					} else {
-						slog.Error("escrow release/refund worker: failed", "deal_id", d.ID, "release", release, "error", err)
+						logger.Error("escrow release/refund worker: failed", "deal_id", d.ID, "release", release, "error", err)
 					}
 					continue
 				}

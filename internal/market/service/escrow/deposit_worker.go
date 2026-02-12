@@ -31,8 +31,11 @@ func (s *service) DepositStreamWorker(ctx context.Context, stream DepositStreamR
 	if stream == nil {
 		return
 	}
+
+	logger := slog.With("component", "escrow_deposit_worker")
+
 	if err := stream.CreateGroup(ctx, escrowDepositStream, escrowDepositGroup, "0"); err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
-		slog.Error("escrow deposit worker: create group", "error", err)
+		logger.Error("create group", "error", err)
 		return
 	}
 	ticker := time.NewTicker(escrowDepositPollInterval)
@@ -42,12 +45,12 @@ func (s *service) DepositStreamWorker(ctx context.Context, stream DepositStreamR
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.processDepositEvents(ctx, stream)
+			s.processDepositEvents(ctx, stream, logger)
 		}
 	}
 }
 
-func (s *service) processDepositEvents(ctx context.Context, stream DepositStreamReader) {
+func (s *service) processDepositEvents(ctx context.Context, stream DepositStreamReader, logger *slog.Logger) {
 	msgs, err := stream.ReadEvents(ctx, &redis.XReadGroupArgs{
 		Group:    escrowDepositGroup,
 		Consumer: escrowDepositConsumer,
@@ -64,7 +67,7 @@ func (s *service) processDepositEvents(ctx context.Context, stream DepositStream
 		ev.FromMap(msg.Values)
 		deal, err := s.marketRepository.GetDealByEscrowAddress(ctx, ev.Address)
 		if err != nil {
-			slog.Error("escrow deposit worker: get deal", "address", ev.Address, "error", err)
+			logger.Error("get deal", "address", ev.Address, "error", err)
 			ids = append(ids, msg.ID)
 			continue
 		}
@@ -73,15 +76,15 @@ func (s *service) processDepositEvents(ctx context.Context, stream DepositStream
 			continue
 		}
 		if ev.Amount < deal.EscrowAmount {
-			slog.Info("escrow deposit worker: amount too low", "deal_id", deal.ID, "address", ev.Address, "amount", ev.Amount, "escrow_amount", deal.EscrowAmount)
+			logger.Info("amount too low", "deal_id", deal.ID, "address", ev.Address, "amount", ev.Amount, "escrow_amount", deal.EscrowAmount)
 			ids = append(ids, msg.ID)
 			continue
 		}
 		if err := s.marketRepository.SetDealStatusEscrowDepositConfirmed(ctx, deal.ID); err != nil {
-			slog.Error("escrow deposit worker: set status", "deal_id", deal.ID, "error", err)
+			logger.Error("set status", "deal_id", deal.ID, "error", err)
 			continue
 		}
-		slog.Info("escrow deposit confirmed", "deal_id", deal.ID, "address", ev.Address)
+		logger.Info("escrow deposit confirmed", "deal_id", deal.ID, "address", ev.Address)
 		ids = append(ids, msg.ID)
 	}
 	if len(ids) > 0 {

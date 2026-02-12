@@ -20,44 +20,46 @@ const (
 
 // RunDealPostSenderWorker lists deals escrow_deposit_confirmed without a post message, sends the post text to the listing's channel, and creates deal_post_message.
 func (s *service) RunDealPostSenderWorker(ctx context.Context, repo marketRepository) {
+	logger := slog.With("component", "deal_post_sendr")
 	ticker := time.NewTicker(postSenderInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.runDealPostSenderOnce(ctx, repo)
+			s.runDealPostSenderOnce(ctx, repo, logger)
 		}
 	}
 }
 
-func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketRepository) {
+func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketRepository, logger *slog.Logger) {
 	deals, err := repo.ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx)
 	if err != nil {
-		slog.Error("deal post sender: list deals", "error", err)
+		logger.Error("list deals", "error", err)
 		return
 	}
 	for _, deal := range deals {
 		listing, err := repo.GetListingByID(ctx, deal.ListingID)
 		if err != nil || listing == nil || listing.ChannelID == nil {
-			slog.Debug("deal post sender: skip deal, no listing or channel", "deal_id", deal.ID)
+			logger.Debug("skip deal, no listing or channel", "deal_id", deal.ID)
 			continue
 		}
 		channel, err := repo.GetChannelByID(ctx, *listing.ChannelID)
 		if err != nil || channel == nil {
-			slog.Debug("deal post sender: skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
+			logger.Debug("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
 			continue
 		}
 		text := domain.GetMessageFromDetails(deal.Details)
 		if text == "" {
-			slog.Debug("deal post sender: skip deal, no message in details", "deal_id", deal.ID)
+			logger.Debug("skip deal, no message in details", "deal_id", deal.ID)
 			continue
 		}
 
 		lockID, err := repo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
 		if err != nil {
-			slog.Debug("deal post sender: skip deal, lock not acquired", "deal_id", deal.ID, "error", err)
+			logger.Debug("skip deal, lock not acquired", "deal_id", deal.ID, "error", err)
 			continue
 		}
 		releaseLock := func(status marketentity.DealActionLockStatus) {
@@ -66,7 +68,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketReposito
 
 		msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text)
 		if err != nil {
-			slog.Error("deal post sender: send message", "deal_id", deal.ID, "error", err)
+			logger.Error("send message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
 			continue
 		}
@@ -82,11 +84,11 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketReposito
 			UntilTs:     untilTs,
 		}
 		if err := repo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
-			slog.Error("deal post sender: create deal_post_message", "deal_id", deal.ID, "error", err)
+			logger.Error("create deal_post_message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
 		} else {
 			releaseLock(marketentity.DealActionLockStatusCompleted)
-			slog.Info("deal post sender: sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
+			logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
 		}
 	}
 }
@@ -117,24 +119,27 @@ func (s *service) sendChannelMessage(ctx context.Context, channelID int64, acces
 
 // RunDealPostCheckerWorker lists deal_post_message with status=exists and next_check <= now, checks if the message still exists, and updates status/next_check or sets passed.
 func (s *service) RunDealPostCheckerWorker(ctx context.Context, repo marketRepository) {
+	logger := slog.With("component", "deal_post_checker")
 	ticker := time.NewTicker(postCheckerInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.runDealPostCheckerOnce(ctx, repo)
+			s.runDealPostCheckerOnce(ctx, repo, logger)
 		}
 	}
 }
 
-func (s *service) runDealPostCheckerOnce(ctx context.Context, repo marketRepository) {
+func (s *service) runDealPostCheckerOnce(ctx context.Context, repo marketRepository, logger *slog.Logger) {
 	list, err := repo.ListDealPostMessageExistsWithNextCheckBefore(ctx, time.Now())
 	if err != nil {
-		slog.Error("deal post checker: list", "error", err)
+		logger.Error("list", "error", err)
 		return
 	}
+
 	for _, m := range list {
 		channel, err := repo.GetChannelByID(ctx, m.ChannelID)
 		if err != nil || channel == nil {
@@ -142,18 +147,18 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, repo marketReposit
 		}
 		exists, err := s.getChannelMessageExists(ctx, m.ChannelID, channel.AccessHash, m.MessageID)
 		if err != nil {
-			slog.Error("deal post checker: get message", "id", m.ID, "error", err)
+			logger.Error("get message", "id", m.ID, "error", err)
 			continue
 		}
 		if !exists {
 			_ = repo.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusDeleted)
-			slog.Info("deal post checker: message deleted", "id", m.ID, "deal_id", m.DealID)
+			logger.Info("message deleted", "id", m.ID, "deal_id", m.DealID)
 			continue
 		}
 		nextCheck := m.NextCheck.Add(postCheckAdvanceHour)
 		if nextCheck.After(m.UntilTs) {
 			_ = repo.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusPassed)
-			slog.Info("deal post checker: passed", "id", m.ID, "deal_id", m.DealID)
+			logger.Info("passed", "id", m.ID, "deal_id", m.DealID)
 		} else {
 			_ = repo.UpdateDealPostMessageStatusAndNextCheck(ctx, m.ID, marketentity.DealPostMessageStatusExists, nextCheck)
 		}

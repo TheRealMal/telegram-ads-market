@@ -89,7 +89,7 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 // ReleaseOrRefundEscrow performs escrow release (to lessor) or refund (to lessee) using a short-lived lock.
 // Takes a 5-minute lock, sends deal.EscrowAmount (nanoton) to the payout address, then marks lock and deal status.
 // Deal must have lessor_payout_address (release) or lessee_payout_address (refund) set.
-func (s *service) ReleaseOrRefundEscrow(ctx context.Context, dealID int64, release bool) error {
+func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger, dealID int64, release bool) error {
 	deal, err := s.marketRepository.GetDealByID(ctx, dealID)
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, dealID int64, relea
 	}
 	amount := tlb.FromNanoTONU(uint64(deal.EscrowAmount))
 	if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
-		slog.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
+		logger.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
 		releaseLockFailed()
 		return err
 	}
@@ -145,7 +145,7 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, dealID int64, relea
 		}
 	}
 	_ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, entity.DealActionLockStatusCompleted)
-	slog.Info("escrow release/refund completed", "deal_id", dealID, "release", release)
+	logger.Info("escrow release/refund completed", "deal_id", dealID, "release", release)
 	return nil
 }
 
