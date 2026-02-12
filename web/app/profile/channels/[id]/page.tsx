@@ -45,15 +45,85 @@ export default function ChannelStatsPage() {
   /** Brush range per graph key (startIndex, endIndex). When set, card header shows this range. */
   const [brushRangeByGraph, setBrushRangeByGraph] = useState<Record<string, { startIndex: number; endIndex: number }>>({});
 
-  /** Recharts Brush does not pass rx/ry to the background rect; set them in the DOM so the brush track has rounded corners. */
+  /** Recharts Brush: (1) set rx/ry on background rect; (2) replace traveller rects with paths that round only outer corners (left: top-left, bottom-left; right: top-right, bottom-right). */
   useEffect(() => {
+    const R = 5;
+
+    const roundRectPath = (x: number, y: number, w: number, h: number, corners: { tl?: number; tr?: number; br?: number; bl?: number }) => {
+      const tl = corners.tl ?? 0;
+      const tr = corners.tr ?? 0;
+      const br = corners.br ?? 0;
+      const bl = corners.bl ?? 0;
+      if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
+        return `M ${x} ${y} h ${w} v ${h} H ${x} Z`;
+      }
+      const parts: string[] = [];
+      parts.push(`M ${x + tl} ${y}`);
+      if (tr > 0) {
+        parts.push(`H ${x + w - tr}`);
+        parts.push(`Q ${x + w} ${y} ${x + w} ${y + tr}`);
+      } else {
+        parts.push(`H ${x + w}`);
+      }
+      parts.push(`V ${y + h - br}`);
+      if (br > 0) {
+        parts.push(`Q ${x + w} ${y + h} ${x + w - br} ${y + h}`);
+      } else {
+        parts.push(`V ${y + h}`);
+      }
+      parts.push(`H ${x + bl}`);
+      if (bl > 0) {
+        parts.push(`Q ${x} ${y + h} ${x} ${y + h - bl}`);
+      } else {
+        parts.push(`H ${x}`);
+      }
+      parts.push(`V ${y + tl}`);
+      if (tl > 0) {
+        parts.push(`Q ${x} ${y} ${x + tl} ${y}`);
+      } else {
+        parts.push(`V ${y}`);
+      }
+      return parts.join(' ');
+    };
+
     const patchBrushRectCorners = () => {
       document.querySelectorAll('.recharts-brush').forEach((g) => {
         const rect = g.querySelector('rect:first-of-type');
         if (rect) {
-          rect.setAttribute('rx', '5');
-          rect.setAttribute('ry', '5');
+          rect.setAttribute('rx', String(R));
+          rect.setAttribute('ry', String(R));
         }
+
+        const travellers = g.querySelectorAll('.recharts-brush-traveller');
+        const rects = Array.from(travellers)
+          .map((t) => t.querySelector('rect'))
+          .filter((r): r is SVGRectElement => r != null)
+          .map((r) => ({
+            el: r,
+            x: parseFloat(r.getAttribute('x') ?? '0'),
+            y: parseFloat(r.getAttribute('y') ?? '0'),
+            w: parseFloat(r.getAttribute('width') ?? '0'),
+            h: parseFloat(r.getAttribute('height') ?? '0'),
+          }))
+          .filter(({ w, h }) => w > 0 && h > 0);
+        if (rects.length < 2) return;
+        rects.sort((a, b) => a.x - b.x);
+        const [left, right] = rects;
+        const fill = left.el.getAttribute('fill') ?? 'var(--brush-border)';
+        const leftPath = roundRectPath(left.x, left.y, left.w, left.h, { tl: R, bl: R });
+        const rightPath = roundRectPath(right.x, right.y, right.w, right.h, { tr: R, br: R });
+        const pathLeft = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathLeft.setAttribute('d', leftPath);
+        pathLeft.setAttribute('fill', fill);
+        pathLeft.setAttribute('stroke', fill);
+        pathLeft.setAttribute('class', left.el.getAttribute('class') ?? '');
+        left.el.parentNode?.replaceChild(pathLeft, left.el);
+        const pathRight = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathRight.setAttribute('d', rightPath);
+        pathRight.setAttribute('fill', fill);
+        pathRight.setAttribute('stroke', fill);
+        pathRight.setAttribute('class', right.el.getAttribute('class') ?? '');
+        right.el.parentNode?.replaceChild(pathRight, right.el);
       });
     };
     const raf = requestAnimationFrame(() => {
