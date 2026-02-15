@@ -5,6 +5,7 @@ import { api, auth, setAuthToken } from '@/lib/api';
 import type { Deal } from '@/types';
 import { DealCard } from '@/components/DealCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -34,6 +35,9 @@ export default function DealsPage() {
       .finally(() => setLoading(false));
   }, [authed]);
 
+  const ready = authed !== null && !loading;
+  if (!ready) return <LoadingScreen />;
+
   return (
     <div className="min-h-screen pb-20">
       <PageTopSpacer />
@@ -43,15 +47,10 @@ export default function DealsPage() {
             Open from Telegram to see your deals.
           </p>
         )}
-        {authed && loading && (
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        )}
-        {authed && !loading && deals.length === 0 && (
+        {authed && deals.length === 0 && (
           <p className="py-8 text-center text-muted-foreground">No deals yet.</p>
         )}
-        {authed && !loading && deals.length > 0 && (
+        {authed && deals.length > 0 && (
           <div className="grid gap-4">
             {deals.map((d) => (
               <DealCard key={d.id} deal={d} />

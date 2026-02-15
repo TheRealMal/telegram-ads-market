@@ -11,6 +11,7 @@ import { LISTING_CATEGORIES } from '@/lib/constants';
 import type { Listing } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function MarketplacePage() {
   const [lessorListings, setLessorListings] = useState<Listing[]>([]);
@@ -58,6 +59,8 @@ export default function MarketplacePage() {
   };
   const filteredLessors = filterBySearch(lessorListings);
   const filteredLessees = filterBySearch(lesseeListings);
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen pb-20">
@@ -150,11 +153,7 @@ export default function MarketplacePage() {
           </TabsList>
 
           <TabsContent value="channels" className="space-y-4">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : filteredLessors.length === 0 ? (
+            {filteredLessors.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No channels found</p>
             ) : (
               <div className="grid gap-4">
@@ -166,11 +165,7 @@ export default function MarketplacePage() {
           </TabsContent>
 
           <TabsContent value="advertisers" className="space-y-4">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : filteredLessees.length === 0 ? (
+            {filteredLessees.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No advertiser requests found</p>
             ) : (
               <div className="grid gap-4">

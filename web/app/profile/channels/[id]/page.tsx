@@ -30,6 +30,7 @@ import {
   Brush,
 } from 'recharts';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function ChannelStatsPage() {
   const params = useParams();
@@ -163,13 +164,7 @@ export default function ChannelStatsPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (error && !stats) {
     return (

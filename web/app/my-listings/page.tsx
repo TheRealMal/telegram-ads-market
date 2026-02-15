@@ -7,6 +7,7 @@ import { api, auth, setAuthToken } from '@/lib/api';
 import type { Listing } from '@/types';
 import { ListingCard } from '@/components/ListingCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MyListingsPage() {
@@ -40,6 +41,9 @@ export default function MyListingsPage() {
   const active = listings.filter((l) => l.status === 'active');
   const inactive = listings.filter((l) => l.status === 'inactive');
 
+  const ready = authed !== null && !loading;
+  if (!ready) return <LoadingScreen />;
+
   return (
     <div className="min-h-screen pb-20">
       <PageTopSpacer />
@@ -49,12 +53,7 @@ export default function MyListingsPage() {
             Open from Telegram to see your listings.
           </p>
         )}
-        {authed && loading && (
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        )}
-        {authed && !loading && (
+        {authed && (
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="mb-4 grid w-full grid-cols-2">
               <TabsTrigger value="active">Active</TabsTrigger>

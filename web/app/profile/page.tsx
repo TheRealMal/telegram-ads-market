@@ -8,6 +8,7 @@ import { ChannelCard } from '@/components/ChannelCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { toggleTheme, getCurrentTheme } from '@/lib/theme';
 import { User, HelpCircle, X, Sun, Moon } from 'lucide-react';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 const ADD_CHANNEL_USERNAME =
   typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADD_CHANNEL_USERNAME || 'therealmal' : 'therealmal';
@@ -46,15 +47,16 @@ export default function ProfilePage() {
       return;
     }
     let isMounted = true;
-    const fetchChannels = () => {
+    const fetchChannels = () =>
       api<Channel[]>('/api/v1/market/my-channels')
         .then((res) => {
           if (isMounted && res.ok && res.data) setChannels(res.data);
         })
-        .catch(() => {});
-    };
+        .catch(() => {})
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
     fetchChannels();
-    setLoading(false);
     const interval = setInterval(fetchChannels, 3000);
     return () => {
       isMounted = false;
@@ -68,6 +70,8 @@ export default function ProfilePage() {
   const displayUsername = tgUser?.username ? `@${tgUser.username}` : null;
   const photoUrl = tgUser?.photo_url ?? null;
   const atUsername = ADD_CHANNEL_USERNAME.startsWith('@') ? ADD_CHANNEL_USERNAME : `@${ADD_CHANNEL_USERNAME}`;
+
+  if (loading || hasToken === null) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen pb-20">
@@ -131,17 +135,12 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        )}
-        {!loading && hasToken === false && (
+        {hasToken === false && (
           <p className="py-8 text-center text-muted-foreground">
             Open this app from Telegram to see your profile.
           </p>
         )}
-        {!loading && hasToken && (
+        {hasToken && (
           <div className="space-y-3">
             {channels.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">
