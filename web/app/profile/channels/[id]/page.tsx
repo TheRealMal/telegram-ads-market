@@ -164,19 +164,6 @@ export default function ChannelStatsPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <LoadingScreen />;
-
-  if (error && !stats) {
-    return (
-      <div className="min-h-screen pb-20">
-        <PageTopSpacer />
-        <div className="mx-auto max-w-2xl px-4 py-8">
-          <p className="text-destructive">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   const followers = stats?.Followers;
   const viewsPerPost = stats?.ViewsPerPost;
   const sharesPerPost = stats?.SharesPerPost;
@@ -299,7 +286,19 @@ export default function ChannelStatsPage() {
     .filter((e): e is NonNullable<typeof e> => e != null);
 
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={loading ? 'opacity-0' : 'opacity-100'}>
+        {loading ? (
+          <div className="min-h-screen" aria-hidden />
+        ) : error && !stats ? (
+          <div className="min-h-screen pb-20">
+            <PageTopSpacer />
+            <div className="mx-auto max-w-2xl px-4 py-8">
+              <p className="text-destructive">{error}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-screen pb-20">
       <PageTopSpacer />
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-5">
         {/* Overview: two columns */}
@@ -687,6 +686,10 @@ export default function ChannelStatsPage() {
           <p className="py-4 text-center text-sm text-muted-foreground">No stats data.</p>
         )}
       </div>
-    </div>
+          </div>
+        )}
+      </div>
+      <LoadingScreen show={loading} />
+    </>
   );
 }

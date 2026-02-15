@@ -42,10 +42,10 @@ export default function MyListingsPage() {
   const inactive = listings.filter((l) => l.status === 'inactive');
 
   const ready = authed !== null && !loading;
-  if (!ready) return <LoadingScreen />;
 
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={`min-h-screen pb-20 ${ready ? 'opacity-100' : 'opacity-0'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {authed === false && (
@@ -84,6 +84,8 @@ export default function MyListingsPage() {
       >
         <Plus size={24} strokeWidth={2} />
       </Link>
-    </div>
+      </div>
+      <LoadingScreen show={!ready} />
+    </>
   );
 }

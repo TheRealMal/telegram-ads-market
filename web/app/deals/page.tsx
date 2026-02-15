@@ -36,10 +36,10 @@ export default function DealsPage() {
   }, [authed]);
 
   const ready = authed !== null && !loading;
-  if (!ready) return <LoadingScreen />;
 
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={`min-h-screen pb-20 ${ready ? 'opacity-100' : 'opacity-0'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {authed === false && (
@@ -58,6 +58,8 @@ export default function DealsPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      <LoadingScreen show={!ready} />
+    </>
   );
 }

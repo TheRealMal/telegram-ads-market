@@ -60,10 +60,9 @@ export default function MarketplacePage() {
   const filteredLessors = filterBySearch(lessorListings);
   const filteredLessees = filterBySearch(lesseeListings);
 
-  if (loading) return <LoadingScreen />;
-
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={`min-h-screen pb-20 ${loading ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         <div className="flex gap-2 mb-4">
@@ -177,6 +176,8 @@ export default function MarketplacePage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+      </div>
+      <LoadingScreen show={loading} />
+    </>
   );
 }

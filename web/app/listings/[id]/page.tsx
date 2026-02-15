@@ -146,18 +146,16 @@ export default function ListingDetailPage() {
     }
   };
 
-  if (loading) return <LoadingScreen />;
-  if (error || !listing)
-    return (
-      <div className="min-h-screen pb-20">
-        <PageTopSpacer />
-        <div className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-destructive">{error || 'Not found'}</p>
-        </div>
+  const content = ( loading ? (
+    <div className="min-h-screen" aria-hidden />
+  ) : (error || !listing) ? (
+    <div className="min-h-screen pb-20">
+      <PageTopSpacer />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <p className="text-destructive">{error || 'Not found'}</p>
       </div>
-    );
-
-  return (
+    </div>
+  ) : (
     <div className="min-h-screen pb-20">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-4">
@@ -436,6 +434,13 @@ export default function ListingDetailPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+  ) );
+
+  return (
+    <>
+      <div className={loading ? 'opacity-0' : 'opacity-100'}>{content}</div>
+      <LoadingScreen show={loading} />
+    </>
   );
 }

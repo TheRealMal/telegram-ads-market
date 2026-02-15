@@ -222,24 +222,13 @@ export default function DealDetailPage() {
     }
   };
 
-  if (loading) return <LoadingScreen />;
-  if (error || !deal)
-    return (
-      <div className="min-h-screen pb-20">
-        <PageTopSpacer />
-        <div className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-destructive">{error || 'Not found'}</p>
-        </div>
-      </div>
-    );
-
-  const isLessor = currentUserId != null && deal.lessor_id === currentUserId;
-  const isLessee = currentUserId != null && deal.lessee_id === currentUserId;
-  const lessorSigned = Boolean(deal.lessor_signature);
-  const lesseeSigned = Boolean(deal.lessee_signature);
-  const canSignAsLessor = deal.status === 'draft' && isLessor && !lessorSigned;
-  const canSignAsLessee = deal.status === 'draft' && isLessee && !lesseeSigned;
-  const bothPayoutsSet = Boolean(deal.lessor_payout_address && deal.lessee_payout_address);
+  const isLessor = deal != null && currentUserId != null && deal.lessor_id === currentUserId;
+  const isLessee = deal != null && currentUserId != null && deal.lessee_id === currentUserId;
+  const lessorSigned = Boolean(deal?.lessor_signature);
+  const lesseeSigned = Boolean(deal?.lessee_signature);
+  const canSignAsLessor = (deal?.status === 'draft') && isLessor && !lessorSigned;
+  const canSignAsLessee = (deal?.status === 'draft') && isLessee && !lesseeSigned;
+  const bothPayoutsSet = Boolean(deal?.lessor_payout_address && deal?.lessee_payout_address);
   const needsWalletToSign = (canSignAsLessor || canSignAsLessee) && !wallet;
   const canSignNow = (canSignAsLessor || canSignAsLessee) && wallet && bothPayoutsSet;
 
@@ -273,7 +262,7 @@ export default function DealDetailPage() {
   };
 
   const handleDepositEscrow = async () => {
-    if (!deal.escrow_address || deal.escrow_amount == null || deal.escrow_amount <= 0) {
+    if (!deal?.escrow_address || deal.escrow_amount == null || deal.escrow_amount <= 0) {
       setDepositError('Escrow details not ready');
       return;
     }
@@ -284,13 +273,13 @@ export default function DealDetailPage() {
     setDepositError(null);
     setDepositing(true);
     try {
-      const escrowFriendly = toFriendlyAddress(deal.escrow_address, false);
+      const escrowFriendly = toFriendlyAddress(deal!.escrow_address, false);
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
         messages: [
           {
             address: escrowFriendly,
-            amount: String(deal.escrow_amount),
+            amount: String(deal!.escrow_amount),
           },
         ],
       });
@@ -304,7 +293,19 @@ export default function DealDetailPage() {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={loading ? 'opacity-0' : 'opacity-100'}>
+        {loading ? (
+          <div className="min-h-screen" aria-hidden />
+        ) : (error || !deal) ? (
+          <div className="min-h-screen pb-20">
+            <PageTopSpacer />
+            <div className="mx-auto max-w-3xl px-4 py-8">
+              <p className="text-destructive">{error || 'Not found'}</p>
+            </div>
+          </div>
+        ) : deal ? (
+          <div className="min-h-screen pb-20">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="w-full">
@@ -615,6 +616,10 @@ export default function DealDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+          </div>
+        ) : null}
+      </div>
+      <LoadingScreen show={loading} />
+    </>
   );
 }

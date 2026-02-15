@@ -22,10 +22,9 @@ export default function ListingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <LoadingScreen />;
-
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={`min-h-screen pb-20 ${loading ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {error && (
@@ -42,6 +41,8 @@ export default function ListingsPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      <LoadingScreen show={loading} />
+    </>
   );
 }

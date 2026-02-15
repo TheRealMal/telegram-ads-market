@@ -71,10 +71,11 @@ export default function ProfilePage() {
   const photoUrl = tgUser?.photo_url ?? null;
   const atUsername = ADD_CHANNEL_USERNAME.startsWith('@') ? ADD_CHANNEL_USERNAME : `@${ADD_CHANNEL_USERNAME}`;
 
-  if (loading || hasToken === null) return <LoadingScreen />;
+  const notReady = loading || hasToken === null;
 
   return (
-    <div className="min-h-screen pb-20">
+    <>
+      <div className={`min-h-screen pb-20 ${notReady ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="bg-gradient-to-b from-primary/10 to-background pt-8 pb-4">
         <div className="mx-auto max-w-2xl px-4">
@@ -202,6 +203,8 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+      <LoadingScreen show={notReady} />
+    </>
   );
 }
