@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
 import type { Deal } from '@/types';
+import { getDealStatusLabel } from '@/types';
 
 interface DealCardProps {
   deal: Deal;
@@ -19,7 +20,7 @@ export function DealCard({ deal }: DealCardProps) {
               {formatPriceKey(String(deal.duration))} – {formatPriceValue(deal.price)}
             </p>
           </div>
-          <Badge>{deal.status}</Badge>
+          <Badge>{getDealStatusLabel(deal.status)}</Badge>
         </CardContent>
       </Card>
     </Link>

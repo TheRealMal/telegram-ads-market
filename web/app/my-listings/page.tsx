@@ -45,7 +45,7 @@ export default function MyListingsPage() {
 
   return (
     <>
-      <div className={`min-h-screen pb-20 ${ready ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`page-with-nav ${ready ? 'opacity-100' : 'opacity-0'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         {authed === false && (

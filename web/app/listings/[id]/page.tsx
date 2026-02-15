@@ -149,14 +149,14 @@ export default function ListingDetailPage() {
   const content = ( loading ? (
     <div className="min-h-screen" aria-hidden />
   ) : (error || !listing) ? (
-    <div className="min-h-screen pb-20">
+    <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-8">
         <p className="text-destructive">{error || 'Not found'}</p>
       </div>
     </div>
   ) : (
-    <div className="min-h-screen pb-20">
+    <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-4">
         <Card>

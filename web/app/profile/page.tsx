@@ -75,7 +75,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div className={`min-h-screen pb-20 ${notReady ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`page-with-nav ${notReady ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="bg-gradient-to-b from-primary/10 to-background pt-8 pb-4">
         <div className="mx-auto max-w-2xl px-4">

@@ -32,7 +32,7 @@ export default function RootLayout({
         <TonConnectProvider>
           <ThemeFromWebApp />
           <TelegramExpandOnMobile />
-          <main className="mx-auto max-w-4xl pb-20">{children}</main>
+          <main className="mx-auto max-w-4xl">{children}</main>
           <BottomNav />
         </TonConnectProvider>
       </body>

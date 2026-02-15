@@ -131,7 +131,7 @@ export default function CreateListingPage() {
 
   if (authed === false) {
     return (
-      <div className="min-h-screen pb-20">
+      <div className="page-with-nav">
         <PageTopSpacer />
         <div className="mx-auto max-w-2xl px-4 py-8">
           <p className="text-center text-muted-foreground">
@@ -143,7 +143,7 @@ export default function CreateListingPage() {
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="page-with-nav">
       <PageTopSpacer />
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl px-4 py-4">
         {error && (

@@ -74,6 +74,12 @@
   stroke: var(--background);
 }
 
+/* Page wrapper: content + bottom nav padding = 100vh so no extra scroll */
+.page-with-nav {
+  min-height: calc(100vh - 5rem);
+  padding-bottom: 5rem;
+}
+
 @layer base {
   * {
     @apply border-border;

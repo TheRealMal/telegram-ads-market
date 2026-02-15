@@ -10,6 +10,7 @@ import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
 import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
 import type { Deal, DealChat, Listing } from '@/types';
+import { getDealStatusLabel } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,17 +19,17 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3 } from 'lucide-react';
 
-/** TON logo icon (diamond), inherits text color via currentColor. */
+/** TON logo (official style). White in SVG; use currentColor so it matches text (black in light theme, white in dark). */
 function TonLogoIcon({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 56 56"
+      viewBox="0 0 237 237"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden
     >
-      <path d="M28 0l28 28-28 28L0 28 28 0z" />
+      <path d="M118.204 0.000292436C183.486 0.000292436 236.408 52.9224 236.408 118.205C236.408 183.487 183.486 236.408 118.204 236.408C52.9216 236.408 0.000184007 183.487 0 118.205C0 52.9225 52.9215 0.000452012 118.204 0.000292436ZM74.1011 62.1965C57.6799 62.1965 47.268 79.912 55.5308 94.2347L109.964 188.582C113.619 194.922 122.781 194.922 126.436 188.582L180.88 94.2347C189.132 79.9343 178.72 62.1966 162.31 62.1965H74.1011ZM162.288 78.8412C166.031 78.8412 168.234 82.8121 166.45 85.9075L137.856 137.091L137.851 137.099L126.506 159.046V78.8412H162.288ZM109.872 78.8517V159.024L98.5376 137.088L98.5334 137.08L69.9294 85.9215L69.8468 85.7725C68.2134 82.6997 70.405 78.8517 74.0899 78.8517H109.872Z" />
     </svg>
   );
 }
@@ -298,14 +299,14 @@ export default function DealDetailPage() {
         {loading ? (
           <div className="min-h-screen" aria-hidden />
         ) : (error || !deal) ? (
-          <div className="min-h-screen pb-20">
+          <div className="page-with-nav">
             <PageTopSpacer />
             <div className="mx-auto max-w-3xl px-4 py-8">
               <p className="text-destructive">{error || 'Not found'}</p>
             </div>
           </div>
         ) : deal ? (
-          <div className="min-h-screen pb-20">
+          <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="w-full">
@@ -317,41 +318,44 @@ export default function DealDetailPage() {
           <TabsContent value="details">
             {/* Wallet: above details card, minimal UI */}
             {(isLessor || isLessee) && (
-              <div className="mb-4 flex flex-col items-center justify-center space-y-1 text-center">
-                {!wallet ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => tonConnectUI.openModal()}
-                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                    >
-                      <span>Connect</span>
-                      <TonLogoIcon className="h-[1em] w-auto shrink-0" />
-                    </button>
-                    {deal.status === 'draft' && (
-                      <p className="text-sm text-muted-foreground">You need to connect wallet to make a deal.</p>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex w-full max-w-md items-center justify-between gap-2">
-                    <span className="font-mono text-sm tabular-nums">{truncateAddressDisplay(rawAddress || '')}</span>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const authRes = await auth();
-                        if (authRes.ok && authRes.data) {
-                          setAuthToken(authRes.data);
-                          await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
-                        }
-                        walletSyncedRef.current = false;
-                        dealPayoutSyncedRef.current = false;
-                        tonConnectUI.disconnect();
-                      }}
-                      className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
-                    >
-                      Disconnect
-                    </button>
-                  </div>
+              <div className="mb-4 flex w-full max-w-md flex-col gap-1">
+                <div className="flex w-full items-center justify-between gap-2">
+                  {!wallet ? (
+                    <>
+                      <span className="text-sm text-muted-foreground">Wallet</span>
+                      <button
+                        type="button"
+                        onClick={() => tonConnectUI.openModal()}
+                        className="shrink-0 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                      >
+                        <span>Connect</span>
+                        <TonLogoIcon className="h-[1em] w-auto shrink-0" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono text-sm tabular-nums">{truncateAddressDisplay(rawAddress || '')}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const authRes = await auth();
+                          if (authRes.ok && authRes.data) {
+                            setAuthToken(authRes.data);
+                            await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
+                          }
+                          walletSyncedRef.current = false;
+                          dealPayoutSyncedRef.current = false;
+                          tonConnectUI.disconnect();
+                        }}
+                        className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+                {deal.status === 'draft' && !wallet && (
+                  <p className="text-center text-xs text-muted-foreground">You need to connect wallet to make a deal.</p>
                 )}
               </div>
             )}
@@ -359,7 +363,7 @@ export default function DealDetailPage() {
             <Card>
               <CardContent className="space-y-2 p-4">
                 <p className="text-sm">
-                  <strong>Status:</strong> {deal.status}
+                  <strong>Status:</strong> {getDealStatusLabel(deal.status)}
                 </p>
                 <div className="flex flex-wrap gap-3 text-sm">
                   <span className={lessorSigned ? 'text-muted-foreground' : ''}>

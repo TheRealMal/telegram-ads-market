@@ -43,6 +43,21 @@ export type DealStatus =
   | 'released'
   | 'cancelled';
 
+/** User-friendly labels for deal statuses. */
+export const DEAL_STATUS_LABEL: Record<DealStatus, string> = {
+  draft: 'Draft',
+  approved: 'Approved',
+  waiting_escrow_deposit: 'Waiting escrow deposit',
+  escrow_deposited: 'Escrow deposited',
+  waiting_release: 'Waiting release',
+  released: 'Released',
+  cancelled: 'Cancelled',
+};
+
+export function getDealStatusLabel(status: DealStatus): string {
+  return DEAL_STATUS_LABEL[status] ?? status;
+}
+
 export interface Deal {
   id: number;
   listing_id: number;
