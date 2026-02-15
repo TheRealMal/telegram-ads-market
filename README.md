@@ -4,6 +4,8 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 
 # MVP
 
+* Current MVP deployment does not support escrow actions as there are some problem with tls handshake & ton litenodes connections from containers on a server. But these features are implemented and ready.
+
 - Bot: https://t.me/BaboonMarketBot
 - Mini APP: https://t.me/BaboonMarketBot?startapp=
 
@@ -111,3 +113,11 @@ Frontend sources are placed into `web` directory, fully written with AI on React
     <img title="Deal details" alt="Deal details" src="/assets/page_deal-details.png" style="width: 25%; max-width: 25%; margin-left: 5%;" />
     <img title="Deal chat" alt="Deal chat" src="/assets/page_deal-chat.png" style="width: 25%; max-width: 25%;" />
 </div>
+
+# TODO
+
+- [ ] Fetch channel picture
+- [ ] Somehow monitor removing & adding new admins which will have ability to create listings
+- [ ] Refresh channels stats & display last update date on stats page
+- [ ] Add telegram notifications about deals
+- [ ] Fix deals being available to everyone (must be available only to deal sides)
