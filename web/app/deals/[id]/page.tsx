@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { TonConnectButton, useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
 import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
@@ -16,6 +16,21 @@ import { Label } from '@/components/ui/label';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3 } from 'lucide-react';
+
+/** TON logo icon (diamond), inherits text color via currentColor. */
+function TonLogoIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 56 56"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <path d="M28 0l28 28-28 28L0 28 28 0z" />
+    </svg>
+  );
+}
 
 type Tab = 'details' | 'chat';
 
@@ -308,7 +323,14 @@ export default function DealDetailPage() {
               <div className="mb-4 flex flex-col items-center justify-center space-y-1 text-center">
                 {!wallet ? (
                   <>
-                    <TonConnectButton />
+                    <button
+                      type="button"
+                      onClick={() => tonConnectUI.openModal()}
+                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                    >
+                      <span>Connect</span>
+                      <TonLogoIcon className="h-[1em] w-auto shrink-0" />
+                    </button>
                     {deal.status === 'draft' && (
                       <p className="text-sm text-muted-foreground">You need to connect wallet to make a deal.</p>
                     )}
