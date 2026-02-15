@@ -475,7 +475,20 @@ export default function ChannelStatsPage() {
                             stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
-                          />
+                          >
+                            <AreaChart data={chartRows}>
+                              <XAxis dataKey="x" hide />
+                              <YAxis hide domain={['auto', 'auto']} />
+                              <Area
+                                type="monotone"
+                                dataKey={yColumns.find((c) => isSeriesVisible(c.key))?.key ?? yColumns[0]?.key}
+                                fill="var(--muted-foreground)"
+                                stroke="var(--muted-foreground)"
+                                fillOpacity={0.25}
+                                strokeWidth={1}
+                              />
+                            </AreaChart>
+                          </Brush>
                         )}
                       </AreaChart>
                     ) : chartType === 'bar' ? (
@@ -518,7 +531,20 @@ export default function ChannelStatsPage() {
                             stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
-                          />
+                          >
+                            <AreaChart data={chartRows}>
+                              <XAxis dataKey="x" hide />
+                              <YAxis hide domain={['auto', 'auto']} />
+                              <Area
+                                type="monotone"
+                                dataKey={yColumns.find((c) => isSeriesVisible(c.key))?.key ?? yColumns[0]?.key}
+                                fill="var(--muted-foreground)"
+                                stroke="var(--muted-foreground)"
+                                fillOpacity={0.25}
+                                strokeWidth={1}
+                              />
+                            </AreaChart>
+                          </Brush>
                         )}
                       </BarChart>
                     ) : (
@@ -567,7 +593,20 @@ export default function ChannelStatsPage() {
                             stroke="var(--muted)"
                             strokeWidth={1.5}
                             onDragEnd={handleBrushChange}
-                          />
+                          >
+                            <AreaChart data={chartRows}>
+                              <XAxis dataKey="x" hide />
+                              <YAxis hide domain={['auto', 'auto']} />
+                              <Area
+                                type="monotone"
+                                dataKey={yColumns.find((c) => isSeriesVisible(c.key))?.key ?? yColumns[0]?.key}
+                                fill="var(--muted-foreground)"
+                                stroke="var(--muted-foreground)"
+                                fillOpacity={0.25}
+                                strokeWidth={1}
+                              />
+                            </AreaChart>
+                          </Brush>
                         )}
                       </LineChart>
                     )}
