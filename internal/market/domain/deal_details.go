@@ -70,3 +70,27 @@ func GetMessageFromDetails(details json.RawMessage) string {
 	}
 	return ""
 }
+
+// GetPostedAtFromDetails returns the "posted_at" field from deal details (RFC3339), or (zero time, false) if not set or invalid.
+func GetPostedAtFromDetails(details json.RawMessage) (time.Time, bool) {
+	if len(details) == 0 || string(details) == "null" {
+		return time.Time{}, false
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return time.Time{}, false
+	}
+	pa, ok := m["posted_at"]
+	if !ok || pa == nil {
+		return time.Time{}, false
+	}
+	s, ok := pa.(string)
+	if !ok || s == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}

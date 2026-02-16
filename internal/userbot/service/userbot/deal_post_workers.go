@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	postSenderInterval   = 2 * time.Minute
+	postSenderInterval   = 1 * time.Minute
 	postCheckerInterval  = 5 * time.Minute
 	postCheckAdvanceHour = time.Hour
 )
@@ -54,6 +54,10 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, repo marketReposito
 		text := domain.GetMessageFromDetails(deal.Details)
 		if text == "" {
 			logger.Debug("skip deal, no message in details", "deal_id", deal.ID)
+			continue
+		}
+		if postedAt, ok := domain.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
+			logger.Debug("skip deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
 			continue
 		}
 
