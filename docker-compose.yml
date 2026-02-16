@@ -48,6 +48,10 @@ services:
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.7
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 
   redis:
     image: redis:6.2-alpine
@@ -145,6 +149,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   bot:
     image: internal.server:latest
@@ -161,6 +167,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   blockchain_observer:
     image: internal.server:latest
@@ -176,6 +184,8 @@ services:
         ipv4_address: 172.32.0.14
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
   # Userbot needs one interactive login to create the session. Run once:
@@ -196,6 +206,8 @@ services:
         ipv4_address: 172.32.0.13
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
 volumes:
