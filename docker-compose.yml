@@ -103,6 +103,8 @@ services:
   #   networks:
   #     ads-mrkt-network:
   #       ipv4_address: 172.32.0.14
+  #   env_file:
+  #     - .env
   # Run once to obtain cert: docker compose ... run --rm certbot
   # Renew (webroot; nginx stays up): docker compose ... run --rm certbot renew --webroot -w /var/www/certbot
 

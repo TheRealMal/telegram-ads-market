@@ -4,8 +4,7 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 
 # MVP
 
-* Current MVP deployment does not support escrow actions as there are some problem with tls handshake & ton litenodes connections from containers on a server. But these features are implemented and ready.
-
+* May be inaccessible without VPN *
 - Bot: https://t.me/BaboonMarketBot
 - Mini APP: https://t.me/BaboonMarketBot?startapp=
 
