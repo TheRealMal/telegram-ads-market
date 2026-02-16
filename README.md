@@ -124,8 +124,8 @@ Frontend sources are placed into `web` directory, fully written with AI on React
 
 # TODO
 
+- [x] Fix deals being available to everyone (must be available only to deal sides)
 - [ ] Fetch channel picture
 - [ ] Somehow monitor removing & adding new admins which will have ability to create listings
 - [ ] Refresh channels stats & display last update date on stats page
 - [ ] Add telegram notifications about deals
-- [ ] Fix deals being available to everyone (must be available only to deal sides)
