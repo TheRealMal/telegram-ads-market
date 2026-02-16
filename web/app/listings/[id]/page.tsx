@@ -8,6 +8,7 @@ import { api, auth, setAuthToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
 import type { Listing, Deal, Channel } from '@/types';
+import { getDealStatusLabel } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -257,7 +258,7 @@ export default function ListingDetailPage() {
                         {formatPriceKey(String(d.duration))} – {formatPriceValue(d.price)}
                       </p>
                     </div>
-                    <Badge>{d.status}</Badge>
+                    <Badge>{getDealStatusLabel(d.status)}</Badge>
                   </Link>
                 ))}
               </div>
