@@ -16,6 +16,7 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 - Automatic advertisment post message sending into a channel, every hour check that post is not deleted
 - Automatic escrow release if advertisment conditions are met otherwise escrow refund to a lessee
 - Send message to second side of a deal via native telegram messages, view history inside a deal
+- 
 
 # User flow
 ## Lessor flow
@@ -129,3 +130,8 @@ Frontend sources are placed into `web` directory, fully written with AI on React
 - [ ] Somehow monitor removing & adding new admins which will have ability to create listings
 - [ ] Refresh channels stats & display last update date on stats page
 - [ ] Add telegram notifications about deals
+- [ ] Add more deal options:
+    - [ ] Keep post in top 1 (no more posts after it)
+    - [ ] Story post
+    - [ ] Add images to posts
+    - [ ] Preview post in telegram messages button
