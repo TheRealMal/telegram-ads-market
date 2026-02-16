@@ -87,11 +87,13 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	// Listings: all (public) and my (auth)
+	// Listings
 	mux.HandleFunc("GET /api/v1/market/listings", server.WithMetrics(
-		server.WithMethod(
-			server.WithJSONResponse(r.handler.ListListings),
-			http.MethodGet,
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.ListListings),
+				http.MethodGet,
+			),
 		),
 		"/api/v1",
 	))
@@ -114,9 +116,11 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 	mux.HandleFunc("GET /api/v1/market/listings/{id}", server.WithMetrics(
-		server.WithMethod(
-			server.WithJSONResponse(r.handler.GetListing),
-			http.MethodGet,
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.GetListing),
+				http.MethodGet,
+			),
 		),
 		"/api/v1",
 	))
@@ -179,16 +183,20 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 	mux.HandleFunc("GET /api/v1/market/deals/{id}", server.WithMetrics(
-		server.WithMethod(
-			server.WithJSONResponse(r.handler.GetDeal),
-			http.MethodGet,
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.GetDeal),
+				http.MethodGet,
+			),
 		),
 		"/api/v1",
 	))
 	mux.HandleFunc("GET /api/v1/market/listings/{listing_id}/deals", server.WithMetrics(
-		server.WithMethod(
-			server.WithJSONResponse(r.handler.ListDealsByListingID),
-			http.MethodGet,
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.ListDealsByListingID),
+				http.MethodGet,
+			),
 		),
 		"/api/v1",
 	))

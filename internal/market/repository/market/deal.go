@@ -167,6 +167,31 @@ func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) (
 	return list, nil
 }
 
+// GetDealsByListingIDForUser returns deals for the given listing where the user is lessor or lessee.
+func (r *repository) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		       lessor_signature, lessee_signature, status, escrow_address, escrow_private_key, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
+		FROM market.deal
+		WHERE listing_id = @listing_id AND (lessor_id = @user_id OR lessee_id = @user_id)
+		ORDER BY updated_at DESC`,
+		pgx.NamedArgs{"listing_id": listingID, "user_id": userID})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*entity.Deal, 0, len(slice))
+	for _, row := range slice {
+		list = append(list, dealRowToEntity(row))
+	}
+	return list, nil
+}
+
 // ListDealsWaitingEscrowRelease returns deals in status waiting_escrow_release (for release worker).
 func (r *repository) ListDealsWaitingEscrowRelease(ctx context.Context) ([]*entity.Deal, error) {
 	return r.listDealsByStatus(ctx, entity.DealStatusWaitingEscrowRelease)

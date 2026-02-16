@@ -118,21 +118,28 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	return d, nil
 }
 
+// @Security	JWT
 // @Tags		Market
-// @Summary	Get deal by ID
+// @Summary	Get deal by ID (only if caller is lessor or lessee)
 // @Produce	json
 // @Param		id	path		int									true	"Deal ID"
 // @Success	200	{object}	response.Template{data=entity.Deal}	"Deal"
 // @Failure	400	{object}	response.Template{data=string}		"Bad request"
+// @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [get]
 func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	d, err := h.dealService.GetDeal(r.Context(), id)
+	d, err := h.dealService.GetDealForUser(r.Context(), id, userID)
 	if err != nil {
 		return nil, toServiceError(err)
 	}
@@ -142,14 +149,21 @@ func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, 
 	return d, nil
 }
 
+// @Security	JWT
 // @Tags		Market
-// @Summary	List deals by listing ID
+// @Summary	List deals by listing ID (only deals where caller is lessor or lessee)
 // @Produce	json
 // @Param		listing_id	path		int										true	"Listing ID"
 // @Success	200			{object}	response.Template{data=[]entity.Deal}	"List of deals"
 // @Failure	400			{object}	response.Template{data=string}			"Bad request"
+// @Failure	401			{object}	response.Template{data=string}			"Unauthorized"
 // @Router		/market/listings/{listing_id}/deals [get]
 func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	userID, ok := auth.GetTelegramID(r.Context())
+	if !ok {
+		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	}
+
 	listingIDStr := r.PathValue("listing_id")
 	if listingIDStr == "" {
 		return nil, apperrors.ServiceError{Err: nil, Message: "listing_id required", Code: apperrors.ErrorCodeBadRequest}
@@ -159,7 +173,7 @@ func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid listing_id", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	list, err := h.dealService.GetDealsByListingID(r.Context(), listingID)
+	list, err := h.dealService.GetDealsByListingIDForUser(r.Context(), listingID, userID)
 	if err != nil {
 		return nil, toServiceError(err)
 	}

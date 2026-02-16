@@ -18,8 +18,25 @@ func (s *DealService) GetDeal(ctx context.Context, id int64) (*entity.Deal, erro
 	return s.dealRepo.GetDealByID(ctx, id)
 }
 
+// GetDealForUser returns the deal only if the user is lessor or lessee; otherwise nil.
+func (s *DealService) GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error) {
+	d, err := s.dealRepo.GetDealByID(ctx, id)
+	if err != nil || d == nil {
+		return nil, err
+	}
+	if d.LessorID != userID && d.LesseeID != userID {
+		return nil, nil
+	}
+	return d, nil
+}
+
 func (s *DealService) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
 	return s.dealRepo.GetDealsByListingID(ctx, listingID)
+}
+
+// GetDealsByListingIDForUser returns deals for the listing where the user is lessor or lessee.
+func (s *DealService) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
+	return s.dealRepo.GetDealsByListingIDForUser(ctx, listingID, userID)
 }
 
 func (s *DealService) GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {

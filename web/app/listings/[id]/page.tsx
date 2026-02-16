@@ -46,14 +46,10 @@ export default function ListingDetailPage() {
       setLoading(false);
       return;
     }
-    Promise.all([
-      api<Listing>(`/api/v1/market/listings/${id}`),
-      api<Deal[]>(`/api/v1/market/listings/${id}/deals`),
-    ])
-      .then(([listRes, dealsRes]) => {
+    api<Listing>(`/api/v1/market/listings/${id}`)
+      .then((listRes) => {
         if (listRes.ok && listRes.data) setListing(listRes.data);
         else setError(listRes.error_code || 'Not found');
-        if (dealsRes.ok && dealsRes.data) setDeals(dealsRes.data);
       })
       .catch(() => setError('Network error'))
       .finally(() => setLoading(false));
@@ -66,6 +62,9 @@ export default function ListingDetailPage() {
       setAuthToken(res.data);
       api<Listing[]>('/api/v1/market/my-listings').then((myRes) => {
         if (myRes.ok && myRes.data) setIsOwner(myRes.data.some((l) => l.id === id));
+      });
+      api<Deal[]>(`/api/v1/market/listings/${id}/deals`).then((dealsRes) => {
+        if (dealsRes.ok && dealsRes.data) setDeals(dealsRes.data);
       });
     });
   }, [listing, id]);

@@ -25,7 +25,9 @@ type ListingService interface {
 type DealService interface {
 	CreateDeal(ctx context.Context, d *entity.Deal) error
 	GetDeal(ctx context.Context, id int64) (*entity.Deal, error)
+	GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error)
 	GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error)
+	GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error)
 	GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error)
 	UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error
 	SignDeal(ctx context.Context, userID int64, dealID int64) error
