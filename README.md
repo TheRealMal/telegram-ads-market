@@ -53,6 +53,8 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 
 ## Deployment
 
+Example environment variables file presented at [example.env](example.env)
+
 MVP can be deployed via make command or directly via docker compose
 
 ```console
