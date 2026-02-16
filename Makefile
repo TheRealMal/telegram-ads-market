@@ -17,17 +17,17 @@ swagger: ## Generate swagger documentation
 	swag fmt
 
 init_userbot: ## Initialize the userbot session file
-	docker compose -f docker-compose.https-selfsigned.yml up -d postgres redis migrations
-	docker compose -f docker-compose.https-selfsigned.yml run --rm -it userbot
+	docker compose up -d postgres redis migrations
+	docker compose run --rm -it userbot
 
 init_certs: ## Initialize the certificates
-	docker compose -f docker-compose.https-selfsigned.yml run --rm certbot
+	docker compose run --rm certbot
 
 start: ## Start the server
-	docker compose -f docker-compose.https-selfsigned.yml up -d
+	docker compose up -d
 
 stop: ## Stop the server
-	docker compose -f docker-compose.https-selfsigned.yml down
+	docker compose down
 
 docker_build_bin: ## Build binary via Docker and save to ./build/server (requires BuildKit)
 	DOCKER_BUILDKIT=1 docker build --platform linux/amd64 --output type=local,dest=./build/bin/ --target=artifact -f Dockerfile .

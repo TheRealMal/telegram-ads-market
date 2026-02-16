@@ -58,11 +58,18 @@ Example environment variables file presented at [example.env](example.env)
 MVP can be deployed via make command or directly via docker compose
 
 ```console
+# Initialize userbot session
+make init_userbot
+# Start
 make start
 ```
 
 ```console
-docker compose -f docker-compose.https-selfsigned.yml up -d
+# Initialize userbot session
+docker compose up -d postgres redis migrations
+docker compose run --rm -it userbot
+# Start
+docker compose up -d
 ```
 
 ## Frontend
