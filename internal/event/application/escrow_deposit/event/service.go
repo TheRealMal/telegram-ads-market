@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"strings"
-	"time"
 
 	"ads-mrkt/internal/event/domain/entity"
 
@@ -16,9 +15,6 @@ type repository interface {
 	ReadEvents(ctx context.Context, args *redis.XReadGroupArgs) ([]redis.XMessage, error)
 	CreateGroup(ctx context.Context, stream, group, id string) error
 	AckMessages(ctx context.Context, stream, group string, messageIDs []string) error
-	AutoClaimPendingEvents(ctx context.Context, args *redis.XAutoClaimArgs) ([]redis.XMessage, string, error)
-	RemoveConsumer(ctx context.Context, stream, group, consumer string) error
-	TrimStreamByAge(ctx context.Context, group string, maxAge time.Duration) error
 }
 
 type Service struct {
@@ -26,7 +22,7 @@ type Service struct {
 }
 
 const (
-	groupName = "master"
+	groupName = "market"
 )
 
 func NewService(repository repository) *Service {
@@ -34,10 +30,11 @@ func NewService(repository repository) *Service {
 		repository: repository,
 	}
 
-	err := s.repository.CreateGroup(context.Background(), (*entity.EventCryptoPayment)(nil).StreamKey(), groupName, "$")
+	streamKey := (*entity.EventEscrowDeposit)(nil).StreamKey()
+	err := s.repository.CreateGroup(context.Background(), streamKey, groupName, "0")
 	if err != nil {
 		if !strings.Contains(err.Error(), "BUSYGROUP") {
-			log.Fatalf("failed to create group: %v", err)
+			log.Fatalf("failed to create escrow_deposit event group: %v", err)
 		}
 	}
 

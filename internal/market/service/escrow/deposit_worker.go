@@ -3,41 +3,26 @@ package escrow
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
-
-	"github.com/redis/go-redis/v9"
 )
 
 const (
-	escrowDepositStream       = "events:escrow_deposit"
 	escrowDepositGroup        = "market"
 	escrowDepositConsumer     = "escrow-deposit"
 	escrowDepositReadCount    = 50
 	escrowDepositPollInterval = 2 * time.Second
 )
 
-// DepositStreamReader is used to read and ack escrow deposit events from Redis stream.
-type DepositStreamReader interface {
-	CreateGroup(ctx context.Context, stream, group, id string) error
-	ReadEvents(ctx context.Context, args *redis.XReadGroupArgs) ([]redis.XMessage, error)
-	AckMessages(ctx context.Context, stream, group string, messageIDs []string) error
+type escrowDepositEventService interface {
+	ReadEscrowDepositEvents(ctx context.Context, group, consumer string, limit int64) ([]*evententity.EventEscrowDeposit, error)
+	AckEscrowDepositMessages(ctx context.Context, group string, messageIDs []string) error
 }
 
-// DepositStreamWorker reads events:escrow_deposit stream and sets deal status to escrow_deposit_confirmed when amount >= deal.Price.
-func (s *service) DepositStreamWorker(ctx context.Context, stream DepositStreamReader) {
-	if stream == nil {
-		return
-	}
-
+// DepositStreamWorker reads escrow_deposit events and sets deal status to escrow_deposit_confirmed when amount >= deal.EscrowAmount.
+func (s *service) DepositStreamWorker(ctx context.Context, eventService escrowDepositEventService) {
 	logger := slog.With("component", "escrow_deposit_worker")
-
-	if err := stream.CreateGroup(ctx, escrowDepositStream, escrowDepositGroup, "0"); err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
-		logger.Error("create group", "error", err)
-		return
-	}
 	ticker := time.NewTicker(escrowDepositPollInterval)
 	defer ticker.Stop()
 	for {
@@ -45,39 +30,31 @@ func (s *service) DepositStreamWorker(ctx context.Context, stream DepositStreamR
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.processDepositEvents(ctx, stream, logger)
+			s.processDepositEvents(ctx, eventService, logger)
 		}
 	}
 }
 
-func (s *service) processDepositEvents(ctx context.Context, stream DepositStreamReader, logger *slog.Logger) {
-	msgs, err := stream.ReadEvents(ctx, &redis.XReadGroupArgs{
-		Group:    escrowDepositGroup,
-		Consumer: escrowDepositConsumer,
-		Streams:  []string{escrowDepositStream, ">"},
-		Count:    escrowDepositReadCount,
-	})
-	if err != nil || len(msgs) == 0 {
+func (s *service) processDepositEvents(ctx context.Context, eventService escrowDepositEventService, logger *slog.Logger) {
+	events, err := eventService.ReadEscrowDepositEvents(ctx, escrowDepositGroup, escrowDepositConsumer, escrowDepositReadCount)
+	if err != nil || len(events) == 0 {
 		return
 	}
 	var ids []string
-	for i := range msgs {
-		msg := &msgs[i]
-		ev := &evententity.EventEscrowDeposit{}
-		ev.FromMap(msg.Values)
+	for _, ev := range events {
 		deal, err := s.marketRepository.GetDealByEscrowAddress(ctx, ev.Address)
 		if err != nil {
 			logger.Error("get deal", "address", ev.Address, "error", err)
-			ids = append(ids, msg.ID)
+			ids = append(ids, ev.ID)
 			continue
 		}
 		if deal == nil {
-			ids = append(ids, msg.ID)
+			ids = append(ids, ev.ID)
 			continue
 		}
 		if ev.Amount < deal.EscrowAmount {
 			logger.Info("amount too low", "deal_id", deal.ID, "address", ev.Address, "amount", ev.Amount, "escrow_amount", deal.EscrowAmount)
-			ids = append(ids, msg.ID)
+			ids = append(ids, ev.ID)
 			continue
 		}
 		if err := s.marketRepository.SetDealStatusEscrowDepositConfirmed(ctx, deal.ID); err != nil {
@@ -85,9 +62,9 @@ func (s *service) processDepositEvents(ctx context.Context, stream DepositStream
 			continue
 		}
 		logger.Info("escrow deposit confirmed", "deal_id", deal.ID, "address", ev.Address)
-		ids = append(ids, msg.ID)
+		ids = append(ids, ev.ID)
 	}
 	if len(ids) > 0 {
-		_ = stream.AckMessages(ctx, escrowDepositStream, escrowDepositGroup, ids)
+		_ = eventService.AckEscrowDepositMessages(ctx, escrowDepositGroup, ids)
 	}
 }

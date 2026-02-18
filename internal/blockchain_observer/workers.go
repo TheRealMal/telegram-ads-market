@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/liteclient"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/xssnick/tonutils-go/address"
 	"github.com/xssnick/tonutils-go/tlb"
 	"github.com/xssnick/tonutils-go/ton"
@@ -80,17 +80,18 @@ func (o *Observer) startDepositNotifier(ctx context.Context) {
 			if ev == nil {
 				return
 			}
-			err := o.rdb.XAdd(ctx, &redis.XAddArgs{
-				Stream: streamEscrowDeposit,
-				Values: map[string]interface{}{
-					"address":   ev.rawAddress,
-					"amount":   ev.amount,
-					"timestamp": ev.timestamp,
-					"tx_hash":  ev.txHash,
+			if err := o.eventService.AddEscrowDepositEvent(
+				ctx,
+				&entity.EventEscrowDeposit{
+					Address:   ev.rawAddress,
+					Amount:    ev.amount,
+					Timestamp: ev.timestamp,
+					TxHash:    ev.txHash,
 				},
-			}).Err()
-			if err != nil {
-				o.log.Error("xadd escrow deposit", "address", ev.rawAddress, "error", err)
+			); err != nil {
+				o.log.Error("add escrow deposit event", "address", ev.rawAddress, "error", err)
+				o.depositEvents <- ev
+				continue
 			}
 		}
 	}
@@ -240,9 +241,9 @@ func (o *Observer) shardHandleWorker(ctx context.Context, idx int) {
 			select {
 			case o.depositEvents <- &depositEvent{
 				rawAddress: rawAddrFromAccount(txInfo.Account),
-				amount:    amount,
-				timestamp: ts,
-				txHash:    hash,
+				amount:     amount,
+				timestamp:  ts,
+				txHash:     hash,
 			}:
 			default:
 				o.log.Warn("deposit events channel full, drop")

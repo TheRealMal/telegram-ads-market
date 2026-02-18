@@ -6,6 +6,7 @@ import (
 
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/config"
+	escrowdepositevent "ads-mrkt/internal/event/application/escrow_deposit/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/liteclient"
@@ -82,9 +83,10 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo)
 			eventRepo := eventredis.New(redisClient)
+			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
 
 			go escrowSvc.Worker(ctxRun)
-			go escrowSvc.DepositStreamWorker(ctxRun, eventRepo)
+			go escrowSvc.DepositStreamWorker(ctxRun, escrowDepositEventSvc)
 			go escrowSvc.ReleaseRefundWorker(ctxRun)
 			go dealpostmessage.RunPassedWorker(ctxRun, repo)
 

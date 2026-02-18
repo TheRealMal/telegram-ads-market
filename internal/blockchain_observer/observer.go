@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"ads-mrkt/internal/event/domain/entity"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/xssnick/tonutils-go/address"
 	"github.com/xssnick/tonutils-go/tlb"
@@ -30,7 +32,9 @@ type DealExpirer interface {
 	SetDealStatusExpiredByEscrowAddress(ctx context.Context, escrowAddress string) error
 }
 
-const streamEscrowDeposit = "events:escrow_deposit"
+type escrowDepositEventService interface {
+	AddEscrowDepositEvent(ctx context.Context, event *entity.EventEscrowDeposit) error
+}
 
 type depositEvent struct {
 	rawAddress string
@@ -41,37 +45,34 @@ type depositEvent struct {
 
 // Observer watches TON chain for transactions to escrow wallets and Redis key expiration for deal expiry.
 type Observer struct {
-	lt          Liteclient
-	rdb         *redis.Client
-	dealExpirer DealExpirer
-	dbIndex     int
-
+	lt             Liteclient
+	rdb            *redis.Client
+	dealExpirer    DealExpirer
+	eventService   escrowDepositEventService
+	dbIndex        int
 	addresses      map[WalletAddress]struct{}
 	addressesMutex sync.RWMutex
-
-	workchain     *virtualWorkchain
-	masterBlocks  chan *ton.BlockIDExt
-	shardBlocks   chan *ton.BlockIDExt
-	depositEvents chan *depositEvent
-
-	log *slog.Logger
+	workchain      *virtualWorkchain
+	masterBlocks   chan *ton.BlockIDExt
+	shardBlocks    chan *ton.BlockIDExt
+	depositEvents  chan *depositEvent
+	log            *slog.Logger
 }
 
-// New builds an observer. rdb is the Redis client (for keys, keyspace subscription, stream). dbIndex is Redis DB index for keyevent channels.
-func New(lt Liteclient, rdb *redis.Client, dealExpirer DealExpirer, dbIndex int) *Observer {
+// New builds an observer. rdb is the Redis client (for keys, keyspace subscription). dbIndex is Redis DB index for keyevent channels. escrowDepositAdder is used to push deposit events to the escrow_deposit stream.
+func New(lt Liteclient, rdb *redis.Client, dealExpirer DealExpirer, eventService escrowDepositEventService, dbIndex int) *Observer {
 	return &Observer{
-		lt:          lt,
-		rdb:         rdb,
-		dealExpirer: dealExpirer,
-		dbIndex:     dbIndex,
-
+		lt:            lt,
+		rdb:           rdb,
+		dealExpirer:   dealExpirer,
+		eventService:  eventService,
+		dbIndex:       dbIndex,
 		addresses:     make(map[WalletAddress]struct{}),
 		workchain:     &virtualWorkchain{ID: 0, Shards: make(map[int64]uint32)},
 		masterBlocks:  make(chan *ton.BlockIDExt),
 		shardBlocks:   make(chan *ton.BlockIDExt),
 		depositEvents: make(chan *depositEvent, 256),
-
-		log: slog.With("component", "blockchain_observer"),
+		log:           slog.With("component", "blockchain_observer"),
 	}
 }
 
