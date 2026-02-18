@@ -29,7 +29,7 @@ type SetWalletRequest struct {
 // @Success	200					{object}	response.Template{data=string}	"JWT token"
 // @Failure	401					{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/auth [post]
-func (h *Handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	initDataStr := r.Header.Get("X-Telegram-InitData")
 	if initDataStr == "" {
 		return nil, apperrors.ServiceError{
@@ -75,7 +75,7 @@ func (h *Handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 // @Failure	400		{object}	response.Template{data=string}	"Bad request"
 // @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/me/wallet [put]
-func (h *Handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -102,7 +102,7 @@ func (h *Handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}
 // @Success	200	{object}	response.Template{data=object}	"ok"
 // @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/me/wallet [delete]
-func (h *Handler) DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}

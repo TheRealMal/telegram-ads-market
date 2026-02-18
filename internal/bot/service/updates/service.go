@@ -43,7 +43,7 @@ type marketDealChatService interface {
 	SetRepliedMessageIfMatch(ctx context.Context, replyToChatID, replyToMessageID int64, repliedText string) error
 }
 
-type Service struct {
+type service struct {
 	telegramClient  telegramService
 	eventService    eventService
 	dealChatReplier marketDealChatService
@@ -53,15 +53,15 @@ func NewService(
 	telegramClient telegramService,
 	eventService eventService,
 	dealChatReplier marketDealChatService,
-) *Service {
-	return &Service{
+) *service {
+	return &service{
 		telegramClient:  telegramClient,
 		eventService:    eventService,
 		dealChatReplier: dealChatReplier,
 	}
 }
 
-func (s *Service) HandleUpdate(ctx context.Context, raw []byte) error {
+func (s *service) HandleUpdate(ctx context.Context, raw []byte) error {
 	update, err := telegram.ParseUpdateData(raw)
 	if err != nil {
 		return nil
@@ -70,7 +70,7 @@ func (s *Service) HandleUpdate(ctx context.Context, raw []byte) error {
 	return s.eventService.AddTelegramUpdateEvent(ctx, update, time.Now())
 }
 
-func (s *Service) StartBackgroundProcessingUpdates(ctx context.Context) {
+func (s *service) StartBackgroundProcessingUpdates(ctx context.Context) {
 	go s.streamCleaner(ctx)
 	go s.processPendingUpdates(ctx)
 
@@ -87,7 +87,7 @@ func (s *Service) StartBackgroundProcessingUpdates(ctx context.Context) {
 	}
 }
 
-func (s *Service) processUpdates(ctx context.Context) error {
+func (s *service) processUpdates(ctx context.Context) error {
 	telegramUpdateEvents, err := s.eventService.ReadTelegramUpdateEvents(ctx, groupName, consumerName, readTelegramUpdateEventsLimit)
 	if err != nil {
 		return fmt.Errorf("failed to get pending updates: %w", err)
@@ -115,7 +115,7 @@ func (s *Service) processUpdates(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) processUpdate(ctx context.Context, updateEvent *evententity.EventTelegramUpdate) error {
+func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.EventTelegramUpdate) error {
 	update := updateEvent.Update
 	updateType := s.getUpdateType(update)
 	switch updateType {
@@ -148,7 +148,7 @@ func (s *Service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 	return nil
 }
 
-func (s *Service) getUpdateType(update *telegram.Update) UpdateType {
+func (s *service) getUpdateType(update *telegram.Update) UpdateType {
 	if update.Message != nil {
 		if update.Message.Text == "/start" {
 			return UpdateCommandStart
@@ -157,7 +157,7 @@ func (s *Service) getUpdateType(update *telegram.Update) UpdateType {
 	return UpdateUnknown
 }
 
-func (s *Service) processPendingUpdates(ctx context.Context) {
+func (s *service) processPendingUpdates(ctx context.Context) {
 	tickerPending := time.NewTicker(pendingPeriod)
 	defer tickerPending.Stop()
 
@@ -198,7 +198,7 @@ func (s *Service) processPendingUpdates(ctx context.Context) {
 	}
 }
 
-func (s *Service) streamCleaner(ctx context.Context) {
+func (s *service) streamCleaner(ctx context.Context) {
 	tickerPeriod := 24 * time.Hour
 	ticker := time.NewTicker(tickerPeriod)
 	defer ticker.Stop()

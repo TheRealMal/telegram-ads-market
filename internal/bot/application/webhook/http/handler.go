@@ -11,12 +11,12 @@ type updatesService interface {
 	HandleUpdate(ctx context.Context, raw []byte) error
 }
 
-type Handler struct {
+type handler struct {
 	updatesService updatesService
 }
 
-func NewHandler(updatesService updatesService) *Handler {
-	return &Handler{
+func NewHandler(updatesService updatesService) *handler {
+	return &handler{
 		updatesService: updatesService,
 	}
 }
@@ -28,7 +28,7 @@ func NewHandler(updatesService updatesService) *Handler {
 // @Param		request	body		[]byte	true	"request body"
 // @Success	200		{object}	string
 // @Router		/telegram/webhook [post]
-func (h *Handler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
+func (h *handler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		slog.Error("ServiceError", "error", err)

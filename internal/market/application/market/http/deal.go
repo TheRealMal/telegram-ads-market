@@ -35,7 +35,7 @@ type CreateDealRequest struct {
 // @Failure	403		{object}	response.Template{data=string}		"Forbidden"
 // @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals [post]
-func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -128,7 +128,7 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [get]
-func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -158,7 +158,7 @@ func (h *Handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, 
 // @Failure	400			{object}	response.Template{data=string}			"Bad request"
 // @Failure	401			{object}	response.Template{data=string}			"Unauthorized"
 // @Router		/market/listings/{listing_id}/deals [get]
-func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -187,7 +187,7 @@ func (h *Handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (
 // @Success	200	{object}	response.Template{data=[]entity.Deal}	"List of user's deals"
 // @Failure	401	{object}	response.Template{data=string}			"Unauthorized"
 // @Router		/market/my-deals [get]
-func (h *Handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -220,7 +220,7 @@ type UpdateDealDraftRequest struct {
 // @Failure	403		{object}	response.Template{data=string}		"Forbidden"
 // @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [patch]
-func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -291,7 +291,7 @@ func (h *Handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 // @Failure	403	{object}	response.Template{data=string}		"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/sign [post]
-func (h *Handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -326,7 +326,7 @@ type SetDealPayoutRequest struct {
 // @Failure	401	{object}	response.Template{data=string}		"Unauthorized"
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/payout-address [put]
-func (h *Handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -363,7 +363,7 @@ func (h *Handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (
 // @Failure	403	{object}	response.Template{data=string}		"Forbidden (deal not draft or not a side)"
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/reject [post]
-func (h *Handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -392,7 +392,7 @@ func (h *Handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Failure	403	{object}	response.Template{data=string}			"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/deals/{id}/send-chat-message [post]
-func (h *Handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -421,7 +421,7 @@ func (h *Handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (i
 // @Failure	403	{object}	response.Template{data=string}				"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}				"Not found"
 // @Router		/market/deals/{id}/messages [get]
-func (h *Handler) ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}

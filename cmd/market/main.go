@@ -6,10 +6,10 @@ import (
 
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/config"
+	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/liteclient"
 	"ads-mrkt/internal/market/application/market/http"
-	"ads-mrkt/internal/market/domain"
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
@@ -22,7 +22,6 @@ import (
 	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
 	marketrouter "ads-mrkt/internal/server/routers/market"
-	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/pkg/auth"
 	"ads-mrkt/pkg/health"
 
@@ -67,24 +66,21 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			}
 			defer redisClient.Close()
 
+			lc, err := liteclient.NewClient(ctxRun, cfg.Liteclient, cfg.IsTestnet, cfg.IsPublic)
+			if err != nil {
+				return errors.Wrap(err, "create liteclient for escrow worker")
+			}
+
 			// Telegram API client (for welcome message + middleware secret token)
 			telegramClient := telegram.NewAPIClient(ctxRun, cfg.Telegram, redisClient)
 
 			repo := marketrepo.New(pg)
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
-			dealSvc := dealservice.NewDealService(repo, repo, domain.EscrowConfig{
-				TransactionGasTON: cfg.Market.Escrow.TransactionGasTON,
-				CommissionPercent:  cfg.Market.Escrow.CommissionPercent,
-			})
+			escrowSvc := escrowservice.NewService(repo, lc, redisClient, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
+			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc)
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo)
-
-			lc, err := liteclient.NewClient(ctxRun, cfg.Liteclient, cfg.IsTestnet, cfg.IsPublic)
-			if err != nil {
-				return errors.Wrap(err, "create liteclient for escrow worker")
-			}
-			escrowSvc := escrowservice.NewService(repo, lc, redisClient)
 			eventRepo := eventredis.New(redisClient)
 
 			go escrowSvc.Worker(ctxRun)

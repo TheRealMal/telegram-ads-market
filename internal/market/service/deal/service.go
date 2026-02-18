@@ -3,11 +3,10 @@ package service
 import (
 	"context"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 )
 
-type DealRepository interface {
+type dealRepository interface {
 	CreateDeal(ctx context.Context, d *entity.Deal) error
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error)
@@ -20,16 +19,24 @@ type DealRepository interface {
 	SetDealStatusRejected(ctx context.Context, dealID int64) (bool, error)
 }
 
-type UserRepository interface {
+type userRepository interface {
 	GetUserByID(ctx context.Context, id int64) (*entity.User, error)
 }
 
-type DealService struct {
-	dealRepo     DealRepository
-	userRepo     UserRepository
-	escrowConfig domain.EscrowConfig
+type escrowService interface {
+	ComputeEscrowAmount(priceTON int64) int64
 }
 
-func NewDealService(dealRepo DealRepository, userRepo UserRepository, escrowConfig domain.EscrowConfig) *DealService {
-	return &DealService{dealRepo: dealRepo, userRepo: userRepo, escrowConfig: escrowConfig}
+type dealService struct {
+	dealRepo  dealRepository
+	userRepo  userRepository
+	escrowSvc escrowService
+}
+
+func NewDealService(dealRepo dealRepository, userRepo userRepository, escrowSvc escrowService) *dealService {
+	return &dealService{
+		dealRepo:  dealRepo,
+		userRepo:  userRepo,
+		escrowSvc: escrowSvc,
+	}
 }

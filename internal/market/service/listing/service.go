@@ -6,7 +6,7 @@ import (
 	"ads-mrkt/internal/market/domain/entity"
 )
 
-type ListingRepository interface {
+type listingRepository interface {
 	CreateListing(ctx context.Context, l *entity.Listing) error
 	GetListingByID(ctx context.Context, id int64) (*entity.Listing, error)
 	UpdateListing(ctx context.Context, l *entity.Listing) error
@@ -15,15 +15,15 @@ type ListingRepository interface {
 	ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error)
 }
 
-type ChannelAdminRepository interface {
+type channelAdminRepository interface {
 	IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error)
 }
 
-type ListingService struct {
-	listingRepo ListingRepository
-	adminRepo   ChannelAdminRepository
+type listingService struct {
+	listingRepo listingRepository
+	adminRepo   channelAdminRepository
 }
 
-func NewListingService(listingRepo ListingRepository, adminRepo ChannelAdminRepository) *ListingService {
-	return &ListingService{listingRepo: listingRepo, adminRepo: adminRepo}
+func NewListingService(listingRepo listingRepository, adminRepo channelAdminRepository) *listingService {
+	return &listingService{listingRepo: listingRepo, adminRepo: adminRepo}
 }

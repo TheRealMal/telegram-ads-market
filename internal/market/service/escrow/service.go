@@ -45,13 +45,18 @@ type service struct {
 	marketRepository marketRepository
 	liteclient       liteclient
 	redis            redisSetter
+
+	transactionGasNanoton int64
+	comissionMultiplier   float64
 }
 
-func NewService(marketRepository marketRepository, liteclient liteclient, redis redisSetter) *service {
+func NewService(marketRepository marketRepository, liteclient liteclient, redis redisSetter, transactionGasTON float64, commissionPercent float64) *service {
 	return &service{
-		marketRepository: marketRepository,
-		liteclient:       liteclient,
-		redis:            redis,
+		marketRepository:      marketRepository,
+		liteclient:            liteclient,
+		redis:                 redis,
+		transactionGasNanoton: int64(transactionGasTON * nanotonPerTON),
+		comissionMultiplier:   1 + (commissionPercent / 100.0),
 	}
 }
 
@@ -124,7 +129,8 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 		return fmt.Errorf("failed to create wallet from private key: %w", err)
 	}
 
-	amount := tlb.FromNanoTONU(uint64(deal.EscrowAmount))
+	amountNanoton := s.GetAmountWithoutGasAndCommission(deal.EscrowAmount)
+	amount := tlb.FromNanoTONU(uint64(amountNanoton))
 
 	err = func() error {
 		lockID, err := s.marketRepository.TakeDealActionLock(ctx, dealID, actionType)

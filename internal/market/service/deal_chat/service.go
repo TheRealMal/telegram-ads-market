@@ -24,7 +24,7 @@ type marketRepository interface {
 	HasActiveDealChatForUser(ctx context.Context, dealID, userID int64) (bool, error)
 }
 
-type Service struct {
+type service struct {
 	marketRepo     marketRepository
 	telegramClient telegramClient
 }
@@ -32,8 +32,8 @@ type Service struct {
 const dealChatInviteText = "Reply to this message to chat with the other side."
 const dealChatForceReplyPlaceholder = "Type your message here..."
 
-func NewService(marketRepo marketRepository, telegramClient telegramClient) *Service {
-	return &Service{
+func NewService(marketRepo marketRepository, telegramClient telegramClient) *service {
+	return &service{
 		marketRepo:     marketRepo,
 		telegramClient: telegramClient,
 	}
@@ -41,7 +41,7 @@ func NewService(marketRepo marketRepository, telegramClient telegramClient) *Ser
 
 // SendDealChatMessage sends the "reply to chat" message to the requesting user and saves it to deal_chat.
 // userID must be lessor or lessee of the deal.
-func (s *Service) SendDealChatMessage(ctx context.Context, dealID, userID int64) (*entity.DealChat, error) {
+func (s *service) SendDealChatMessage(ctx context.Context, dealID, userID int64) (*entity.DealChat, error) {
 	if s.telegramClient == nil {
 		return nil, fmt.Errorf("telegram sender not configured")
 	}
@@ -80,7 +80,7 @@ func (s *Service) SendDealChatMessage(ctx context.Context, dealID, userID int64)
 
 // ListDealMessages returns all deal_chat rows for the deal in chronological order.
 // userID must be lessor or lessee of the deal.
-func (s *Service) ListDealMessages(ctx context.Context, dealID, userID int64) ([]*entity.DealChat, error) {
+func (s *service) ListDealMessages(ctx context.Context, dealID, userID int64) ([]*entity.DealChat, error) {
 	deal, err := s.marketRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (s *Service) ListDealMessages(ctx context.Context, dealID, userID int64) ([
 
 // SetRepliedMessageIfMatch finds a deal_chat by the message being replied to and sets replied_message.
 // Returns nil if no matching row (not an error).
-func (s *Service) SetRepliedMessageIfMatch(ctx context.Context, replyToChatID, replyToMessageID int64, repliedText string) error {
+func (s *service) SetRepliedMessageIfMatch(ctx context.Context, replyToChatID, replyToMessageID int64, repliedText string) error {
 	dc, err := s.marketRepo.GetDealChatByReply(ctx, replyToChatID, replyToMessageID)
 	if err != nil {
 		return err

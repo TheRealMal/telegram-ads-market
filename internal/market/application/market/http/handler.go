@@ -7,13 +7,13 @@ import (
 	"ads-mrkt/pkg/auth"
 )
 
-type UserService interface {
+type userService interface {
 	AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error)
 	SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error
 	ClearWallet(ctx context.Context, userID int64) error
 }
 
-type ListingService interface {
+type listingService interface {
 	CreateListing(ctx context.Context, userID int64, l *entity.Listing) error
 	GetListing(ctx context.Context, id int64) (*entity.Listing, error)
 	UpdateListing(ctx context.Context, userID int64, l *entity.Listing) error
@@ -22,7 +22,7 @@ type ListingService interface {
 	ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error)
 }
 
-type DealService interface {
+type dealService interface {
 	CreateDeal(ctx context.Context, d *entity.Deal) error
 	GetDeal(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error)
@@ -35,28 +35,28 @@ type DealService interface {
 	RejectDeal(ctx context.Context, userID int64, dealID int64) error
 }
 
-type DealChatService interface {
+type dealChatService interface {
 	SendDealChatMessage(ctx context.Context, dealID, userID int64) (*entity.DealChat, error)
 	ListDealMessages(ctx context.Context, dealID, userID int64) ([]*entity.DealChat, error)
 }
 
-type ChannelService interface {
+type channelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	RefreshChannel(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
 	GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error)
 }
 
-type Handler struct {
-	userService     UserService
-	listingService  ListingService
-	dealService     DealService
-	dealChatService DealChatService
-	channelService  ChannelService
+type handler struct {
+	userService     userService
+	listingService  listingService
+	dealService     dealService
+	dealChatService dealChatService
+	channelService  channelService
 	jwtManager      *auth.JWTManager
 }
 
-func NewHandler(userService UserService, listingService ListingService, dealService DealService, dealChatService DealChatService, channelService ChannelService, jwtManager *auth.JWTManager) *Handler {
-	return &Handler{
+func NewHandler(userService userService, listingService listingService, dealService dealService, dealChatService dealChatService, channelService channelService, jwtManager *auth.JWTManager) *handler {
+	return &handler{
 		userService:     userService,
 		listingService:  listingService,
 		dealService:     dealService,

@@ -54,7 +54,7 @@ type CreateListingRequest struct {
 // @Failure	401		{object}	response.Template{data=string}			"Unauthorized"
 // @Failure	403		{object}	response.Template{data=string}			"Forbidden"
 // @Router		/market/listings [post]
-func (h *Handler) CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -96,7 +96,7 @@ func (h *Handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 // @Failure	400	{object}	response.Template{data=string}			"Bad request"
 // @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [get]
-func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
@@ -120,7 +120,7 @@ func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{
 // @Param		min_followers	query		int									false	"Min channel followers (only lessor listings with stats)"
 // @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of listings"
 // @Router		/market/listings [get]
-func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	var typ *entity.ListingType
 	if t := r.URL.Query().Get("type"); t != "" {
 		tp := entity.ListingType(t)
@@ -155,7 +155,7 @@ func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) (interfac
 // @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of my listings"
 // @Failure	401		{object}	response.Template{data=string}				"Unauthorized"
 // @Router		/market/my-listings [get]
-func (h *Handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -195,7 +195,7 @@ type UpdateListingRequest struct {
 // @Failure	403		{object}	response.Template{data=string}			"Forbidden"
 // @Failure	404		{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [patch]
-func (h *Handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -262,7 +262,7 @@ func (h *Handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 // @Failure	403		{object}	response.Template{data=string}			"Forbidden"
 // @Failure	404		{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [delete]
-func (h *Handler) DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}

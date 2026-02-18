@@ -5,18 +5,18 @@ import (
 	"context"
 )
 
-type UserRepository interface {
+type userRepository interface {
 	UpsertUser(ctx context.Context, u *entity.User) error
 	GetUserByID(ctx context.Context, id int64) (*entity.User, error)
 	SetUserWallet(ctx context.Context, userID int64, walletAddressRaw string) error
 	ClearUserWallet(ctx context.Context, userID int64) error
 }
 
-type UserService struct {
+type userService struct {
 	botToken string
-	userRepo UserRepository
+	userRepo userRepository
 }
 
-func NewUserService(botToken string, userRepo UserRepository) *UserService {
-	return &UserService{botToken: botToken, userRepo: userRepo}
+func NewUserService(botToken string, userRepo userRepository) *userService {
+	return &userService{botToken: botToken, userRepo: userRepo}
 }

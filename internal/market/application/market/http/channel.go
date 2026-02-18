@@ -17,7 +17,7 @@ import (
 // @Success	200	{object}	response.Template{data=[]entity.Channel}	"List of my channels"
 // @Failure	401	{object}	response.Template{data=string}				"Unauthorized"
 // @Router		/market/my-channels [get]
-func (h *Handler) ListMyChannels(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) ListMyChannels(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -40,7 +40,7 @@ func (h *Handler) ListMyChannels(w http.ResponseWriter, r *http.Request) (interf
 // @Failure	403	{object}	response.Template{data=string}			"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/channels/{id}/refresh [get]
-func (h *Handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -74,7 +74,7 @@ func (h *Handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interf
 // @Failure	403	{object}	response.Template{data=string}	"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}	"Not found"
 // @Router		/market/channels/{id}/stats [get]
-func (h *Handler) GetChannelStats(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) GetChannelStats(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}

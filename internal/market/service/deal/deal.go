@@ -8,18 +8,18 @@ import (
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
 
-func (s *DealService) CreateDeal(ctx context.Context, d *entity.Deal) error {
+func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal) error {
 	d.Status = entity.DealStatusDraft
-	d.EscrowAmount = domain.ComputeEscrowAmount(d.Price, s.escrowConfig)
+	d.EscrowAmount = s.escrowSvc.ComputeEscrowAmount(d.Price)
 	return s.dealRepo.CreateDeal(ctx, d)
 }
 
-func (s *DealService) GetDeal(ctx context.Context, id int64) (*entity.Deal, error) {
+func (s *dealService) GetDeal(ctx context.Context, id int64) (*entity.Deal, error) {
 	return s.dealRepo.GetDealByID(ctx, id)
 }
 
 // GetDealForUser returns the deal only if the user is lessor or lessee; otherwise nil.
-func (s *DealService) GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error) {
+func (s *dealService) GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error) {
 	d, err := s.dealRepo.GetDealByID(ctx, id)
 	if err != nil || d == nil {
 		return nil, err
@@ -30,22 +30,22 @@ func (s *DealService) GetDealForUser(ctx context.Context, id int64, userID int64
 	return d, nil
 }
 
-func (s *DealService) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
+func (s *dealService) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
 	return s.dealRepo.GetDealsByListingID(ctx, listingID)
 }
 
 // GetDealsByListingIDForUser returns deals for the listing where the user is lessor or lessee.
-func (s *DealService) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
+func (s *dealService) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
 	return s.dealRepo.GetDealsByListingIDForUser(ctx, listingID, userID)
 }
 
-func (s *DealService) GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
+func (s *dealService) GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
 	return s.dealRepo.ListDealsByUserID(ctx, userID)
 }
 
 // UpdateDealDraft updates type, duration, price, details when status is draft. Clears both signatures.
 // Caller must be lessor or lessee.
-func (s *DealService) UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error {
+func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error {
 	existing, err := s.dealRepo.GetDealByID(ctx, d.ID)
 	if err != nil || existing == nil {
 		return marketerrors.ErrNotFound
@@ -60,13 +60,13 @@ func (s *DealService) UpdateDealDraft(ctx context.Context, userID int64, d *enti
 	d.LesseeID = existing.LesseeID
 	d.ListingID = existing.ListingID
 	d.Status = entity.DealStatusDraft
-	d.EscrowAmount = domain.ComputeEscrowAmount(d.Price, s.escrowConfig)
+	d.EscrowAmount = s.escrowSvc.ComputeEscrowAmount(d.Price)
 	return s.dealRepo.UpdateDealDraftFieldsAndClearSignatures(ctx, d)
 }
 
 // SignDeal sets the current user's signature (hash of type, duration, price, details, user_id, payout addresses) in a transaction.
 // Both payout addresses must already be set on the deal; user's wallet must match their deal payout. Then both signatures use the same payload.
-func (s *DealService) SignDeal(ctx context.Context, userID int64, dealID int64) error {
+func (s *dealService) SignDeal(ctx context.Context, userID int64, dealID int64) error {
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil || existing == nil {
 		return marketerrors.ErrNotFound
@@ -96,7 +96,7 @@ func (s *DealService) SignDeal(ctx context.Context, userID int64, dealID int64) 
 }
 
 // SetDealPayoutAddress sets the current user's payout address on the deal (lessor or lessee). Only in draft.
-func (s *DealService) SetDealPayoutAddress(ctx context.Context, userID int64, dealID int64, payoutAddressRaw string) error {
+func (s *dealService) SetDealPayoutAddress(ctx context.Context, userID int64, dealID int64, payoutAddressRaw string) error {
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil || existing == nil {
 		return marketerrors.ErrNotFound
@@ -114,7 +114,7 @@ func (s *DealService) SetDealPayoutAddress(ctx context.Context, userID int64, de
 }
 
 // RejectDeal sets deal status to rejected. Only allowed when status is draft; caller must be lessor or lessee.
-func (s *DealService) RejectDeal(ctx context.Context, userID int64, dealID int64) error {
+func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64) error {
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil || existing == nil {
 		return marketerrors.ErrNotFound
