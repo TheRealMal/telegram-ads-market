@@ -40,7 +40,7 @@ type telegramService interface {
 }
 
 type marketDealChatService interface {
-	SetRepliedMessageIfMatch(ctx context.Context, replyToChatID, replyToMessageID int64, repliedText string) error
+	CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error
 }
 
 type service struct {
@@ -129,21 +129,11 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 		}
 	}
 
-	// If user replied to a message, check if it's a deal-chat invite and save the reply; then set reaction on the user's message.
-	if update.Message != nil && update.Message.ReplyToMessage != nil && update.Message.ReplyToMessage.Chat != nil && s.dealChatReplier != nil {
-		replyTo := update.Message.ReplyToMessage
-		if err := s.dealChatReplier.SetRepliedMessageIfMatch(ctx, replyTo.Chat.ID, replyTo.MessageID, update.Message.Text); err != nil {
-			slog.Error("failed to set deal chat replied message", "error", err, "chat_id", replyTo.Chat.ID, "message_id", replyTo.MessageID)
+	// If message is in a forum topic (deal chat), mirror it to the other side's topic.
+	if update.Message != nil && update.Message.Chat != nil && update.Message.MessageThreadID != 0 && s.dealChatReplier != nil {
+		if err := s.dealChatReplier.CopyMessageToOtherTopic(ctx, update.Message.Chat.ID, update.Message.MessageThreadID, update.Message.MessageID); err != nil {
+			slog.Debug("deal chat copy message", "error", err, "chat_id", update.Message.Chat.ID, "thread_id", update.Message.MessageThreadID, "message_id", update.Message.MessageID)
 		}
-		if update.Message.Chat == nil {
-			return nil
-		}
-
-		// Reply was saved; set a reaction on the user's message to acknowledge.
-		if err := s.telegramClient.SetMessageReaction(ctx, update.Message.Chat.ID, update.Message.MessageID, "✉️"); err != nil {
-			slog.Debug("failed to set message reaction on saved reply", "error", err, "chat_id", update.Message.Chat.ID, "message_id", update.Message.MessageID)
-		}
-
 	}
 	return nil
 }

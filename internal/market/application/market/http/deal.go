@@ -381,47 +381,23 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 	return updated, nil
 }
 
-// @Security	JWT
-// @Tags		Market
-// @Summary	Send deal chat invite message to the current user. Sends "Reply to this message to chat with the other side." and stores the message for reply tracking.
-// @Produce	json
-// @Param		id	path		int										true	"Deal ID"
-// @Success	200	{object}	response.Template{data=entity.DealChat}	"Created deal chat row"
-// @Failure	400	{object}	response.Template{data=string}			"Bad request"
-// @Failure	401	{object}	response.Template{data=string}			"Unauthorized"
-// @Failure	403	{object}	response.Template{data=string}			"Forbidden"
-// @Failure	404	{object}	response.Template{data=string}			"Not found"
-// @Router		/market/deals/{id}/send-chat-message [post]
-func (h *handler) SendDealChatMessage(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
-	}
-
-	dc, err := h.dealChatService.SendDealChatMessage(r.Context(), id, userID)
-	if err != nil {
-		return nil, toServiceError(err)
-	}
-	return dc, nil
+// DealChatLinkResponse is the response for get-or-create deal forum chat.
+type DealChatLinkResponse struct {
+	ChatLink string `json:"chat_link"`
 }
 
 // @Security	JWT
 // @Tags		Market
-// @Summary	List deal messages (chat invite + replies) for the deal in chronological order. Caller must be lessor or lessee.
+// @Summary	Get or create deal forum chat and return link to open the topic. Caller must be lessor or lessee.
 // @Produce	json
-// @Param		id	path		int											true	"Deal ID"
-// @Success	200	{object}	response.Template{data=[]entity.DealChat}	"List of deal chat messages"
-// @Failure	400	{object}	response.Template{data=string}				"Bad request"
-// @Failure	401	{object}	response.Template{data=string}				"Unauthorized"
-// @Failure	403	{object}	response.Template{data=string}				"Forbidden"
-// @Failure	404	{object}	response.Template{data=string}				"Not found"
-// @Router		/market/deals/{id}/messages [get]
-func (h *handler) ListDealMessages(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+// @Param		id	path		int	true	"Deal ID"
+// @Success	200	{object}	response.Template{data=DealChatLinkResponse}	"Chat link to open in Telegram"
+// @Failure	400	{object}	response.Template{data=string}	"Bad request"
+// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}	"Forbidden"
+// @Failure	404	{object}	response.Template{data=string}	"Not found"
+// @Router		/market/deals/{id}/chat-link [post]
+func (h *handler) GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, ok := auth.GetTelegramID(r.Context())
 	if !ok {
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
@@ -432,9 +408,9 @@ func (h *handler) ListDealMessages(w http.ResponseWriter, r *http.Request) (inte
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	list, err := h.dealChatService.ListDealMessages(r.Context(), id, userID)
+	chatLink, err := h.dealChatService.GetOrCreateDealForumChat(r.Context(), id, userID)
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return list, nil
+	return &DealChatLinkResponse{ChatLink: chatLink}, nil
 }

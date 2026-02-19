@@ -68,7 +68,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			}
 
 			marketRepo := marketrepo.New(pg)
-			dealChatSvc := dealchatservice.NewService(marketRepo, nil)
+			dealChatSvc := dealchatservice.NewService(marketRepo, telegramClient, cfg.Telegram.BotUsername)
 
 			// Bot updates service
 			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, dealChatSvc)

@@ -41,20 +41,26 @@ type redisSetter interface {
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
 }
 
+type dealChatService interface {
+	DeleteDealForumTopic(ctx context.Context, dealID int64) error
+}
+
 type service struct {
 	marketRepository marketRepository
 	liteclient       liteclient
 	redis            redisSetter
+	dealChatService  dealChatService
 
 	transactionGasNanoton int64
 	comissionMultiplier   float64
 }
 
-func NewService(marketRepository marketRepository, liteclient liteclient, redis redisSetter, transactionGasTON float64, commissionPercent float64) *service {
+func NewService(marketRepository marketRepository, liteclient liteclient, redis redisSetter, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
 	return &service{
 		marketRepository:      marketRepository,
 		liteclient:            liteclient,
 		redis:                 redis,
+		dealChatService:       dealChatService,
 		transactionGasNanoton: int64(transactionGasTON * nanotonPerTON),
 		comissionMultiplier:   1 + (commissionPercent / 100.0),
 	}
@@ -155,8 +161,8 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 			if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
 				return err
 			}
-
 		}
+		_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
 		dealACtionLockStatus = entity.DealActionLockStatusCompleted
 		return nil
 	}()

@@ -16,6 +16,7 @@ type Update struct {
 // Message represents a message from Telegram.
 type UpdateMessage struct {
 	MessageID         int64              `json:"message_id"`
+	MessageThreadID   int64              `json:"message_thread_id,omitempty"` // Forum topic thread ID when present
 	From              *User              `json:"from,omitempty"`
 	Chat              *Chat              `json:"chat"`
 	Text              string             `json:"text,omitempty"`

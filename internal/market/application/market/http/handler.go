@@ -36,8 +36,7 @@ type dealService interface {
 }
 
 type dealChatService interface {
-	SendDealChatMessage(ctx context.Context, dealID, userID int64) (*entity.DealChat, error)
-	ListDealMessages(ctx context.Context, dealID, userID int64) ([]*entity.DealChat, error)
+	GetOrCreateDealForumChat(ctx context.Context, dealID, userID int64) (chatLink string, err error)
 }
 
 type channelService interface {

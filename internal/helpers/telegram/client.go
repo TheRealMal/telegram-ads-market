@@ -28,6 +28,9 @@ const (
 	telegramPathAnswerPreCheckoutQuery TelegramPath = "/answerPreCheckoutQuery"
 	telegramPathRefundStarPayment      TelegramPath = "/refundStarPayment"
 	telegramPathSetMessageReaction     TelegramPath = "/setMessageReaction"
+	telegramPathCreateForumTopic       TelegramPath = "/createForumTopic"
+	telegramPathDeleteForumTopic       TelegramPath = "/deleteForumTopic"
+	telegramPathCopyMessage            TelegramPath = "/copyMessage"
 
 	messageWelcome = "Start message"
 	openAppURL     = "https://t.me/%s?startapp="
@@ -311,6 +314,86 @@ type ForceReplyMarkup struct {
 	Selective             bool   `json:"selective,omitempty"`
 }
 
+// CreateForumTopic creates a forum topic in a supergroup. Returns the message_thread_id of the new topic.
+// See https://core.telegram.org/bots/api#createforumtopic
+func (c *APIClient) CreateForumTopic(ctx context.Context, chatID int64, name string) (messageThreadID int64, err error) {
+	uri := c.buildTelegramURL(telegramPathCreateForumTopic)
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"name":    name,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("marshal createForumTopic payload: %w", err)
+	}
+	body, err := c.sendRequest(ctx, uri, jsonData)
+	if err != nil {
+		return 0, err
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageThreadID int64 `json:"message_thread_id"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("unmarshal createForumTopic response: %w", err)
+	}
+	if !result.OK {
+		return 0, fmt.Errorf("createForumTopic returned ok=false")
+	}
+	return result.Result.MessageThreadID, nil
+}
+
+// DeleteForumTopic deletes a forum topic. See https://core.telegram.org/bots/api#deleteforumtopic
+func (c *APIClient) DeleteForumTopic(ctx context.Context, chatID int64, messageThreadID int64) error {
+	uri := c.buildTelegramURL(telegramPathDeleteForumTopic)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal deleteForumTopic payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
+}
+
+// CopyMessage copies a message to a chat (optionally to a forum topic). See https://core.telegram.org/bots/api#copymessage
+func (c *APIClient) CopyMessage(ctx context.Context, fromChatID int64, messageID int64, toChatID int64, toMessageThreadID *int64) (copiedMessageID int64, err error) {
+	uri := c.buildTelegramURL(telegramPathCopyMessage)
+	payload := map[string]interface{}{
+		"chat_id":      toChatID,
+		"from_chat_id": fromChatID,
+		"message_id":   messageID,
+	}
+	if toMessageThreadID != nil {
+		payload["message_thread_id"] = *toMessageThreadID
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("marshal copyMessage payload: %w", err)
+	}
+	body, err := c.sendRequest(ctx, uri, jsonData)
+	if err != nil {
+		return 0, err
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int64 `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("unmarshal copyMessage response: %w", err)
+	}
+	if !result.OK {
+		return 0, fmt.Errorf("copyMessage returned ok=false")
+	}
+	return result.Result.MessageID, nil
+}
+
 // SendMessageWithForceReply sends a text message with reply_markup force_reply so the user is asked to reply.
 // placeholder is optional (1-64 chars); use "" to omit.
 func (c *APIClient) SendMessageWithForceReply(ctx context.Context, chatID int64, text string, placeholder string) (*SentMessage, error) {
@@ -324,9 +407,9 @@ func (c *APIClient) SendMessageWithForceReply(ctx context.Context, chatID int64,
 
 	url := c.buildTelegramURL(telegramPathSendMessage)
 	payload := struct {
-		ChatID      int64             `json:"chat_id"`
-		Text        string            `json:"text"`
-		ReplyMarkup ForceReplyMarkup  `json:"reply_markup"`
+		ChatID      int64            `json:"chat_id"`
+		Text        string           `json:"text"`
+		ReplyMarkup ForceReplyMarkup `json:"reply_markup"`
 	}{
 		ChatID: chatID,
 		Text:   text,

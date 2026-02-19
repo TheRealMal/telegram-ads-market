@@ -19,10 +19,8 @@ func toServiceError(err error) apperrors.ServiceError {
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeForbidden}
 	case errors.Is(err, marketerrors.ErrDealNotDraft), errors.Is(err, marketerrors.ErrWalletNotSet), errors.Is(err, marketerrors.ErrPayoutNotSet):
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-	case errors.Is(err, deal_chat.ErrTelegramSenderNil):
-		return apperrors.ServiceError{Err: err, Message: "telegram not configured", Code: apperrors.ErrorCodeInternalServerError}
-	case errors.Is(err, deal_chat.ErrActiveDealChatExists):
-		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+	case errors.Is(err, deal_chat.ErrForumNotConfigured):
+		return apperrors.ServiceError{Err: err, Message: "deal chat forum not configured", Code: apperrors.ErrorCodeInternalServerError}
 	default:
 		return apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeInternalServerError}
 	}

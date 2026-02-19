@@ -78,9 +78,9 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			repo := marketrepo.New(pg)
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
-			escrowSvc := escrowservice.NewService(repo, lc, redisClient, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
+			dealChatSvc := dealchatservice.NewService(repo, telegramClient, cfg.Telegram.BotUsername)
+			escrowSvc := escrowservice.NewService(repo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc)
-			dealChatSvc := dealchatservice.NewService(repo, telegramClient) // pass TelegramSender to enable send-chat-message
 			channelSvc := channelservice.NewChannelService(repo)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)

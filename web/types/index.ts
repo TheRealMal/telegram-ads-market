@@ -89,13 +89,3 @@ export interface Deal {
   created_at: string;
   updated_at: string;
 }
-
-// Deal chat message
-export interface DealChat {
-  deal_id: number;
-  reply_to_chat_id?: number;
-  reply_to_message_id?: number;
-  replied_message?: string;
-  created_at: string;
-  updated_at: string;
-}

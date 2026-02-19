@@ -9,15 +9,14 @@ import { useTelegramBackButton } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
 import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
-import type { Deal, DealChat, Listing } from '@/types';
+import type { Deal, Listing } from '@/types';
 import { getDealStatusLabel } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, MessageCircle } from 'lucide-react';
 
 /** TON logo (official style). White in SVG; use currentColor so it matches text (black in light theme, white in dark). */
 function TonLogoIcon({ className }: { className?: string }) {
@@ -33,8 +32,6 @@ function TonLogoIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-
-type Tab = 'details' | 'chat';
 
 function getDealMessage(details: Record<string, unknown> | undefined): string {
   if (!details || typeof details.message !== 'string') return '';
@@ -77,9 +74,8 @@ export default function DealDetailPage() {
   useTelegramBackButton(() => router.back());
   const [deal, setDeal] = useState<Deal | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
-  const [messages, setMessages] = useState<DealChat[]>([]);
-  const [tab, setTab] = useState<Tab>('details');
   const [loading, setLoading] = useState(true);
+  const [chatLinkLoading, setChatLinkLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState('');
   const [draftPostedAt, setDraftPostedAt] = useState('');
@@ -187,39 +183,23 @@ export default function DealDetailPage() {
     if (user?.id != null) setCurrentUserId(user.id);
   }, []);
 
-  // Chat messages: initial fetch when opening chat tab + polling every 3s while on chat tab
-  useEffect(() => {
-    if (tab !== 'chat' || !id || Number.isNaN(id)) return;
-    const token = typeof window !== 'undefined' && localStorage.getItem('ads_mrkt_jwt');
-    if (!token) return;
-    let isMounted = true;
-    const fetchMessages = () => {
-      api<DealChat[]>(`/api/v1/market/deals/${id}/messages`)
-        .then((res) => {
-          if (isMounted && res.ok && res.data) setMessages(res.data);
-        })
-        .catch(() => {});
-    };
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [id, tab]);
-
-  const handleSendChatMessage = async () => {
+  const handleJumpIntoChat = async () => {
     const authRes = await auth();
     if (!authRes.ok || !authRes.data) {
-      alert('Open from Telegram to send messages.');
+      alert('Open from Telegram to use deal chat.');
       return;
     }
     setAuthToken(authRes.data);
-    const res = await api<DealChat>(`/api/v1/market/deals/${id}/send-chat-message`, {
-      method: 'POST',
-    });
-    if (res.ok && res.data) {
-      setMessages((prev) => [...prev, res.data!]);
+    setChatLinkLoading(true);
+    try {
+      const res = await api<{ chat_link: string }>(`/api/v1/market/deals/${id}/chat-link`, { method: 'POST' });
+      if (res.ok && res.data?.chat_link) {
+        window.open(res.data.chat_link, '_blank', 'noopener,noreferrer');
+      } else {
+        alert(res.error_code || 'Could not open chat');
+      }
+    } finally {
+      setChatLinkLoading(false);
     }
   };
 
@@ -309,13 +289,8 @@ export default function DealDetailPage() {
           <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-4">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="w-full">
-          <TabsList className="mb-4 grid w-full grid-cols-2">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="chat">Chat history</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details">
+        <div className="w-full">
+          <div className="mb-4">
             {/* Wallet: above details card, minimal UI */}
             {(isLessor || isLessee) && (
               <div className="mb-4 flex w-full max-w-md flex-col gap-1">
@@ -462,6 +437,19 @@ export default function DealDetailPage() {
                     <strong>Release:</strong> {new Date(deal.escrow_release_time).toLocaleString()}
                   </p>
                 )}
+                {(isLessor || isLessee) && deal.status !== 'draft' && deal.status !== 'rejected' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="inline-flex items-center gap-2"
+                    onClick={handleJumpIntoChat}
+                    disabled={chatLinkLoading}
+                  >
+                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                    {chatLinkLoading ? 'Opening…' : 'Jump into chat'}
+                  </Button>
+                )}
                 {(getDealMessage(deal.details as Record<string, unknown>) || getDealPostedAt(deal.details as Record<string, unknown>)) && (
                   <div className="mt-2">
                     <strong className="text-sm">Post text</strong>
@@ -587,38 +575,8 @@ export default function DealDetailPage() {
                 </p>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="chat">
-            <div className="space-y-2">
-              {messages.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">No messages yet.</p>
-              ) : (
-                messages.map((m, i) => {
-                  const isFromMe = currentUserId != null && m.reply_to_chat_id !== currentUserId;
-                  const otherLabel = isLessor ? 'Lessee' : isLessee ? 'Lessor' : 'Other';
-                  const authorLabel = isFromMe ? 'Me' : otherLabel;
-                  return (
-                    <Card key={i} className="py-0">
-                      <CardContent className="p-3">
-                        <p className="text-xs font-medium text-muted-foreground">{authorLabel}</p>
-                        {m.replied_message != null && (
-                          <p className="mt-1 text-sm whitespace-pre-wrap">{m.replied_message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(m.created_at).toLocaleString()}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-            <Button className="mt-4 w-full" onClick={handleSendChatMessage}>
-              Send chat invite
-            </Button>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
           </div>
         ) : null}
