@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
 import { api, auth, setAuthToken } from '@/lib/api';
-import { useTelegramBackButton } from '@/lib/telegram';
+import { useTelegramBackButton, openTelegramLink } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
 import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
@@ -194,7 +194,7 @@ export default function DealDetailPage() {
     try {
       const res = await api<{ chat_link: string }>(`/api/v1/market/deals/${id}/chat-link`, { method: 'POST' });
       if (res.ok && res.data?.chat_link) {
-        window.open(res.data.chat_link, '_blank', 'noopener,noreferrer');
+        openTelegramLink(res.data.chat_link);
       } else {
         alert(res.error_code || 'Could not open chat');
       }

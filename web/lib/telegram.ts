@@ -79,6 +79,20 @@ function postTelegramMethod(eventType: string, eventData: Record<string, unknown
 }
 
 /**
+ * Opens a t.me link in the Telegram app via web_app_open_tg_link (Mini App will close).
+ * link must be in format https://t.me/<path> (e.g. https://t.me/BotUsername/thread_id).
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_open_tg_link
+ */
+export function openTelegramLink(link: string): void {
+  if (typeof window === 'undefined' || !link) return;
+  const prefix = 'https://t.me/';
+  if (!link.startsWith(prefix)) return;
+  const pathFull = link.slice(prefix.length).replace(/\/$/, '');
+  if (!pathFull) return;
+  postTelegramMethod('web_app_open_tg_link', { path_full: pathFull });
+}
+
+/**
  * Disables vertical swipe-to-close (since v7.7). Prevents accidental minimize when scrolling.
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_setup_swipe_behavior
  */

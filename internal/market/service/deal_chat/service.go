@@ -89,25 +89,18 @@ func (s *service) GetOrCreateDealForumChat(ctx context.Context, dealID int64, us
 	return s.chatLinkForUser(t, deal, userID), nil
 }
 
-func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, userID int64) string {
-	if s.botUsername != "" {
-		return "https://t.me/" + s.botUsername
-	}
-	var chatID int64
-	var threadID int64
+func (s *service) threadIDForUser(t *entity.DealForumTopic, deal *entity.Deal, userID int64) int64 {
 	if deal.LessorID == userID {
-		chatID = t.LessorChatID
-		threadID = t.LessorMessageThreadID
-	} else {
-		chatID = t.LesseeChatID
-		threadID = t.LesseeMessageThreadID
+		return t.LessorMessageThreadID
 	}
-	if chatID < 0 {
-		cID := -chatID
-		if cID >= 1e13 {
-			cID = cID % 1e10
-		}
-		return fmt.Sprintf("https://t.me/c/%d/%d", cID, threadID)
+	return t.LesseeMessageThreadID
+}
+
+// chatLinkForUser returns the deal chat link in format https://t.me/<bot_username>/<thread_id> for use with web_app_open_tg_link.
+func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, userID int64) string {
+	threadID := s.threadIDForUser(t, deal, userID)
+	if s.botUsername != "" {
+		return "https://t.me/" + s.botUsername + "/" + strconv.FormatInt(threadID, 10)
 	}
 	return ""
 }
