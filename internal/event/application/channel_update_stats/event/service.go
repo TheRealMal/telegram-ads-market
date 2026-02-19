@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strings"
+	"time"
 
 	"ads-mrkt/internal/event/domain/entity"
 
@@ -15,6 +16,8 @@ type repository interface {
 	ReadEvents(ctx context.Context, args *redis.XReadGroupArgs) ([]redis.XMessage, error)
 	CreateGroup(ctx context.Context, stream, group, id string) error
 	AckMessages(ctx context.Context, stream, group string, messageIDs []string) error
+	AutoClaimPendingEvents(ctx context.Context, args *redis.XAutoClaimArgs) ([]redis.XMessage, string, error)
+	TrimStreamByAge(ctx context.Context, stream string, maxAge time.Duration) error
 }
 
 type Service struct {

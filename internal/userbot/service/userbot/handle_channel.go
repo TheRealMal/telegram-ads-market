@@ -26,7 +26,7 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		return fmt.Errorf("failed to get full channel: %w", err)
 	}
 
-	channel := mapChannel(fullChannel)
+	channel, statsDC := mapChannel(fullChannel)
 	if channel == nil {
 		slog.Error("failed to map channel", "channel_id", update.ChannelID, "full_channel", fullChannel)
 		return nil
@@ -39,7 +39,8 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 
 	if channel.AdminRights.CanViewStats {
 		slog.Info("updating channel stats", "channel_id", update.ChannelID)
-		if err = s.UpdateChannelStats(ctx, update.ChannelID, channelEnt.AccessHash); err != nil {
+		if err = s.UpdateChannelStats(ctx, update.ChannelID, channelEnt.AccessHash, statsDC); err != nil {
+			slog.Error("failed to update channel stats", "channel_id", update.ChannelID, "error", err)
 			return fmt.Errorf("failed to update channel stats: %w", err)
 		}
 	}
@@ -93,19 +94,19 @@ func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash i
 	return nil
 }
 
-func mapChannel(rawChannel *tg.MessagesChatFull) *marketentity.Channel {
+func mapChannel(rawChannel *tg.MessagesChatFull) (*marketentity.Channel, int) {
 	if len(rawChannel.Chats) == 0 {
-		return nil
+		return nil, 0
 	}
 
 	channel, ok := rawChannel.GetChats()[0].(*tg.Channel)
 	if !ok {
-		return nil
+		return nil, 0
 	}
 
 	channelFull, ok := rawChannel.GetFullChat().(*tg.ChannelFull)
 	if !ok {
-		return nil
+		return nil, 0
 	}
 
 	username, ok := channel.GetUsername()
@@ -119,7 +120,7 @@ func mapChannel(rawChannel *tg.MessagesChatFull) *marketentity.Channel {
 		Username:    username,
 		Photo:       "",
 		AdminRights: mapAdminRights(channel.AdminRights, channelFull.CanViewStats),
-	}
+	}, channelFull.StatsDC
 }
 
 func mapAdminRights(adminRights tg.ChatAdminRights, canViewStats bool) marketentity.AdminRights {

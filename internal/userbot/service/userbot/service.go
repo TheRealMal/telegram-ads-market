@@ -38,17 +38,19 @@ type marketRepository interface {
 
 type channelUpdateStatsEventService interface {
 	ReadChannelUpdateStatsEvents(ctx context.Context, group, consumer string, limit int64) ([]*evententity.EventChannelUpdateStats, error)
+	PendingChannelUpdateStatsEvents(ctx context.Context, group, consumer string, limit int64, minIdle time.Duration) ([]*evententity.EventChannelUpdateStats, error)
 	AckChannelUpdateStatsMessages(ctx context.Context, group string, messageIDs []string) error
+	TrimStreamByAge(ctx context.Context, age time.Duration) error
 }
 
 type service struct {
-	stateStorage                 updates.StateStorage
-	marketRepository             marketRepository
-	channelUpdateStatsEventSvc   channelUpdateStatsEventService
-	telegramClient               *telegram.Client
-	authFlow                     auth.Flow
-	updatesManager               *updates.Manager
-	userID                       int64
+	stateStorage               updates.StateStorage
+	marketRepository           marketRepository
+	channelUpdateStatsEventSvc channelUpdateStatsEventService
+	telegramClient             *telegram.Client
+	authFlow                   auth.Flow
+	updatesManager             *updates.Manager
+	userID                     int64
 }
 
 func New(cfg config.Config, stateStorage updates.StateStorage, marketRepository marketRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService) *service {
@@ -141,11 +143,9 @@ func (s *service) run(ctx context.Context) error {
 
 	s.userID = user.ID
 
-	go s.RunDealPostSenderWorker(ctx, s.marketRepository)
-	go s.RunDealPostCheckerWorker(ctx, s.marketRepository)
-	if s.channelUpdateStatsEventSvc != nil {
-		go s.RunChannelUpdateStatsWorker(ctx, s.channelUpdateStatsEventSvc)
-	}
+	go s.RunDealPostSenderWorker(ctx)
+	go s.RunDealPostCheckerWorker(ctx)
+	go s.RunChannelUpdateStatsWorker(ctx)
 
 	slog.Debug("getting current state")
 	if err := s.getCurrentState(ctx); err != nil {

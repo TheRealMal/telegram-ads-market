@@ -55,39 +55,79 @@ func applyLoadedGraphs(stats *tg.StatsBroadcastStats, jobs []asyncGraphJob, resu
 	}
 }
 
-func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, accessHash int64) error {
-	stats, err := s.telegramClient.API().StatsGetBroadcastStats(ctx, &tg.StatsGetBroadcastStatsRequest{
-		Channel: &tg.InputChannel{
-			ChannelID:  channelID,
-			AccessHash: accessHash,
-		},
+func (s *service) prefetchStatsDC(ctx context.Context, channelID int64, accessHash int64) (int, error) {
+	channel, err := s.telegramClient.API().ChannelsGetFullChannel(ctx, &tg.InputChannel{
+		ChannelID:  channelID,
+		AccessHash: accessHash,
 	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get full channel: %w", err)
+	}
+
+	channelFull, ok := channel.GetFullChat().(*tg.ChannelFull)
+	if !ok {
+		return 0, fmt.Errorf("failed to get full channel: %w", err)
+	}
+
+	return channelFull.StatsDC, nil
+}
+
+func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, accessHash int64, statsDC int) (err error) {
+	if statsDC == 0 {
+		statsDC, err = s.prefetchStatsDC(ctx, channelID, accessHash)
+		if err != nil {
+			return fmt.Errorf("failed to prefetch stats DC: %w", err)
+		}
+	}
+	dcConnectionInvoker, err := s.telegramClient.DC(ctx, statsDC, 1)
+	if err != nil {
+		return fmt.Errorf("failed to get DC: %w", err)
+	}
+	defer dcConnectionInvoker.Close()
+
+	var stats tg.StatsBroadcastStats
+	err = dcConnectionInvoker.Invoke(
+		ctx,
+		&tg.StatsGetBroadcastStatsRequest{
+			Channel: &tg.InputChannel{
+				ChannelID:  channelID,
+				AccessHash: accessHash,
+			},
+		},
+		&stats,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get broadcast stats: %w", err)
 	}
 
-	jobs := collectAsyncGraphJobs(stats)
+	jobs := collectAsyncGraphJobs(&stats)
 	slog.Info("collected async graph jobs", "channel_id", channelID, "jobs", len(jobs))
 	if len(jobs) > 0 {
 		results := make([]tg.StatsGraphClass, len(jobs))
 		g, gctx := errgroup.WithContext(ctx)
-		api := s.telegramClient.API()
 		for i := range jobs {
+			idx := i
 			g.Go(func() error {
-				loaded, err := api.StatsLoadAsyncGraph(gctx, &tg.StatsLoadAsyncGraphRequest{
-					Token: jobs[i].token,
-				})
+				var statsGraphBox tg.StatsGraphBox
+				err := dcConnectionInvoker.Invoke(
+					gctx,
+					&tg.StatsLoadAsyncGraphRequest{
+						Token: jobs[idx].token,
+					},
+					&statsGraphBox,
+				)
 				if err != nil {
-					return fmt.Errorf("load async graph: %w", err)
+					return fmt.Errorf("load async graph: %w: token: %s", err, jobs[i].token)
 				}
-				results[i] = loaded
+				results[idx] = statsGraphBox.StatsGraph
 				return nil
 			})
 		}
 		if err := g.Wait(); err != nil {
+			slog.Error("loading async graphs", "channel_id", channelID, "error", err)
 			return fmt.Errorf("loading async graphs: %w", err)
 		}
-		applyLoadedGraphs(stats, jobs, results)
+		applyLoadedGraphs(&stats, jobs, results)
 	}
 	slog.Info("applied loaded graphs", "channel_id", channelID)
 

@@ -55,6 +55,37 @@ func (s *Service) AckChannelUpdateStatsMessages(ctx context.Context, group strin
 	return s.repository.AckMessages(ctx, eventChannelUpdateStatsStream, group, messageIDs)
 }
 
+func (s *Service) PendingChannelUpdateStatsEvents(ctx context.Context, group string, consumer string, limit int64, minIdle time.Duration) ([]*entity.EventChannelUpdateStats, error) {
+	data, _, err := s.repository.AutoClaimPendingEvents(ctx, &redis.XAutoClaimArgs{
+		Stream:   eventChannelUpdateStatsStream,
+		Group:    group,
+		MinIdle:  minIdle,
+		Count:    max(minReadLimit, min(maxReadLimit, limit)),
+		Consumer: consumer,
+		Start:    "0-0",
+	})
+	if err != nil {
+		return nil, err
+	}
+	events := make([]*entity.EventChannelUpdateStats, 0, len(data))
+	for _, item := range data {
+		event := createEvent(item)
+		if event != nil {
+			events = append(events, event)
+		} else {
+			slog.Info("can't parse event.pending channel_update_stats", "event", item)
+			if errAck := s.AckChannelUpdateStatsMessages(ctx, group, []string{item.ID}); errAck != nil {
+				slog.Error("cannot ack pending channel_update_stats", "err", errAck)
+			}
+		}
+	}
+	return events, nil
+}
+
+func (s *Service) TrimStreamByAge(ctx context.Context, age time.Duration) error {
+	return s.repository.TrimStreamByAge(ctx, eventChannelUpdateStatsStream, age)
+}
+
 func createEvent(streamMessage redis.XMessage) *entity.EventChannelUpdateStats {
 	e := &entity.EventChannelUpdateStats{
 		ID: streamMessage.ID,
