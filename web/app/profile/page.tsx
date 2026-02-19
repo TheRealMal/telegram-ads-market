@@ -22,7 +22,12 @@ export default function ProfilePage() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   );
-  const [notification, setNotification] = useState<{ success: boolean; message: string } | null>(null);
+  const [notification, setNotification] = useState<{
+    success: boolean;
+    message: string;
+    exiting?: boolean;
+  } | null>(null);
+  const [notificationEntered, setNotificationEntered] = useState(false);
   const [refreshDisabledChannels, setRefreshDisabledChannels] = useState<Set<number>>(new Set());
   const [refreshLoading, setRefreshLoading] = useState(false);
 
@@ -98,18 +103,52 @@ export default function ProfilePage() {
     }
   }, [refreshLoading]);
 
+  // Enter animation: after mount, slide in
   useEffect(() => {
-    if (!notification) return;
-    const t = setTimeout(() => setNotification(null), 4000);
-    return () => clearTimeout(t);
+    if (!notification || notification.exiting) {
+      setNotificationEntered(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      setNotificationEntered(true);
+    });
+    return () => cancelAnimationFrame(id);
   }, [notification]);
+
+  // Auto-dismiss: start exit animation after 4s, then remove after fade-out
+  useEffect(() => {
+    if (!notification || notification.exiting) return;
+    const startExit = setTimeout(() => {
+      setNotification((prev) => (prev ? { ...prev, exiting: true } : null));
+    }, 4000);
+    return () => clearTimeout(startExit);
+  }, [notification]);
+
+  // After exit animation, remove from DOM
+  useEffect(() => {
+    if (!notification?.exiting) return;
+    const remove = setTimeout(() => setNotification(null), 300);
+    return () => clearTimeout(remove);
+  }, [notification?.exiting]);
+
+  const isFullscreen =
+    typeof window !== 'undefined' &&
+    (window as Window & { Telegram?: { WebApp?: { isExpanded?: boolean } } }).Telegram?.WebApp?.isExpanded === true;
 
   return (
     <>
       <div className={`page-with-nav ${notReady ? 'opacity-0' : 'opacity-100'}`}>
       {notification && (
         <div
-          className="sticky top-0 z-40 mx-auto max-w-2xl px-4 pt-2"
+          className={`sticky z-40 mx-auto max-w-2xl px-4 pt-2 transition-[transform,opacity] duration-300 ease-out ${
+            isFullscreen ? 'top-20' : 'top-0'
+          }           ${
+            notification.exiting
+              ? 'translate-y-0 opacity-0'
+              : notificationEntered
+                ? 'translate-y-0 opacity-100'
+                : '-translate-y-full opacity-0'
+          }`}
           role="status"
           aria-live="polite"
         >
