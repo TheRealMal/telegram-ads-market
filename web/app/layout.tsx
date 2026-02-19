@@ -2,6 +2,7 @@ import Script from 'next/script';
 import './globals.css';
 import { BottomNav } from '@/components/BottomNav';
 import { TonConnectProvider } from '@/components/TonConnectProvider';
+import { TelegramAppearance } from '@/components/TelegramAppearance';
 import { TelegramExpandOnMobile } from '@/components/TelegramExpandOnMobile';
 import { ThemeFromWebApp } from '@/components/ThemeFromWebApp';
 
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-foreground antialiased">
         <TonConnectProvider>
           <ThemeFromWebApp />
+          <TelegramAppearance />
           <TelegramExpandOnMobile />
           <main className="mx-auto max-w-4xl">{children}</main>
           <BottomNav />

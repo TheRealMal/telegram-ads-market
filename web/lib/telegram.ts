@@ -54,6 +54,53 @@ export function requestFullscreenMiniApp(): void {
   }
 }
 
+const TELEGRAM_WEB_ORIGIN = 'https://web.telegram.org';
+
+/**
+ * Sends a Telegram Mini App method. Works in Web (postMessage) and Desktop/Mobile (TelegramWebviewProxy.postEvent).
+ * @see https://docs.telegram-mini-apps.com/platform/methods
+ */
+function postTelegramMethod(eventType: string, eventData: Record<string, unknown> = {}): void {
+  if (typeof window === 'undefined') return;
+  const data = JSON.stringify(eventData);
+  const proxy = window.TelegramWebviewProxy;
+  if (proxy?.postEvent) {
+    proxy.postEvent(eventType, data);
+    return;
+  }
+  try {
+    window.parent.postMessage(
+      JSON.stringify({ eventType, eventData }),
+      TELEGRAM_WEB_ORIGIN
+    );
+  } catch {
+    // not in iframe or same-origin
+  }
+}
+
+/**
+ * Disables vertical swipe-to-close (since v7.7). Prevents accidental minimize when scrolling.
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_setup_swipe_behavior
+ */
+export function setupSwipeBehavior(allowVerticalSwipe = false): void {
+  postTelegramMethod('web_app_setup_swipe_behavior', { allow_vertical_swipe: allowVerticalSwipe });
+}
+
+/**
+ * Sets Mini App background and bottom bar colors from CSS theme (--background, --muted).
+ * Call after theme is applied. Uses #RRGGBB from :root or .dark.
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_background_color
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_bottom_bar_color
+ */
+export function setTelegramThemeColors(): void {
+  if (typeof document === 'undefined') return;
+  const style = getComputedStyle(document.documentElement);
+  const bg = style.getPropertyValue('--background').trim();
+  const bottomBar = style.getPropertyValue('--muted').trim();
+  if (bg) postTelegramMethod('web_app_set_background_color', { color: bg });
+  if (bottomBar) postTelegramMethod('web_app_set_bottom_bar_color', { color: bottomBar });
+}
+
 export function getColorScheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light';
   return window.Telegram?.WebApp?.colorScheme || 'light';

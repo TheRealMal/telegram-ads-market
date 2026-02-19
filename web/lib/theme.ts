@@ -26,6 +26,7 @@ export function setStoredTheme(theme: Theme): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(THEME_STORAGE_KEY, theme);
   document.documentElement.classList.toggle('dark', theme === 'dark');
+  window.dispatchEvent(new CustomEvent('ads_mrkt_theme_changed', { detail: theme }));
 }
 
 export function getCurrentTheme(): Theme {

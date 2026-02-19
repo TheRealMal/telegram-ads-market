@@ -437,7 +437,7 @@ export default function DealDetailPage() {
                     <strong>Release:</strong> {new Date(deal.escrow_release_time).toLocaleString()}
                   </p>
                 )}
-                {(isLessor || isLessee) && deal.status !== 'draft' && deal.status !== 'rejected' && (
+                {deal.status !== 'rejected' && (
                   <Button
                     type="button"
                     variant="outline"
