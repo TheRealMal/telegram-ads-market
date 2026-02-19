@@ -133,16 +133,15 @@ export default function ProfilePage() {
 
   const isFullscreen =
     typeof window !== 'undefined' &&
-    (window as Window & { Telegram?: { WebApp?: { isExpanded?: boolean } } }).Telegram?.WebApp?.isExpanded === true;
+    (window as Window & { Telegram?: { WebApp?: { isFullscreen?: boolean } } }).Telegram?.WebApp?.isFullscreen === true;
 
   return (
     <>
-      <div className={`page-with-nav ${notReady ? 'opacity-0' : 'opacity-100'}`}>
       {notification && (
         <div
-          className={`sticky z-40 mx-auto max-w-2xl px-4 pt-2 transition-[transform,opacity] duration-300 ease-out ${
-            isFullscreen ? 'top-20' : 'top-0'
-          }           ${
+          className={`fixed left-0 right-0 z-[100] mx-auto max-w-2xl px-4 pt-2 transition-[transform,opacity] duration-300 ease-out ${
+            isFullscreen ? 'top-[6.25rem]' : 'top-0'
+          } ${
             notification.exiting
               ? 'translate-y-0 opacity-0'
               : notificationEntered
@@ -161,6 +160,7 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+      <div className={`page-with-nav ${notReady ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="bg-gradient-to-b from-primary/10 to-background pt-8 pb-4">
         <div className="mx-auto max-w-2xl px-4">
