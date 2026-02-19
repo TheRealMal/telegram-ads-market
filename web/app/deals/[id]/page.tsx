@@ -89,6 +89,7 @@ export default function DealDetailPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const walletSyncedRef = useRef(false);
   const dealPayoutSyncedRef = useRef(false);
+  const draftEditorsSyncedRef = useRef(false);
 
   const wallet = useTonWallet();
   const rawAddress = useTonAddress(false);
@@ -136,6 +137,7 @@ export default function DealDetailPage() {
       setLoading(false);
       return;
     }
+    draftEditorsSyncedRef.current = false; // reset so this deal's first load can sync draft fields
     let isMounted = true;
     const fetchDeal = () => {
       api<Deal>(`/api/v1/market/deals/${id}`)
@@ -144,9 +146,17 @@ export default function DealDetailPage() {
           if (res.ok && res.data) {
             setDeal(res.data);
             setError(null);
+            // When status is draft, sync draft editors only on first load; polling must not overwrite user input.
             const d = res.data.details as Record<string, unknown>;
-            setDraftMessage(getDealMessage(d));
-            setDraftPostedAt(isoToDatetimeLocal(getDealPostedAt(d)));
+            if (res.data.status !== 'draft') {
+              draftEditorsSyncedRef.current = false; // allow sync again if deal goes back to draft
+              setDraftMessage(getDealMessage(d));
+              setDraftPostedAt(isoToDatetimeLocal(getDealPostedAt(d)));
+            } else if (!draftEditorsSyncedRef.current) {
+              draftEditorsSyncedRef.current = true;
+              setDraftMessage(getDealMessage(d));
+              setDraftPostedAt(isoToDatetimeLocal(getDealPostedAt(d)));
+            }
           } else setError(res.error_code || 'Not found');
         })
         .catch(() => {

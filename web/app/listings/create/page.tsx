@@ -26,7 +26,7 @@ export default function CreateListingPage() {
   const [type, setType] = useState<ListingType>('lessor');
   const [status, setStatus] = useState<ListingStatus>('inactive');
   const [channelId, setChannelId] = useState<string>('');
-  const [prices, setPrices] = useState<PriceRow[]>([{ duration: '24', price: '' }]);
+  const [prices, setPrices] = useState<PriceRow[]>([{ duration: '', price: '' }]);
   const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [channels, setChannels] = useState<Channel[]>([]);

@@ -400,12 +400,12 @@ export default function ListingDetailPage() {
                   id="deal-message"
                   value={dealMessage}
                   onChange={(e) => setDealMessage(e.target.value)}
-                  placeholder="Text of the post..."
+                  placeholder="You can type here anything you want, either draft post text either some of your ad plans. This can be changed any time before approvement."
                   rows={4}
                   className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="deal-posted-at" className="text-sm text-muted-foreground">
                   Date and time of posting
                 </Label>
@@ -414,7 +414,7 @@ export default function ListingDetailPage() {
                   type="datetime-local"
                   value={dealPostedAt}
                   onChange={(e) => setDealPostedAt(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  className="mt-1 w-full min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                 />
               </div>
             </div>
