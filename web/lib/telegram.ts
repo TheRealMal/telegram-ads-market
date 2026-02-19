@@ -85,7 +85,7 @@ function postTelegramMethod(eventType: string, eventData: Record<string, unknown
  */
 export function openTelegramLink(link: string): void {
   if (typeof window === 'undefined' || !link) return;
-  const prefix = 'https://t.me/';
+  const prefix = 'https://t.me';
   if (!link.startsWith(prefix)) return;
   const pathFull = link.slice(prefix.length);
   if (!pathFull) return;
