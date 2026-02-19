@@ -164,6 +164,11 @@ export default function ChannelStatsPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const requestedAt = stats?.requested_at;
+  const requestedAtLabel =
+    requestedAt != null
+      ? `Last updated: ${new Date(requestedAt * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
+      : null;
   const followers = stats?.Followers;
   const viewsPerPost = stats?.ViewsPerPost;
   const sharesPerPost = stats?.SharesPerPost;
@@ -301,6 +306,9 @@ export default function ChannelStatsPage() {
           <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-5">
+        {requestedAtLabel && (
+          <p className="text-sm text-muted-foreground">{requestedAtLabel}</p>
+        )}
         {/* Overview: two columns */}
         <Card>
           <CardHeader>

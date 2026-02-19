@@ -4,8 +4,11 @@ import (
 	"context"
 
 	"ads-mrkt/internal/config"
+	channelupdateevent "ads-mrkt/internal/event/application/channel_update_stats/event"
+	eventredis "ads-mrkt/internal/event/repository/redis"
 	marketrepo "ads-mrkt/internal/market/repository/market"
 	"ads-mrkt/internal/postgres"
+	"ads-mrkt/internal/redis"
 	userbotrepo "ads-mrkt/internal/userbot/repository/state"
 	userbotservice "ads-mrkt/internal/userbot/service/userbot"
 
@@ -37,9 +40,17 @@ func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return errors.Wrap(err, "postgres")
 			}
 
+			redisClient, err := redis.New(ctx, cfg.Redis)
+			if err != nil {
+				return errors.Wrap(err, "redis")
+			}
+			defer redisClient.Close()
+
 			stateStorage := userbotrepo.New(pg)
 			marketRepo := marketrepo.New(pg)
-			b := userbotservice.New(cfg.UserBot, stateStorage, marketRepo)
+			eventRepo := eventredis.New(redisClient)
+			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
+			b := userbotservice.New(cfg.UserBot, stateStorage, marketRepo, channelUpdateStatsEventSvc)
 
 			if err := b.Start(ctx); err != nil {
 				return errors.Wrap(err, "userbot start")

@@ -34,8 +34,16 @@ type eventService interface {
 	TrimStreamByAge(ctx context.Context, age time.Duration) error
 }
 
+type telegramNotificationEventService interface {
+	ReadTelegramNotificationEvents(ctx context.Context, group, consumer string, limit int64) ([]*evententity.EventTelegramNotification, error)
+	PendingTelegramNotificationEvents(ctx context.Context, group, consumer string, limit int64, minIdle time.Duration) ([]*evententity.EventTelegramNotification, error)
+	AckTelegramNotificationMessages(ctx context.Context, group string, messageIDs []string) error
+	TrimStreamByAge(ctx context.Context, age time.Duration) error
+}
+
 type telegramService interface {
 	SendWelcomeMessage(ctx context.Context, chatID int64) error
+	SendMessageSimple(ctx context.Context, chatID int64, text string) error
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 }
 
@@ -44,20 +52,23 @@ type marketDealChatService interface {
 }
 
 type service struct {
-	telegramClient  telegramService
-	eventService    eventService
-	dealChatReplier marketDealChatService
+	telegramClient        telegramService
+	eventService          eventService
+	notificationEventSvc  telegramNotificationEventService
+	marketDealChatService marketDealChatService
 }
 
 func NewService(
 	telegramClient telegramService,
 	eventService eventService,
-	dealChatReplier marketDealChatService,
+	notificationEventSvc telegramNotificationEventService,
+	marketDealChatService marketDealChatService,
 ) *service {
 	return &service{
-		telegramClient:  telegramClient,
-		eventService:    eventService,
-		dealChatReplier: dealChatReplier,
+		telegramClient:        telegramClient,
+		eventService:          eventService,
+		notificationEventSvc:  notificationEventSvc,
+		marketDealChatService: marketDealChatService,
 	}
 }
 
@@ -130,8 +141,8 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 	}
 
 	// If message is in a forum topic (deal chat), mirror it to the other side's topic.
-	if update.Message != nil && update.Message.Chat != nil && update.Message.MessageThreadID != 0 && s.dealChatReplier != nil {
-		if err := s.dealChatReplier.CopyMessageToOtherTopic(ctx, update.Message.Chat.ID, update.Message.MessageThreadID, update.Message.MessageID); err != nil {
+	if update.Message != nil && update.Message.Chat != nil && update.Message.MessageThreadID != 0 {
+		if err := s.marketDealChatService.CopyMessageToOtherTopic(ctx, update.Message.Chat.ID, update.Message.MessageThreadID, update.Message.MessageID); err != nil {
 			slog.Debug("deal chat copy message", "error", err, "chat_id", update.Message.Chat.ID, "thread_id", update.Message.MessageThreadID, "message_id", update.Message.MessageID)
 		}
 	}

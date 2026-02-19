@@ -16,6 +16,8 @@ type ServiceError struct {
 	Err     error
 	Message string
 	Code    ErrorCode
+	// Data is optional payload for error responses (e.g. next_available_at for rate limit).
+	Data interface{}
 }
 
 func (se ServiceError) Error() string {

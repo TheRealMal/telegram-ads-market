@@ -77,19 +77,11 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	switch listing.Type {
 	case entity.ListingTypeLessor:
 		if listing.ChannelID != nil {
-			_, err = h.channelService.RefreshChannel(r.Context(), *listing.ChannelID, listing.UserID)
-			if err != nil {
-				return nil, apperrors.ServiceError{Err: err, Message: "listing channel is not authorized for the listing owner", Code: apperrors.ErrorCodeForbidden}
-			}
 			dealChannelID = listing.ChannelID
 		}
 	case entity.ListingTypeLessee:
 		if req.ChannelID == nil {
 			return nil, apperrors.ServiceError{Err: nil, Message: "channel_id is required when applying to a lessee listing", Code: apperrors.ErrorCodeBadRequest}
-		}
-		_, err = h.channelService.RefreshChannel(r.Context(), *req.ChannelID, userID)
-		if err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: "you must be an admin of the channel to use it for this deal", Code: apperrors.ErrorCodeForbidden}
 		}
 		dealChannelID = req.ChannelID
 	}
@@ -112,7 +104,7 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		Price:     req.Price,
 		Details:   canonDetails,
 	}
-	if err := h.dealService.CreateDeal(r.Context(), d); err != nil {
+	if err := h.dealService.CreateDeal(r.Context(), d, listing.UserID); err != nil {
 		return nil, toServiceError(err)
 	}
 	return d, nil
@@ -305,8 +297,7 @@ func (h *handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{},
 	if err := h.dealService.SignDeal(r.Context(), userID, id); err != nil {
 		return nil, toServiceError(err)
 	}
-	updated, _ := h.dealService.GetDeal(r.Context(), id)
-	return updated, nil
+	return h.dealService.GetDeal(r.Context(), id)
 }
 
 // SetDealPayoutRequest is the body for PUT /api/v1/market/deals/{id}/payout-address.
@@ -377,8 +368,7 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if err := h.dealService.RejectDeal(r.Context(), userID, id); err != nil {
 		return nil, toServiceError(err)
 	}
-	updated, _ := h.dealService.GetDeal(r.Context(), id)
-	return updated, nil
+	return h.dealService.GetDeal(r.Context(), id)
 }
 
 // DealChatLinkResponse is the response for get-or-create deal forum chat.

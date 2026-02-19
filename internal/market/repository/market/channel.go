@@ -154,3 +154,27 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 	}
 	return row.Stats, nil
 }
+
+// MergeStatsRequestedAt updates the channel_stats row by merging requested_at (unix timestamp) into the existing stats JSON.
+// If no row exists, creates one with stats = {"requested_at": requestedAtUnix}.
+func (r *repository) MergeStatsRequestedAt(ctx context.Context, channelID int64, requestedAtUnix int64) error {
+	raw, err := r.GetChannelStats(ctx, channelID)
+	if err != nil {
+		return err
+	}
+	var statsMap map[string]interface{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &statsMap); err != nil {
+			return err
+		}
+	}
+	if statsMap == nil {
+		statsMap = make(map[string]interface{})
+	}
+	statsMap["requested_at"] = requestedAtUnix
+	merged, err := json.Marshal(statsMap)
+	if err != nil {
+		return err
+	}
+	return r.UpsertChannelStats(ctx, channelID, merged)
+}

@@ -306,6 +306,12 @@ func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string) 
 	return result.Result, nil
 }
 
+// SendMessageSimple sends a text message to the chat and returns only an error (for use by notification workers).
+func (c *APIClient) SendMessageSimple(ctx context.Context, chatID int64, text string) error {
+	_, err := c.SendMessage(ctx, chatID, text)
+	return err
+}
+
 // ForceReplyMarkup is the reply_markup for "Reply to this message" (Bot API ForceReply).
 // See https://core.telegram.org/bots/api#forcereply and https://core.telegram.org/constructor/replyKeyboardForceReply.
 type ForceReplyMarkup struct {

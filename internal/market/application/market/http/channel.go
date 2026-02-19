@@ -1,10 +1,12 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	apperrors "ads-mrkt/internal/errors"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	_ "ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
 	"ads-mrkt/pkg/auth"
@@ -53,8 +55,17 @@ func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interf
 	if err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
 	}
-	ch, err := h.channelService.RefreshChannel(r.Context(), id, userID)
+	ch, err := h.channelService.RequestStatsRefresh(r.Context(), id, userID)
 	if err != nil {
+		var tooSoon *marketerrors.ErrStatsRefreshTooSoon
+		if errors.As(err, &tooSoon) {
+			return nil, apperrors.ServiceError{
+				Err:     err,
+				Message: tooSoon.Error(),
+				Code:    apperrors.ErrorCodeTooManyRequests,
+				Data:   map[string]string{"next_available_at": tooSoon.NextAvailableAt.Format("15:04")},
+			}
+		}
 		return nil, toServiceError(err)
 	}
 	if ch == nil {

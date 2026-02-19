@@ -6,7 +6,9 @@ import (
 
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/config"
+	channelupdateevent "ads-mrkt/internal/event/application/channel_update_stats/event"
 	escrowdepositevent "ads-mrkt/internal/event/application/escrow_deposit/event"
+	telegramnotifyevent "ads-mrkt/internal/event/application/telegram_notification/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/liteclient"
@@ -80,10 +82,13 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			listingSvc := listingservice.NewListingService(repo, repo)
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient, cfg.Telegram.BotUsername)
 			escrowSvc := escrowservice.NewService(repo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
-			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc)
-			channelSvc := channelservice.NewChannelService(repo)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
+			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
+			telegramNotifyEventSvc := telegramnotifyevent.NewService(eventRepo)
+
+			channelSvc := channelservice.NewChannelService(repo, channelUpdateStatsEventSvc)
+			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc, telegramNotifyEventSvc)
 
 			go escrowSvc.Worker(ctxRun)
 			go escrowSvc.DepositStreamWorker(ctxRun, escrowDepositEventSvc)

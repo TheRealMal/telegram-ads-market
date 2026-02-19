@@ -23,7 +23,7 @@ type listingService interface {
 }
 
 type dealService interface {
-	CreateDeal(ctx context.Context, d *entity.Deal) error
+	CreateDeal(ctx context.Context, d *entity.Deal, otherSideID int64) error
 	GetDeal(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error)
 	GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error)
@@ -41,7 +41,7 @@ type dealChatService interface {
 
 type channelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
-	RefreshChannel(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
+	RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
 	GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error)
 }
 

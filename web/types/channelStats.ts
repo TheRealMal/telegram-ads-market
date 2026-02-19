@@ -29,6 +29,8 @@ export interface RecentPostInteraction {
 }
 
 export interface ChannelStatsResponse {
+  /** Unix timestamp when stats were last requested/updated */
+  requested_at?: number;
   Period?: StatsPeriod;
   Followers?: StatsCurrentPrevious;
   ViewsPerPost?: StatsCurrentPrevious;

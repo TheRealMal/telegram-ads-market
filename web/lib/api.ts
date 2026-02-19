@@ -62,7 +62,8 @@ export async function api<T>(
     return {
       ok: false,
       error_code: body.error_code || 'request_failed',
-    };
+      data: body.data,
+    } as ApiResponse<T>;
   }
   return body as ApiResponse<T>;
 }

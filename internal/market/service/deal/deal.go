@@ -2,16 +2,25 @@ package service
 
 import (
 	"context"
+	"strconv"
 
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
 
-func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal) error {
+func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal, otherSideID int64) error {
 	d.Status = entity.DealStatusDraft
 	d.EscrowAmount = s.escrowSvc.ComputeEscrowAmount(d.Price)
-	return s.dealRepo.CreateDeal(ctx, d)
+	if err := s.dealRepo.CreateDeal(ctx, d); err != nil {
+		return err
+	}
+	_ = s.notificationAdder.AddTelegramNotificationEvent(
+		ctx,
+		otherSideID,
+		"New deal #"+strconv.FormatInt(d.ID, 10)+" on your listing.",
+	)
+	return nil
 }
 
 func (s *dealService) GetDeal(ctx context.Context, id int64) (*entity.Deal, error) {
@@ -92,7 +101,20 @@ func (s *dealService) SignDeal(ctx context.Context, userID int64, dealID int64) 
 	lessorPayout := *existing.LessorPayoutAddress
 	lesseePayout := *existing.LesseePayoutAddress
 	sig := domain.ComputeDealSignature(existing.Type, existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
-	return s.dealRepo.SignDealInTx(ctx, dealID, userID, sig)
+	if err := s.dealRepo.SignDealInTx(ctx, dealID, userID, sig); err != nil {
+		return err
+	}
+	otherID := existing.LesseeID
+	if userID == existing.LesseeID {
+		otherID = existing.LessorID
+	}
+	_ = s.notificationAdder.AddTelegramNotificationEvent(
+		ctx,
+		otherID,
+		"Deal #"+strconv.FormatInt(dealID, 10)+" was signed by the other party.",
+	)
+
+	return nil
 }
 
 // SetDealPayoutAddress sets the current user's payout address on the deal (lessor or lessee). Only in draft.
@@ -129,5 +151,15 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	if !updated {
 		return marketerrors.ErrDealNotDraft
 	}
+	otherID := existing.LesseeID
+	if userID == existing.LesseeID {
+		otherID = existing.LessorID
+	}
+	_ = s.notificationAdder.AddTelegramNotificationEvent(
+		ctx,
+		otherID,
+		"Deal #"+strconv.FormatInt(dealID, 10)+" was rejected.",
+	)
+
 	return nil
 }

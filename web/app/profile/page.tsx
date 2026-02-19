@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api, auth, setAuthToken } from '@/lib/api';
 import { getTelegramUser } from '@/lib/initData';
 import type { Channel } from '@/types';
@@ -22,6 +22,9 @@ export default function ProfilePage() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   );
+  const [notification, setNotification] = useState<{ success: boolean; message: string } | null>(null);
+  const [refreshDisabledChannels, setRefreshDisabledChannels] = useState<Set<number>>(new Set());
+  const [refreshLoading, setRefreshLoading] = useState(false);
 
   useEffect(() => {
     setTgUser(getTelegramUser());
@@ -73,9 +76,52 @@ export default function ProfilePage() {
 
   const notReady = loading || hasToken === null;
 
+  const handleRefreshChannel = useCallback(async (channelId: number) => {
+    if (refreshLoading) return;
+    setRefreshLoading(true);
+    setNotification(null);
+    try {
+      const res = await api<Channel>(`/api/v1/market/channels/${channelId}/refresh`, { method: 'GET' });
+      if (res.ok) {
+        setNotification({ success: true, message: 'Channel update metadata request sent' });
+      } else {
+        const data = res.data as { next_available_at?: string } | undefined;
+        const at = data?.next_available_at ?? '--:--';
+        setNotification({ success: false, message: `Update request will be available at ${at}` });
+        setRefreshDisabledChannels((prev) => new Set(prev).add(channelId));
+      }
+    } catch {
+      setNotification({ success: false, message: 'Update request will be available at --:--' });
+      setRefreshDisabledChannels((prev) => new Set(prev).add(channelId));
+    } finally {
+      setRefreshLoading(false);
+    }
+  }, [refreshLoading]);
+
+  useEffect(() => {
+    if (!notification) return;
+    const t = setTimeout(() => setNotification(null), 4000);
+    return () => clearTimeout(t);
+  }, [notification]);
+
   return (
     <>
       <div className={`page-with-nav ${notReady ? 'opacity-0' : 'opacity-100'}`}>
+      {notification && (
+        <div
+          className="sticky top-0 z-40 mx-auto max-w-2xl px-4 pt-2"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm bg-background ${
+              notification.success ? 'border-green-500 text-foreground' : 'border-red-500 text-foreground'
+            }`}
+          >
+            {notification.message}
+          </div>
+        </div>
+      )}
       <PageTopSpacer />
       <div className="bg-gradient-to-b from-primary/10 to-background pt-8 pb-4">
         <div className="mx-auto max-w-2xl px-4">
@@ -148,7 +194,14 @@ export default function ProfilePage() {
                 No channels linked. Use “How to add a channel” above.
               </p>
             ) : (
-              channels.map((c) => <ChannelCard key={c.id} channel={c} />)
+              channels.map((c) => (
+                <ChannelCard
+                  key={c.id}
+                  channel={c}
+                  onRefreshClick={handleRefreshChannel}
+                  refreshDisabled={refreshDisabledChannels.has(c.id)}
+                />
+              ))
             )}
           </div>
         )}

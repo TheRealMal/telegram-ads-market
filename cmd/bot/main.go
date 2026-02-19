@@ -7,6 +7,7 @@ import (
 	webhookhttp "ads-mrkt/internal/bot/application/webhook/http"
 	botupdates "ads-mrkt/internal/bot/service/updates"
 	"ads-mrkt/internal/config"
+	eventtelegramnotify "ads-mrkt/internal/event/application/telegram_notification/event"
 	eventtelegram "ads-mrkt/internal/event/application/telegram_update/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
@@ -58,9 +59,10 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			// Telegram API client (for welcome message + middleware secret token)
 			telegramClient := telegram.NewAPIClient(ctxRun, cfg.Telegram, redisClient)
 
-			// Event stream: telegram updates
+			// Event streams: telegram updates + telegram notifications
 			eventRepo := eventredis.New(redisClient)
 			telegramEventSvc := eventtelegram.NewService(eventRepo)
+			telegramNotifyEventSvc := eventtelegramnotify.NewService(eventRepo)
 
 			pg, err := postgres.New(ctxRun, cfg.Database)
 			if err != nil {
@@ -71,8 +73,9 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealChatSvc := dealchatservice.NewService(marketRepo, telegramClient, cfg.Telegram.BotUsername)
 
 			// Bot updates service
-			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, dealChatSvc)
+			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc)
 			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
+			go updatesSvc.StartBackgroundProcessingNotifications(ctxRun)
 
 			// Webhook HTTP handler and router
 			webhookHandler := webhookhttp.NewHandler(updatesSvc)

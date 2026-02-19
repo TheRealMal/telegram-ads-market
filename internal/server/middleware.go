@@ -80,27 +80,28 @@ func WithJSONResponse(handler APIHandler) http.HandlerFunc {
 		if err != nil {
 			var (
 				errCode         string
+				errorData       interface{}
 				serviceError    errors.ServiceError
 				serviceErrorPtr *errors.ServiceError
 			)
 			switch {
 			case stderrors.As(err, &serviceError):
 				errCode = string(serviceError.Code)
-
+				errorData = serviceError.Data
 				slog.Error("ServiceError", "error", serviceError, "stack", serviceError.Err)
 			case stderrors.As(err, &serviceErrorPtr):
 				errCode = string(serviceErrorPtr.Code)
-
+				errorData = serviceErrorPtr.Data
 				slog.Error("ServiceError", "error", serviceErrorPtr, "stack", serviceErrorPtr.Err)
 			default:
 				errCode = err.Error()
-
 				slog.Error("UnknownError", "error", err)
 			}
 
 			errorResponse := &response.Template{
 				Ok:        false,
 				ErrorCode: errCode,
+				Data:      errorData,
 			}
 
 			// Encode and send the error response

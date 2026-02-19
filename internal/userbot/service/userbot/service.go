@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/userbot/config"
 
@@ -35,19 +36,26 @@ type marketRepository interface {
 	ReleaseDealActionLock(ctx context.Context, lockID string, status marketentity.DealActionLockStatus) error
 }
 
-type service struct {
-	stateStorage     updates.StateStorage
-	marketRepository marketRepository
-	telegramClient   *telegram.Client
-	authFlow         auth.Flow
-	updatesManager   *updates.Manager
-	userID           int64
+type channelUpdateStatsEventService interface {
+	ReadChannelUpdateStatsEvents(ctx context.Context, group, consumer string, limit int64) ([]*evententity.EventChannelUpdateStats, error)
+	AckChannelUpdateStatsMessages(ctx context.Context, group string, messageIDs []string) error
 }
 
-func New(cfg config.Config, stateStorage updates.StateStorage, marketRepository marketRepository) *service {
+type service struct {
+	stateStorage                 updates.StateStorage
+	marketRepository             marketRepository
+	channelUpdateStatsEventSvc   channelUpdateStatsEventService
+	telegramClient               *telegram.Client
+	authFlow                     auth.Flow
+	updatesManager               *updates.Manager
+	userID                       int64
+}
+
+func New(cfg config.Config, stateStorage updates.StateStorage, marketRepository marketRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService) *service {
 	s := &service{
-		stateStorage:     stateStorage,
-		marketRepository: marketRepository,
+		stateStorage:               stateStorage,
+		marketRepository:           marketRepository,
+		channelUpdateStatsEventSvc: channelUpdateStatsEventSvc,
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()
@@ -135,6 +143,9 @@ func (s *service) run(ctx context.Context) error {
 
 	go s.RunDealPostSenderWorker(ctx, s.marketRepository)
 	go s.RunDealPostCheckerWorker(ctx, s.marketRepository)
+	if s.channelUpdateStatsEventSvc != nil {
+		go s.RunChannelUpdateStatsWorker(ctx, s.channelUpdateStatsEventSvc)
+	}
 
 	slog.Debug("getting current state")
 	if err := s.getCurrentState(ctx); err != nil {

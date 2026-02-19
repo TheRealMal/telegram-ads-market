@@ -129,7 +129,7 @@ Frontend sources are placed into `web` directory, fully written with AI on React
 - [ ] Fetch channel picture
 - [ ] Secure escrow keys in database
 - [ ] Somehow monitor removing & adding new admins which will have ability to create listings
-- [ ] Refresh channels stats & display last update date on stats page
+- [x] Refresh channels stats & display last update date on stats page
 - [ ] Add telegram notifications about deals
 - [ ] Add more deal options:
     - [ ] Keep post in top 1 (no more posts after it)

@@ -27,16 +27,22 @@ type escrowService interface {
 	ComputeEscrowAmount(priceTON int64) int64
 }
 
-type dealService struct {
-	dealRepo  dealRepository
-	userRepo  userRepository
-	escrowSvc escrowService
+type telegramNotificationAdder interface {
+	AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error
 }
 
-func NewDealService(dealRepo dealRepository, userRepo userRepository, escrowSvc escrowService) *dealService {
+type dealService struct {
+	dealRepo          dealRepository
+	userRepo          userRepository
+	escrowSvc         escrowService
+	notificationAdder telegramNotificationAdder
+}
+
+func NewDealService(dealRepo dealRepository, userRepo userRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder) *dealService {
 	return &dealService{
-		dealRepo:  dealRepo,
-		userRepo:  userRepo,
-		escrowSvc: escrowSvc,
+		dealRepo:          dealRepo,
+		userRepo:          userRepo,
+		escrowSvc:         escrowSvc,
+		notificationAdder: notificationAdder,
 	}
 }

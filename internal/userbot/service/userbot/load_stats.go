@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"time"
 
 	"github.com/gotd/td/tg"
 	"golang.org/x/sync/errgroup"
@@ -93,6 +94,17 @@ func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, acces
 	jsonStats, err := json.Marshal(stats)
 	if err != nil {
 		return fmt.Errorf("failed to marshal stats: %w", err)
+	}
+
+	// Append requested_at timestamp to stats JSON.
+	var statsMap map[string]interface{}
+	if err := json.Unmarshal(jsonStats, &statsMap); err != nil {
+		return fmt.Errorf("failed to unmarshal stats for requested_at: %w", err)
+	}
+	statsMap["requested_at"] = time.Now().Unix()
+	jsonStats, err = json.Marshal(statsMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stats with requested_at: %w", err)
 	}
 
 	if err := s.marketRepository.UpsertChannelStats(ctx, channelID, jsonStats); err != nil {
