@@ -19,7 +19,7 @@ type CreateDealRequest struct {
 	ChannelID *int64          `json:"channel_id,omitempty"` // Required when listing type is lessee; ignored when lessor (taken from listing).
 	Type      string          `json:"type"`
 	Duration  int64           `json:"duration"`
-	Price     int64           `json:"price"`
+	Price     float64         `json:"price"`
 	Details   json.RawMessage `json:"details"`
 }
 
@@ -195,7 +195,7 @@ func (h *handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface
 type UpdateDealDraftRequest struct {
 	Type     *string         `json:"type,omitempty"`
 	Duration *int64          `json:"duration,omitempty"`
-	Price    *int64          `json:"price,omitempty"`
+	Price    *float64        `json:"price,omitempty"`
 	Details  json.RawMessage `json:"details,omitempty"`
 }
 

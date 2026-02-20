@@ -43,22 +43,53 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 	for _, deal := range deals {
 		listing, err := s.marketRepository.GetListingByID(ctx, deal.ListingID)
 		if err != nil || listing == nil || listing.ChannelID == nil {
-			logger.Debug("skip deal, no listing or channel", "deal_id", deal.ID)
+			logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
 			continue
 		}
 		channel, err := s.marketRepository.GetChannelByID(ctx, *listing.ChannelID)
 		if err != nil || channel == nil {
-			logger.Debug("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
+			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
 			continue
 		}
 		text := domain.GetMessageFromDetails(deal.Details)
 		if text == "" {
-			logger.Debug("skip deal, no message in details", "deal_id", deal.ID)
+			logger.Error("skip deal, no message in details", "deal_id", deal.ID)
 			continue
 		}
 		if postedAt, ok := domain.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
 			logger.Debug("skip deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
 			continue
+		}
+
+		// If there is an expired post_message lock, previous run may have posted then crashed: try to find the message in the channel.
+		expiredLockID, hasExpired, err := s.marketRepository.GetExpiredDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+		if err != nil {
+			logger.Error("get expired lock", "deal_id", deal.ID, "error", err)
+			continue
+		}
+		if hasExpired {
+			if foundMsgID, found := s.tryRecoverPostFromChannel(ctx, *listing.ChannelID, channel.AccessHash, text); found {
+				untilTs := time.Now().Add(time.Duration(deal.Duration) * time.Hour)
+				nextCheck := time.Now().Add(postCheckAdvanceHour)
+				m := &marketentity.DealPostMessage{
+					DealID:      deal.ID,
+					ChannelID:   *listing.ChannelID,
+					MessageID:   foundMsgID,
+					PostMessage: text,
+					Status:      marketentity.DealPostMessageStatusExists,
+					NextCheck:   nextCheck,
+					UntilTs:     untilTs,
+				}
+				if err := s.marketRepository.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+					logger.Error("recover create deal_post_message", "deal_id", deal.ID, "error", err)
+					_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusFailed)
+					continue
+				}
+				_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusCompleted)
+				logger.Info("recovered post from channel", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", foundMsgID)
+				continue
+			}
+			_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusFailed)
 		}
 
 		lockID, err := s.marketRepository.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
@@ -90,12 +121,15 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 		if err := s.marketRepository.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
 			logger.Error("create deal_post_message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
-		} else {
-			releaseLock(marketentity.DealActionLockStatusCompleted)
-			logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
+			continue
 		}
+		releaseLock(marketentity.DealActionLockStatusCompleted)
+		logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
+
 	}
 }
+
+const lastMessagesRecoveryLimit = 20
 
 // sendChannelMessage sends a text message to the channel and returns the message ID.
 func (s *service) sendChannelMessage(ctx context.Context, channelID int64, accessHash int64, text string) (int64, error) {
@@ -169,20 +203,80 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 	}
 }
 
-// getChannelMessageExists returns true if the message exists in the channel.
-func (s *service) getChannelMessageExists(ctx context.Context, channelID int64, accessHash int64, messageID int64) (bool, error) {
-	channel := &tg.InputChannel{ChannelID: channelID, AccessHash: accessHash}
-	req := &tg.ChannelsGetMessagesRequest{
-		Channel: channel,
-		ID:      []tg.InputMessageClass{&tg.InputMessageID{ID: int(messageID)}},
+// channelMessage is a message ID and text from a channel.
+type channelMessage struct {
+	ID   int64
+	Text string
+}
+
+// getChannelHistory fetches channel history via MessagesGetHistory.
+// See https://core.telegram.org/api/offsets: offset = offsetFromID(offsetID) + addOffset; results are reverse chronological (newest first).
+// For "most recent N": offsetID=0, addOffset=0, limit=N.
+// For "around message ID": offsetID=messageID, addOffset=-halfWindow, limit=windowSize.
+func (s *service) getChannelHistory(ctx context.Context, channelID int64, accessHash int64, offsetID int, addOffset int, limit int) ([]channelMessage, error) {
+	result, err := s.telegramClient.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+		Peer: &tg.InputPeerChannel{
+			ChannelID:  channelID,
+			AccessHash: accessHash,
+		},
+		OffsetID:   offsetID,
+		OffsetDate: 0,
+		AddOffset:  addOffset,
+		Limit:      limit,
+		MaxID:      0,
+		MinID:      0,
+		Hash:       0,
+	})
+	if err != nil {
+		return nil, err
 	}
-	result, err := s.telegramClient.API().ChannelsGetMessages(ctx, req)
+	var messages []tg.MessageClass
+	switch r := result.(type) {
+	case *tg.MessagesMessages:
+		messages = r.Messages
+	case *tg.MessagesChannelMessages:
+		messages = r.Messages
+	default:
+		return nil, nil
+	}
+	out := make([]channelMessage, 0, len(messages))
+	for _, msg := range messages {
+		m, ok := msg.(*tg.Message)
+		if !ok {
+			continue
+		}
+		out = append(out, channelMessage{ID: int64(m.ID), Text: m.Message})
+	}
+	return out, nil
+}
+
+// getChannelMessageExists returns true if the message exists in the channel, by fetching a small window of history around that message ID (per Telegram offset semantics).
+func (s *service) getChannelMessageExists(ctx context.Context, channelID int64, accessHash int64, messageID int64) (bool, error) {
+	// "Around message MSGID": offset_id=MSGID, add_offset=-10, limit=20 (per core.telegram.org/api/offsets)
+	const windowAround = 20
+	msgs, err := s.getChannelHistory(ctx, channelID, accessHash, int(messageID), -windowAround/2, windowAround)
 	if err != nil {
 		return false, err
 	}
-	messages, ok := result.(*tg.MessagesMessages)
-	if !ok {
-		return false, nil
+	for _, m := range msgs {
+		if m.ID == messageID {
+			return true, nil
+		}
 	}
-	return len(messages.Messages) > 0, nil
+	return false, nil
+}
+
+// tryRecoverPostFromChannel fetches the last messages in the channel and returns (messageID, true) if one matches text exactly.
+func (s *service) tryRecoverPostFromChannel(ctx context.Context, channelID int64, accessHash int64, text string) (int64, bool) {
+	// "Most recent N": offset_id=0, add_offset=0, limit=N (per core.telegram.org/api/offsets)
+	msgs, err := s.getChannelHistory(ctx, channelID, accessHash, 0, 0, lastMessagesRecoveryLimit)
+	if err != nil {
+		return 0, false
+	}
+	for _, m := range msgs {
+		if m.Text == text {
+			return m.ID, true
+		}
+	}
+	return 0, false
 }

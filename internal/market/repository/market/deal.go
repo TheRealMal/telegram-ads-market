@@ -21,7 +21,7 @@ type dealRow struct {
 	ChannelID           *int64          `db:"channel_id"`
 	Type                string          `db:"type"`
 	Duration            int64           `db:"duration"`
-	Price               int64           `db:"price"`
+	Price               float64         `db:"price"`
 	EscrowAmount        int64           `db:"escrow_amount"`
 	Details             json.RawMessage `db:"details"`
 	LessorSignature     *string         `db:"lessor_signature"`

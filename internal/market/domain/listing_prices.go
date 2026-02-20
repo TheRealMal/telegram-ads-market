@@ -12,8 +12,8 @@ import (
 var durationRegex = regexp.MustCompile(`^\d+hr$`)
 
 // DealPriceMatchesListing checks that the deal's type, duration, and price correspond to an option in the listing's prices.
-// listingPrices must be a JSON array of [durationStr, price] pairs (e.g. [["24hr", 100]]). Returns false if no match.
-func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dealDuration int64, dealPrice int64) bool {
+// listingPrices must be a JSON array of [durationStr, price] pairs; price can be int or float. Returns false if no match.
+func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dealDuration int64, dealPrice float64) bool {
 	if len(listingPrices) == 0 {
 		return false
 	}
@@ -31,13 +31,8 @@ func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dea
 		if !ok || !durationRegex.MatchString(durStr) {
 			continue
 		}
-		var price int64
-		switch v := pair[1].(type) {
-		case float64:
-			price = int64(v)
-		case json.Number:
-			price, _ = v.Int64()
-		default:
+		price, ok := parsePriceNumber(pair[1])
+		if !ok {
 			continue
 		}
 		if normalizeDurationType(durStr) != dealTypeNorm || price != dealPrice {
@@ -50,6 +45,18 @@ func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dea
 		return true
 	}
 	return false
+}
+
+func parsePriceNumber(v interface{}) (float64, bool) {
+	switch x := v.(type) {
+	case float64:
+		return x, true
+	case json.Number:
+		f, err := x.Float64()
+		return f, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func normalizeDurationType(s string) string {
@@ -95,13 +102,15 @@ func ValidateListingPrices(raw json.RawMessage) error {
 		}
 		switch v := pair[1].(type) {
 		case float64:
-			if v < 0 || v != float64(int64(v)) {
-				return fmt.Errorf("prices[%d][1]: price must be a non-negative integer", i)
+			if v < 0 || (v != v) {
+				return fmt.Errorf("prices[%d][1]: price must be a non-negative number", i)
 			}
 		case json.Number:
-			if _, err := v.Int64(); err != nil || v.String() == "" {
-				return fmt.Errorf("prices[%d][1]: price must be an integer", i)
+			f, err := v.Float64()
+			if err != nil || v.String() == "" || f < 0 || (f != f) {
+				return fmt.Errorf("prices[%d][1]: price must be a non-negative number", i)
 			}
+			_ = f
 		default:
 			return fmt.Errorf("prices[%d][1]: price must be a number", i)
 		}

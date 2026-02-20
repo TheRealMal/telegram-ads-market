@@ -24,7 +24,7 @@ type userRepository interface {
 }
 
 type escrowService interface {
-	ComputeEscrowAmount(priceTON int64) int64
+	ComputeEscrowAmount(priceTON float64) int64
 }
 
 type telegramNotificationAdder interface {

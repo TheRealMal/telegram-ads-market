@@ -4,9 +4,9 @@ import "math"
 
 const nanotonPerTON float64 = 1e9
 
-// ComputeEscrowAmount returns the amount needed for escrow deposit. Includes gas and commission.
-func (s *service) ComputeEscrowAmount(priceTON int64) int64 {
-	amountWithComission := int64(math.Round(float64(priceTON) * nanotonPerTON * s.comissionMultiplier))
+// ComputeEscrowAmount returns the amount needed for escrow deposit (nanoton). Includes gas and commission. priceTON can be fractional.
+func (s *service) ComputeEscrowAmount(priceTON float64) int64 {
+	amountWithComission := int64(math.Round(priceTON * nanotonPerTON * s.comissionMultiplier))
 	return amountWithComission + s.transactionGasNanoton
 }
 

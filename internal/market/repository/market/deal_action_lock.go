@@ -57,6 +57,27 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 	return lockID, nil
 }
 
+// GetExpiredDealActionLock returns the ID of an expired lock (status=locked, expire_at <= now) for the given deal and action type, if any.
+// Used to detect "lock was held, app crashed after posting, lock expired" and recover by finding the message in the channel.
+func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (lockID string, ok bool, err error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id FROM market.deal_action_lock
+		WHERE deal_id = $1 AND action_type = $2 AND status = 'locked' AND expire_at <= NOW()
+		ORDER BY expire_at DESC
+		LIMIT 1`, dealID, string(actionType))
+	if err != nil {
+		return "", false, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return "", false, nil
+	}
+	if err = rows.Scan(&lockID); err != nil {
+		return "", false, err
+	}
+	return lockID, true, nil
+}
+
 // ReleaseDealActionLock sets the lock status to completed or failed.
 func (r *repository) ReleaseDealActionLock(ctx context.Context, lockID string, status entity.DealActionLockStatus) error {
 	_, err := r.db.Exec(ctx, `

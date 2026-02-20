@@ -9,11 +9,12 @@ import (
 
 // ComputeDealSignature returns a deterministic signature for deal terms and payout addresses.
 // lessorPayoutRaw and lesseePayoutRaw are TON addresses in raw format; use "" when not set.
-func ComputeDealSignature(dealType string, duration, price int64, details json.RawMessage, userID int64, lessorPayoutRaw, lesseePayoutRaw string) string {
+// Price is formatted with fixed 9 decimal places so float values match consistently.
+func ComputeDealSignature(dealType string, duration int64, price float64, details json.RawMessage, userID int64, lessorPayoutRaw, lesseePayoutRaw string) string {
 	h := sha256.New()
 	h.Write([]byte(dealType))
 	h.Write([]byte(fmt.Sprintf("%d", duration)))
-	h.Write([]byte(fmt.Sprintf("%d", price)))
+	h.Write([]byte(fmt.Sprintf("%.9f", price)))
 	h.Write(details)
 	h.Write([]byte(fmt.Sprintf("%d", userID)))
 	h.Write([]byte(lessorPayoutRaw))
