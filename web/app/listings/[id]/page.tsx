@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-react';
@@ -212,15 +212,14 @@ export default function ListingDetailPage() {
           </CardHeader>
           <CardContent>
             {priceRowsForListing.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div className="text-xs font-medium text-muted-foreground">Duration</div>
+                <div className="text-xs font-medium text-muted-foreground">Price</div>
                 {priceRowsForListing.map((row, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
-                  >
+                  <Fragment key={i}>
                     <span className="text-sm text-muted-foreground">{formatPriceKey(row.duration)}</span>
                     <span className="font-semibold tabular-nums text-primary">{formatPriceValue(row.price)}</span>
-                  </div>
+                  </Fragment>
                 ))}
               </div>
             ) : (

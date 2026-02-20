@@ -101,17 +101,40 @@ export function setupSwipeBehavior(allowVerticalSwipe = false): void {
 }
 
 /**
- * Sets Mini App background and bottom bar colors from CSS theme (--background, --muted).
- * Call after theme is applied. Uses #RRGGBB from :root or .dark.
+ * Converts a CSS color value to #RRGGBB for Telegram API.
+ * getComputedStyle may return hex or rgb(r,g,b); Telegram expects #RRGGBB.
+ */
+function toHexColor(cssValue: string): string {
+  const s = cssValue.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(s)) return s;
+  const rgb = s.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+  if (rgb) {
+    const r = Number.parseInt(rgb[1], 10).toString(16).padStart(2, '0');
+    const g = Number.parseInt(rgb[2], 10).toString(16).padStart(2, '0');
+    const b = Number.parseInt(rgb[3], 10).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+  return s;
+}
+
+/**
+ * Sets Mini App background, header, and bottom bar colors from CSS theme (--background, --muted).
+ * Call after theme is applied. Ensures white theme uses #ffffff for header/bg/bottom so they match.
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_background_color
+ * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_header_color
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_bottom_bar_color
  */
 export function setTelegramThemeColors(): void {
   if (typeof document === 'undefined') return;
   const style = getComputedStyle(document.documentElement);
-  const bg = style.getPropertyValue('--background').trim();
-  const bottomBar = style.getPropertyValue('--muted').trim();
-  if (bg) postTelegramMethod('web_app_set_background_color', { color: bg });
+  const bgRaw = style.getPropertyValue('--background').trim();
+  const mutedRaw = style.getPropertyValue('--muted').trim();
+  const bg = toHexColor(bgRaw);
+  const bottomBar = toHexColor(mutedRaw);
+  if (bg) {
+    postTelegramMethod('web_app_set_background_color', { color: bg });
+    postTelegramMethod('web_app_set_header_color', { color: bg });
+  }
   if (bottomBar) postTelegramMethod('web_app_set_bottom_bar_color', { color: bottomBar });
 }
 

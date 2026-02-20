@@ -65,6 +65,7 @@ export default function MarketplacePage() {
       <div className={`page-with-nav ${loading ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
+        <div className="relative">
         <div className="flex gap-2 mb-4">
           <div className="relative flex-1">
             <Search
@@ -82,13 +83,17 @@ export default function MarketplacePage() {
             variant="outline"
             size="icon"
             onClick={() => setShowFilters((v) => !v)}
-            className={showFilters ? 'bg-accent' : ''}
+            className={
+              showFilters
+                ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background'
+                : ''
+            }
           >
             <SlidersHorizontal size={18} />
           </Button>
         </div>
         {showFilters && (
-          <div className="mb-4 space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="absolute left-0 right-0 top-10 z-20 space-y-4 rounded-lg border border-border bg-background shadow-lg p-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Filters</span>
               <Button
@@ -139,9 +144,6 @@ export default function MarketplacePage() {
                 onChange={(e) => setFilterMinFollowers(e.target.value)}
                 className="mt-1 max-w-[140px]"
               />
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Only channels with stats (Find Channels tab)
-              </p>
             </div>
           </div>
         )}
@@ -175,6 +177,7 @@ export default function MarketplacePage() {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       </div>
       </div>
       <LoadingScreen show={loading} />

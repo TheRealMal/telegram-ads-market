@@ -70,9 +70,6 @@ export function ListingCard({ listing, showApply = false }: ListingCardProps) {
                 </p>
               )}
               <div className="mt-1 flex items-center gap-2">
-                <Badge variant={listing.type === 'lessor' ? 'default' : 'secondary'} className="text-xs">
-                  {listing.type === 'lessor' ? 'Offering' : 'Seeking'}
-                </Badge>
                 {listing.status !== 'active' && (
                   <Badge variant="secondary" className="text-xs">
                     {listing.status}
