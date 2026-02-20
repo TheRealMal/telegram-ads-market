@@ -285,7 +285,7 @@ function DealStatusRoadmap({
         )}
       </div>
 
-      {/* Tooltip: one shape (rounded rect + arrow) with same background and border */}
+      {/* Tooltip: one shape (rounded rect + small arrow), centered on tap so arrow points at status; text single line */}
       {tooltip &&
         typeof document !== 'undefined' &&
         document.body &&
@@ -301,20 +301,20 @@ function DealStatusRoadmap({
             <div className="relative flex px-3 py-2">
               <svg
                 className="absolute inset-0 h-full w-full"
-                viewBox="0 0 120 44"
+                viewBox="0 0 120 40"
                 preserveAspectRatio="none"
                 style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
               >
-                {/* Rounded rect + downward arrow as one path; border continues around arrow */}
+                {/* Rounded rect + small downward arrow (~3x smaller); border continues around arrow */}
                 <path
-                  d="M 12 0 L 108 0 Q 120 0 120 12 L 120 28 L 116 28 L 60 44 L 4 28 L 0 28 L 0 12 Q 0 0 12 0 Z"
+                  d="M 12 0 L 108 0 Q 120 0 120 12 L 120 36 L 78 36 L 60 40 L 42 36 L 0 36 L 0 12 Q 0 0 12 0 Z"
                   fill="var(--popover)"
                   stroke="var(--border)"
                   strokeWidth="1"
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="relative z-10 text-sm font-medium text-popover-foreground">
+              <span className="relative z-10 whitespace-nowrap text-sm font-medium text-popover-foreground">
                 {tooltip.label}
               </span>
             </div>
