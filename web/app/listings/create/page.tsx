@@ -87,7 +87,8 @@ export default function CreateListingPage() {
     const pricePairs: [string, number][] = [];
     for (const row of prices) {
       const dur = row.duration.trim();
-      const num = parseFloat(row.price.trim());
+      const priceStr = row.price.trim().replace(',', '.');
+      const num = parseFloat(priceStr);
       if (!dur || Number.isNaN(num) || num < 0) continue;
       const durationStr = /^\d+$/.test(dur) ? `${dur}hr` : dur.endsWith('hr') ? dur : `${dur}hr`;
       pricePairs.push([durationStr, num]);
@@ -145,7 +146,7 @@ export default function CreateListingPage() {
   return (
     <div className="page-with-nav">
       <PageTopSpacer />
-      <form onSubmit={handleSubmit} className="mx-auto max-w-2xl px-4 py-4">
+      <form onSubmit={handleSubmit} className="mx-auto max-w-2xl px-4 py-4" noValidate>
         {error && (
           <p className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
@@ -287,9 +288,8 @@ export default function CreateListingPage() {
                 </div>
                 <div className="flex-1">
                   <Input
-                    type="number"
-                    min={0}
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="TON (e.g. 100 or 99.5)"
                     value={row.price}
                     onChange={(e) => updatePriceRow(index, 'price', e.target.value)}
