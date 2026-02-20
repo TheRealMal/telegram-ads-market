@@ -307,7 +307,7 @@ function DealStatusRoadmap({
               >
                 {/* Rounded rect + small downward arrow (~3x smaller); border continues around arrow */}
                 <path
-                  d="M 12 0 L 108 0 Q 120 0 120 12 L 120 36 L 78 36 L 60 40 L 42 36 L 0 36 L 0 12 Q 0 0 12 0 Z"
+                  d="M 12 0 L 108 0 Q 120 0 120 12 L 120 30 Q 120 36 114 36 L 78 36 L 60 40 L 42 36 L 6 36 Q 0 36 0 30 L 0 12 Q 0 0 12 0 Z"
                   fill="var(--popover)"
                   stroke="var(--border)"
                   strokeWidth="1"
