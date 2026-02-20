@@ -70,12 +70,16 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if err := domain.ValidateListingCategories(req.Categories); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
 	}
+	pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
+	if err != nil {
+		return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
+	}
 
 	l := &entity.Listing{
 		Status:      entity.ListingStatus(req.Status),
 		ChannelID:   req.ChannelID,
 		Type:        entity.ListingType(req.Type),
-		Prices:      req.Prices,
+		Prices:      pricesNanoton,
 		Categories:  categoriesToRaw(req.Categories),
 		Description: req.Description,
 	}
@@ -85,7 +89,7 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if err := h.listingService.CreateListing(r.Context(), userID, l); err != nil {
 		return nil, toServiceError(err)
 	}
-	return l, nil
+	return listingWithPricesInTON(l), nil
 }
 
 // @Tags		Market
@@ -109,7 +113,18 @@ func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{
 	if l == nil {
 		return nil, apperrors.ServiceError{Err: nil, Message: "not found", Code: apperrors.ErrorCodeNotFound}
 	}
-	return l, nil
+	return listingWithPricesInTON(l), nil
+}
+
+// listingWithPricesInTON returns a copy of the listing with Prices JSON converted from nanoton to TON for API.
+func listingWithPricesInTON(l *entity.Listing) *entity.Listing {
+	if l == nil {
+		return nil
+	}
+	converted, _ := domain.ConvertListingPricesNanotonToTON(l.Prices)
+	out := *l
+	out.Prices = converted
+	return &out
 }
 
 // @Tags		Market
@@ -144,7 +159,15 @@ func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interfac
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return list, nil
+	return listingsWithPricesInTON(list), nil
+}
+
+func listingsWithPricesInTON(list []*entity.Listing) []*entity.Listing {
+	out := make([]*entity.Listing, len(list))
+	for i, l := range list {
+		out[i] = listingWithPricesInTON(l)
+	}
+	return out
 }
 
 // @Security	JWT
@@ -169,7 +192,7 @@ func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interf
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return list, nil
+	return listingsWithPricesInTON(list), nil
 }
 
 // UpdateListingRequest is the body for PATCH /api/v1/market/listings/:id.
@@ -236,7 +259,11 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 		l.Type = entity.ListingType(*req.Type)
 	}
 	if req.Prices != nil {
-		l.Prices = req.Prices
+		pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
+		}
+		l.Prices = pricesNanoton
 	}
 	if req.Categories != nil {
 		l.Categories = categoriesToRaw(*req.Categories)
@@ -248,7 +275,8 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if err := h.listingService.UpdateListing(r.Context(), userID, &l); err != nil {
 		return nil, toServiceError(err)
 	}
-	return &l, nil
+	updated, _ := h.listingService.GetListing(r.Context(), id)
+	return listingWithPricesInTON(updated), nil
 }
 
 // @Security	JWT

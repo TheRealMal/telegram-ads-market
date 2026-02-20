@@ -67,7 +67,7 @@ export function formatPriceKey(key: string): string {
 }
 
 /**
- * Format price value as "X TON".
+ * Format price value as "X TON" or "X.Y TON" when fractional.
  */
 export function formatPriceValue(value: number): string {
   if (value == null || Number.isNaN(Number(value))) return '—';

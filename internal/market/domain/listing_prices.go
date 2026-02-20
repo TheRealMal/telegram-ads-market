@@ -12,8 +12,8 @@ import (
 var durationRegex = regexp.MustCompile(`^\d+hr$`)
 
 // DealPriceMatchesListing checks that the deal's type, duration, and price correspond to an option in the listing's prices.
-// listingPrices must be a JSON array of [durationStr, price] pairs; price can be int or float. Returns false if no match.
-func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dealDuration int64, dealPrice float64) bool {
+// listingPrices must be a JSON array of [durationStr, priceNanoton] pairs (prices stored in nanoton). Returns false if no match.
+func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dealDuration int64, dealPriceNanoton int64) bool {
 	if len(listingPrices) == 0 {
 		return false
 	}
@@ -31,11 +31,11 @@ func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dea
 		if !ok || !durationRegex.MatchString(durStr) {
 			continue
 		}
-		price, ok := parsePriceNumber(pair[1])
+		price, ok := parsePriceAsInt64(pair[1])
 		if !ok {
 			continue
 		}
-		if normalizeDurationType(durStr) != dealTypeNorm || price != dealPrice {
+		if normalizeDurationType(durStr) != dealTypeNorm || price != dealPriceNanoton {
 			continue
 		}
 		entryHours := parseDurationHours(durStr)

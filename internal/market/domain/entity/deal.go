@@ -33,7 +33,7 @@ type Deal struct {
 	ChannelID            *int64          `json:"channel_id,omitempty"` // from listing; channel where ad is posted (validated at deal creation)
 	Type                 string          `json:"type"`
 	Duration             int64           `json:"duration"`
-	Price                float64         `json:"price"`
+	Price                int64           `json:"price"` // in nanoton; API layer converts to/from TON
 	EscrowAmount         int64           `json:"escrow_amount"` // price + transaction gas + commission
 	Details              json.RawMessage `json:"details"`
 	LessorSignature     *string         `json:"lessor_signature,omitempty"`

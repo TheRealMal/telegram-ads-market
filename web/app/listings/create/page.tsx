@@ -87,13 +87,13 @@ export default function CreateListingPage() {
     const pricePairs: [string, number][] = [];
     for (const row of prices) {
       const dur = row.duration.trim();
-      const num = parseInt(row.price.trim(), 10);
-      if (!dur || isNaN(num) || num < 0) continue;
+      const num = parseFloat(row.price.trim());
+      if (!dur || Number.isNaN(num) || num < 0) continue;
       const durationStr = /^\d+$/.test(dur) ? `${dur}hr` : dur.endsWith('hr') ? dur : `${dur}hr`;
       pricePairs.push([durationStr, num]);
     }
     if (pricePairs.length === 0) {
-      setError('Add at least one price (e.g. 24 hours, 100).');
+      setError('Add at least one price (e.g. 24 hours, 100 or 99.5).');
       return;
     }
 
@@ -289,7 +289,8 @@ export default function CreateListingPage() {
                   <Input
                     type="number"
                     min={0}
-                    placeholder="TON"
+                    step="any"
+                    placeholder="TON (e.g. 100 or 99.5)"
                     value={row.price}
                     onChange={(e) => updatePriceRow(index, 'price', e.target.value)}
                   />
