@@ -34,7 +34,7 @@ type marketRepository interface {
 	ListDealPostMessageExistsWithNextCheckBefore(ctx context.Context, before time.Time) ([]*marketentity.DealPostMessage, error)
 	TakeDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (string, error)
 	ReleaseDealActionLock(ctx context.Context, lockID string, status marketentity.DealActionLockStatus) error
-	GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (lockID string, ok bool, err error)
+	GetLastDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (*marketentity.DealActionLock, error)
 }
 
 type channelUpdateStatsEventService interface {

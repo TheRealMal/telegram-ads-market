@@ -31,10 +31,12 @@ type marketRepository interface {
 	SetDealStatusEscrowRefundConfirmed(ctx context.Context, dealID int64) error
 	TakeDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (string, error)
 	ReleaseDealActionLock(ctx context.Context, lockID string, status entity.DealActionLockStatus) error
+	GetLastDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (*entity.DealActionLock, error)
 }
 
 type liteclient interface {
 	Client() ton.APIClientWrapped
+	HasOutgoingTxTo(ctx context.Context, fromAddrRaw *address.Address, amountNanoton int64, toAddr *address.Address) (bool, error)
 }
 
 type redisSetter interface {
@@ -137,6 +139,37 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 
 	amountNanoton := s.GetAmountWithoutGasAndCommission(deal.EscrowAmount)
 	amount := tlb.FromNanoTONU(uint64(amountNanoton))
+
+	if deal.EscrowAddress == nil || *deal.EscrowAddress == "" {
+		return ErrPayoutAddressNotSet
+	}
+
+	escrowAddr, err := address.ParseRawAddr(*deal.EscrowAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse escrow address: %w", err)
+	}
+
+	// If the last lock for this action is Locked and expired, previous run may have transferred then crashed: try to find outgoing tx by amount and recover.
+	lastLock, lerr := s.marketRepository.GetLastDealActionLock(ctx, dealID, actionType)
+	if lerr == nil && lastLock != nil && lastLock.Status == entity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+		found, _ := s.liteclient.HasOutgoingTxTo(ctx, escrowAddr, amountNanoton, toAddr)
+		if found {
+			if release {
+				if err = s.marketRepository.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
+					return err
+				}
+			} else {
+				if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
+					return err
+				}
+			}
+			_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusCompleted)
+			_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
+			logger.Info("escrow release/refund recovered from expired lock", "deal_id", dealID, "release", release)
+			return nil
+		}
+		_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
+	}
 
 	err = func() error {
 		lockID, err := s.marketRepository.TakeDealActionLock(ctx, dealID, actionType)

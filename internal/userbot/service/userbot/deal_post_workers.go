@@ -61,13 +61,13 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			continue
 		}
 
-		// If there is an expired post_message lock, previous run may have posted then crashed: try to find the message in the channel.
-		expiredLockID, hasExpired, err := s.marketRepository.GetExpiredDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+		// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
+		lastLock, err := s.marketRepository.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
 		if err != nil {
-			logger.Error("get expired lock", "deal_id", deal.ID, "error", err)
+			logger.Error("get last lock", "deal_id", deal.ID, "error", err)
 			continue
 		}
-		if hasExpired {
+		if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
 			if foundMsgID, found := s.tryRecoverPostFromChannel(ctx, *listing.ChannelID, channel.AccessHash, text); found {
 				untilTs := time.Now().Add(time.Duration(deal.Duration) * time.Hour)
 				nextCheck := time.Now().Add(postCheckAdvanceHour)
@@ -82,14 +82,14 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 				}
 				if err := s.marketRepository.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
 					logger.Error("recover create deal_post_message", "deal_id", deal.ID, "error", err)
-					_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusFailed)
+					_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
 					continue
 				}
-				_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusCompleted)
+				_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusCompleted)
 				logger.Info("recovered post from channel", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", foundMsgID)
 				continue
 			}
-			_ = s.marketRepository.ReleaseDealActionLock(ctx, expiredLockID, marketentity.DealActionLockStatusFailed)
+			_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
 		}
 
 		lockID, err := s.marketRepository.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)

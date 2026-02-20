@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -215,4 +216,52 @@ func (c *client) LookupBlock(ctx context.Context, timeout time.Duration, workcha
 
 func IsNotReadyError(err error) bool {
 	return strings.Contains(err.Error(), ErrBlockNotApplied) || strings.Contains(err.Error(), ErrBlockNotInDB)
+}
+
+// HasOutgoingTxTo returns true if the account at fromAddrRaw has an outgoing internal transaction
+// with the given amount (nanoton) to the given destination address.
+// Used e.g. to recover when a previous run transferred but crashed before updating status.
+func (c *client) HasOutgoingTxTo(ctx context.Context, fromAddr *address.Address, amountNanoton int64, toAddr *address.Address) (bool, error) {
+	block, err := c.api.CurrentMasterchainInfo(ctx)
+	if err != nil {
+		return false, err
+	}
+	account, err := c.api.GetAccount(ctx, block, fromAddr)
+	if err != nil {
+		return false, err
+	}
+	if account == nil || account.LastTxLT == 0 {
+		return false, nil
+	}
+	txs, err := c.api.ListTransactions(ctx, fromAddr, 20, account.LastTxLT, account.LastTxHash)
+	if err != nil {
+		return false, err
+	}
+	if len(txs) == 0 {
+		return false, nil
+	}
+	want := big.NewInt(amountNanoton)
+	for _, tx := range txs {
+		if tx.IO.Out == nil {
+			continue
+		}
+		msgs, err := tx.IO.Out.ToSlice()
+		if err != nil {
+			continue
+		}
+		for _, msg := range msgs {
+			internal := msg.AsInternal()
+			if internal == nil {
+				continue
+			}
+			dst := internal.DestAddr()
+			if dst == nil || !toAddr.Equals(dst) {
+				continue
+			}
+			if internal.Amount.Nano().Cmp(want) == 0 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
