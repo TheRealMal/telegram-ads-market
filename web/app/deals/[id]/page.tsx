@@ -76,6 +76,7 @@ function DealStatusRoadmap({
     currentIndex <= 0 ? 'justify-start' : currentIndex >= n - 1 ? 'justify-end' : 'justify-center';
 
   const handleTap = (status: DealStatus, event: React.MouseEvent<HTMLButtonElement>) => {
+    if (status === current) return;
     const label = DEAL_STATUS_LABEL[status];
     const rect = (event.target as HTMLElement).closest('button')?.getBoundingClientRect();
     if (!rect) return;
@@ -87,69 +88,233 @@ function DealStatusRoadmap({
     setTimeout(() => setTooltip(null), 2500);
   };
 
+  const showLeftLine = currentIndex > 0;
+  const showRightLine = currentIndex >= 0 && currentIndex < n - 1;
+
+  // viewBox 0 0 100 24: line thickness = dot (4 units); inflow = bigger bulge at circle (12 units), taper over 10 units
+  const LINE_TOP = 10;
+  const LINE_BOTTOM = 14;
+  const INFLOW_TOP = 6;
+  const INFLOW_BOTTOM = 18;
+  const INFLOW_UNITS = 10;
+  const CAP_R = 2; // round cap at line end (before dots), radius 2
+
+  /** Line as thick as dots, thickening at both ends (water-drop inflow). Optional gradient: current → future (muted). Future-only segments use muted fill. */
+  const Connector = ({
+    colorClass,
+    className = '',
+    useGradient = false,
+    gradientId = 'connector-grad',
+    useMutedFill = false,
+  }: {
+    colorClass: string;
+    className?: string;
+    useGradient?: boolean;
+    gradientId?: string;
+    useMutedFill?: boolean;
+  }) => {
+    const d = [
+      `M 0 ${INFLOW_TOP} L ${INFLOW_UNITS} ${LINE_TOP} L ${100 - INFLOW_UNITS} ${LINE_TOP} L 100 ${INFLOW_TOP}`,
+      `L 100 ${INFLOW_BOTTOM} L ${100 - INFLOW_UNITS} ${LINE_BOTTOM} L ${INFLOW_UNITS} ${LINE_BOTTOM} L 0 ${INFLOW_BOTTOM} Z`,
+    ].join(' ');
+    const pathFill =
+      useGradient ? `url(#${gradientId})` : useMutedFill ? 'var(--muted)' : undefined;
+    return (
+      <div
+        className={`flex min-w-0 flex-1 items-center ${className}`}
+        style={{ marginLeft: '-4px', marginRight: '-4px', minWidth: 20 }}
+        aria-hidden
+      >
+        <svg
+          viewBox="0 0 100 24"
+          preserveAspectRatio="none"
+          className="h-6 w-full"
+          style={{ overflow: 'visible' }}
+        >
+          {useGradient && (
+            <defs>
+              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="var(--primary)" />
+                <stop offset="35%" stopColor="var(--primary)" />
+                <stop offset="65%" stopColor="var(--muted)" />
+                <stop offset="100%" stopColor="var(--muted)" />
+              </linearGradient>
+            </defs>
+          )}
+          <path
+            d={d}
+            fill={pathFill ?? 'currentColor'}
+            className={pathFill ? undefined : colorClass}
+          />
+        </svg>
+      </div>
+    );
+  };
+
+  /** Line with inflow at right (meets first circle); rounded cap at left (before dots). */
+  const LeftLineWithFlare = () => {
+    const d = [
+      `M ${CAP_R} ${LINE_TOP} L ${100 - INFLOW_UNITS} ${LINE_TOP} L 100 ${INFLOW_TOP} L 100 ${INFLOW_BOTTOM} L ${100 - INFLOW_UNITS} ${LINE_BOTTOM} L ${CAP_R} ${LINE_BOTTOM}`,
+      `A ${CAP_R} ${CAP_R} 0 0 1 ${CAP_R} ${LINE_TOP} Z`,
+    ].join(' ');
+    return (
+      <div className="flex min-w-0 flex-1 items-center justify-end" style={{ marginRight: '-4px' }} aria-hidden>
+        <svg
+          viewBox="0 0 100 24"
+          preserveAspectRatio="none"
+          className="h-6 min-w-[12px] flex-1"
+          style={{ overflow: 'visible' }}
+        >
+          <path d={d} fill="currentColor" className="text-foreground dark:text-white" />
+        </svg>
+      </div>
+    );
+  };
+
+  /** Line with inflow at left (meets last circle); rounded cap at right (before dots). */
+  const RightLineWithFlare = () => {
+    const d = [
+      `M 0 ${INFLOW_TOP} L 0 ${INFLOW_BOTTOM} L ${INFLOW_UNITS} ${LINE_BOTTOM} L ${100 - CAP_R} ${LINE_BOTTOM}`,
+      `A ${CAP_R} ${CAP_R} 0 0 0 ${100 - CAP_R} ${LINE_TOP} L ${INFLOW_UNITS} ${LINE_TOP} Z`,
+    ].join(' ');
+    return (
+      <div className="flex min-w-0 flex-1 items-center justify-start" style={{ marginLeft: '-4px' }} aria-hidden>
+        <svg
+          viewBox="0 0 100 24"
+          preserveAspectRatio="none"
+          className="h-6 min-w-[12px] flex-1"
+          style={{ overflow: 'visible' }}
+        >
+          <path d={d} fill="var(--muted)" />
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full py-4">
-      {/* Full-width connecting line behind circles */}
-      <div
-        className="absolute left-0 right-0 top-1/2 z-0 h-0.5 -translate-y-1/2 bg-muted"
-        aria-hidden
-      />
-      <div className={`relative z-10 flex items-center ${justify} gap-6`}>
-        {indices.map((i) => {
+      <div className={`relative z-10 flex items-center ${justify} gap-0`}>
+        {/* Left: three dots by width (farthest→nearest: same, less wide, wider) + line with rounded end */}
+        {showLeftLine && (
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-0">
+            <span
+              className="flex items-end gap-0.5 pr-1 text-[8px] leading-none text-foreground dark:text-white"
+              aria-hidden
+            >
+              <span className="inline-block h-1 w-1 rounded-full bg-current opacity-80" />
+              <span className="inline-block h-1 w-1.5 rounded-full bg-current opacity-80" />
+              <span className="inline-block h-1 w-2 rounded-full bg-current opacity-80" />
+            </span>
+            <LeftLineWithFlare />
+          </div>
+        )}
+
+        {/* Three circles with exactly ONE connector between each pair (line that thickens at circles) */}
+        {indices.map((i, idx) => {
           const status = DEAL_STATUS_ROADMAP[i];
           const Icon = DEAL_STATUS_ICON[status];
           const label = DEAL_STATUS_LABEL[status];
           const isCurrent = status === current;
           const isPast = currentIndex >= 0 && i < currentIndex;
+          const isPastOrCurrent = isCurrent || isPast;
+          const nextIndex = idx + 1 < indices.length ? indices[idx + 1]! : -1;
+          const nextIsPastOrCurrent = nextIndex <= currentIndex;
+          const isFutureSegment = !nextIsPastOrCurrent;
+          const connectorColor =
+            nextIsPastOrCurrent
+              ? 'text-foreground dark:text-white'
+              : 'text-muted-foreground/70';
+          const isCurrentToNext = isCurrent && nextIndex > currentIndex;
           return (
-            <button
-              key={status}
-              type="button"
-              onClick={(e) => handleTap(status, e)}
-              title={label}
-              className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-background transition-colors hover:bg-muted/50"
-              style={{ boxShadow: '0 0 0 4px var(--background)' }}
-            >
-              <span
-                className={
-                  'flex h-9 w-9 items-center justify-center rounded-full border-0 transition-colors ' +
-                  (isCurrent
-                    ? 'bg-primary text-primary-foreground'
-                    : isPast
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-muted/70 text-muted-foreground')
-                }
-              >
-                <Icon size={18} />
-              </span>
-            </button>
+            <React.Fragment key={status}>
+              <div className="relative z-10 flex flex-shrink-0 flex-col items-center">
+                {isCurrent && (
+                  <span className="mb-1 whitespace-nowrap text-xs text-primary dark:text-white">
+                    {label}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => handleTap(status, e)}
+                  title={isCurrent ? undefined : label}
+                  className={`relative flex flex-shrink-0 items-center justify-center rounded-full bg-transparent transition-colors hover:opacity-90 ${isCurrent ? 'h-11 w-11' : 'h-10 w-10'}`}
+                >
+                  <span
+                    className={
+                      'flex items-center justify-center rounded-full border-0 transition-colors ' +
+                      (isCurrent ? 'h-10 w-10' : 'h-9 w-9') +
+                      ' ' +
+                      (isPastOrCurrent
+                        ? 'bg-primary text-primary-foreground dark:bg-white dark:text-black'
+                        : 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground')
+                    }
+                  >
+                    <Icon size={isCurrent ? 20 : 18} />
+                  </span>
+                </button>
+              </div>
+              {idx < indices.length - 1 ? (
+                <Connector
+                  colorClass={connectorColor}
+                  className="flex-1 min-w-[24px] max-w-[80px]"
+                  useGradient={isCurrentToNext}
+                  gradientId={`connector-grad-${status}-${idx}`}
+                  useMutedFill={isFutureSegment && !isCurrentToNext}
+                />
+              ) : null}
+            </React.Fragment>
           );
         })}
+
+        {/* Right: line with rounded end + three dots (same color as line: muted) */}
+        {showRightLine && (
+          <div className="flex min-w-0 flex-1 items-center justify-start gap-0">
+            <RightLineWithFlare />
+            <span
+              className="flex items-end gap-0.5 pl-1 text-[8px] leading-none"
+              aria-hidden
+            >
+              <span className="inline-block h-1 w-2 rounded-full bg-[var(--muted)] opacity-80" />
+              <span className="inline-block h-1 w-1.5 rounded-full bg-[var(--muted)] opacity-80" />
+              <span className="inline-block h-1 w-1 rounded-full bg-[var(--muted)] opacity-80" />
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Tooltip above UI with triangle pointing down to tapped status */}
+      {/* Tooltip: one shape (rounded rect + arrow) with same background and border */}
       {tooltip &&
         typeof document !== 'undefined' &&
         document.body &&
         createPortal(
           <div
-            className="fixed z-[100] rounded-lg border border-border bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md"
+            className="fixed z-[100] flex flex-col items-center"
             style={{
               left: tooltip.x,
-              top: tooltip.y - 8,
-              transform: 'translate(-50%, -100%)',
+              top: tooltip.y,
+              transform: 'translate(-50%, calc(-100% - 10px))',
             }}
           >
-            <span>{tooltip.label}</span>
-            {/* Triangle pointing down to the status */}
-            <div
-              className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-border"
-              style={{ marginTop: -1 }}
-            />
-            <div
-              className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-popover"
-              style={{ marginTop: 2 }}
-            />
+            <div className="relative flex px-3 py-2">
+              <svg
+                className="absolute inset-0 h-full w-full"
+                viewBox="0 0 120 44"
+                preserveAspectRatio="none"
+                style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
+              >
+                {/* Rounded rect + downward arrow as one path; border continues around arrow */}
+                <path
+                  d="M 12 0 L 108 0 Q 120 0 120 12 L 120 28 L 116 28 L 60 44 L 4 28 L 0 28 L 0 12 Q 0 0 12 0 Z"
+                  fill="var(--popover)"
+                  stroke="var(--border)"
+                  strokeWidth="1"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="relative z-10 text-sm font-medium text-popover-foreground">
+                {tooltip.label}
+              </span>
+            </div>
           </div>,
           document.body
         )}
