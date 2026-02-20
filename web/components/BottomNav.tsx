@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useRef } from 'react';
 import { Home, ListChecks, Briefcase, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,35 +15,73 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const isActive = (item: (typeof navItems)[number]) =>
-    item.path === '/'
-      ? pathname === '/'
-      : pathname === item.path || pathname.startsWith(item.path + '/');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const isActive = useCallback(
+    (item: (typeof navItems)[number]) =>
+      item.path === '/'
+        ? pathname === '/'
+        : pathname === item.path || pathname.startsWith(item.path + '/'),
+    [pathname]
+  );
+
+  const activeIndex = navItems.findIndex((item) => isActive(item));
+  const safeIndex = activeIndex >= 0 ? activeIndex : 0;
+
+  useEffect(() => {
+    const list = listRef.current;
+    const container = containerRef.current;
+    if (!list || !container) return;
+
+    const activeEl = list.querySelector('li.active') as HTMLElement | null;
+    if (!activeEl) return;
+
+    const listRect = list.getBoundingClientRect();
+    const liRect = activeEl.getBoundingClientRect();
+
+    container.style.setProperty('--pill-x', `${liRect.left - listRect.left}px`);
+    container.style.setProperty('--pill-w', `${liRect.width}px`);
+    container.style.setProperty('--pill-h', `${liRect.height}px`);
+  }, [pathname, safeIndex]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background">
-      <div className="mx-auto max-w-lg">
-        <ul className="flex items-center justify-around px-2 py-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item);
-            return (
-              <li key={item.id} className="flex-1">
-                <Link
-                  href={item.path}
-                  className={cn(
-                    'flex w-full flex-col items-center gap-1 py-2 transition-colors',
-                    active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Icon size={20} strokeWidth={2} />
-                  <span className="text-xs font-medium">{item.label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+    <nav
+      id="container-bottombar"
+      ref={containerRef}
+      className="fixed bottom-6 left-4 right-4 z-50 mx-auto flex max-w-lg items-center justify-center"
+      aria-label="Main navigation"
+    >
+      <ul
+        ref={listRef}
+        className="flex h-16 w-full items-stretch rounded-full bg-white/72 dark:bg-black/48 backdrop-blur-2xl backdrop-saturate-150"
+      >
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item);
+          return (
+            <li
+              key={item.id}
+              className={cn(
+                'flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors',
+                active && 'active'
+              )}
+            >
+              <Link
+                href={item.path}
+                className={cn(
+                  'flex h-full w-full flex-col items-center justify-center gap-0.5',
+                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                )}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon size={22} strokeWidth={2} aria-hidden />
+                <span className="text-[10px] font-semibold">{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
