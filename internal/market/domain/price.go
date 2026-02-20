@@ -41,7 +41,7 @@ func ConvertListingPricesTONToNanoton(raw json.RawMessage) (json.RawMessage, err
 	return json.Marshal(out)
 }
 
-// ConvertListingPricesNanotonToTON converts prices JSON to TON for API. Values >= 1e9 are treated as nanoton; smaller values are legacy TON (returned as-is).
+// ConvertListingPricesNanotonToTON converts prices JSON to TON for API.
 func ConvertListingPricesNanotonToTON(raw json.RawMessage) (json.RawMessage, error) {
 	if len(raw) == 0 {
 		return raw, nil
@@ -60,13 +60,7 @@ func ConvertListingPricesNanotonToTON(raw json.RawMessage) (json.RawMessage, err
 		if !ok {
 			continue
 		}
-		var ton float64
-		if n >= 1e9 {
-			ton = NanotonToTON(n)
-		} else {
-			ton = float64(n) // legacy: was stored as TON
-		}
-		out = append(out, []interface{}{pair[0], ton})
+		out = append(out, []interface{}{pair[0], NanotonToTON(n)})
 	}
 	return json.Marshal(out)
 }
