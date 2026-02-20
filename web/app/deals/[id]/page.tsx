@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
@@ -56,60 +57,102 @@ function DealStatusRoadmap({
 }: {
   currentStatus: DealStatus | string;
 }) {
-  const [tappedLabel, setTappedLabel] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
   const current = currentStatus as DealStatus;
   const currentIndex = DEAL_STATUS_ROADMAP.indexOf(current);
+  const n = DEAL_STATUS_ROADMAP.length;
 
-  const handleTap = (status: DealStatus) => {
+  // Show only three: previous, current, next. First: current + 2 next (left). Last: 2 prev + current (right). Else: prev, current, next (center).
+  const indices: number[] =
+    currentIndex < 0
+      ? [0, 1, 2]
+      : currentIndex === 0
+        ? [0, 1, 2]
+        : currentIndex === n - 1
+          ? [n - 3, n - 2, n - 1]
+          : [currentIndex - 1, currentIndex, currentIndex + 1];
+
+  const justify =
+    currentIndex <= 0 ? 'justify-start' : currentIndex >= n - 1 ? 'justify-end' : 'justify-center';
+
+  const handleTap = (status: DealStatus, event: React.MouseEvent<HTMLButtonElement>) => {
     const label = DEAL_STATUS_LABEL[status];
-    setTappedLabel(label);
-    setTimeout(() => setTappedLabel(null), 2500);
+    const rect = (event.target as HTMLElement).closest('button')?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltip({
+      label,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+    setTimeout(() => setTooltip(null), 2500);
   };
 
   return (
-    <div className="w-full">
-      <div className="flex items-center overflow-x-auto pb-2">
-        {DEAL_STATUS_ROADMAP.map((status, i) => {
+    <div className="relative w-full py-4">
+      {/* Full-width connecting line behind circles */}
+      <div
+        className="absolute left-0 right-0 top-1/2 z-0 h-0.5 -translate-y-1/2 bg-muted"
+        aria-hidden
+      />
+      <div className={`relative z-10 flex items-center ${justify} gap-6`}>
+        {indices.map((i) => {
+          const status = DEAL_STATUS_ROADMAP[i];
           const Icon = DEAL_STATUS_ICON[status];
           const label = DEAL_STATUS_LABEL[status];
           const isCurrent = status === current;
           const isPast = currentIndex >= 0 && i < currentIndex;
           return (
-            <div key={status} className="flex flex-shrink-0 items-center">
-              <button
-                type="button"
-                onClick={() => handleTap(status)}
-                title={label}
-                className="flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-muted/50"
+            <button
+              key={status}
+              type="button"
+              onClick={(e) => handleTap(status, e)}
+              title={label}
+              className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-background transition-colors hover:bg-muted/50"
+              style={{ boxShadow: '0 0 0 4px var(--background)' }}
+            >
+              <span
+                className={
+                  'flex h-9 w-9 items-center justify-center rounded-full border-0 transition-colors ' +
+                  (isCurrent
+                    ? 'bg-primary text-primary-foreground'
+                    : isPast
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-muted/70 text-muted-foreground')
+                }
               >
-                <span
-                  className={
-                    'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ' +
-                    (isCurrent
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : isPast
-                        ? 'border-muted-foreground/50 bg-muted text-muted-foreground'
-                        : 'border-muted bg-muted/50 text-muted-foreground')
-                  }
-                >
-                  <Icon size={18} />
-                </span>
-              </button>
-              {i < DEAL_STATUS_ROADMAP.length - 1 && (
-                <div
-                  className={
-                    'mx-0.5 h-0.5 w-3 flex-shrink-0 rounded ' +
-                    (i < currentIndex ? 'bg-muted-foreground/50' : 'bg-muted/50')
-                  }
-                />
-              )}
-            </div>
+                <Icon size={18} />
+              </span>
+            </button>
           );
         })}
       </div>
-      {tappedLabel && (
-        <p className="text-center text-xs font-medium text-primary">Status: {tappedLabel}</p>
-      )}
+
+      {/* Tooltip above UI with triangle pointing down to tapped status */}
+      {tooltip &&
+        typeof document !== 'undefined' &&
+        document.body &&
+        createPortal(
+          <div
+            className="fixed z-[100] rounded-lg border border-border bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md"
+            style={{
+              left: tooltip.x,
+              top: tooltip.y - 8,
+              transform: 'translate(-50%, -100%)',
+            }}
+          >
+            <span>{tooltip.label}</span>
+            {/* Triangle pointing down to the status */}
+            <div
+              className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-border"
+              style={{ marginTop: -1 }}
+            />
+            <div
+              className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-popover"
+              style={{ marginTop: 2 }}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
