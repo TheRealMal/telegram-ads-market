@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
@@ -16,7 +16,103 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { BarChart3, MessageCircle } from 'lucide-react';
+import { BarChart3, MessageCircle, FileEdit, FileCheck, Wallet, CircleCheck, Play, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import type { DealStatus } from '@/types';
+import { DEAL_STATUS_LABEL } from '@/types';
+
+/** Order of statuses for the roadmap (main flow + terminal). */
+const DEAL_STATUS_ROADMAP: DealStatus[] = [
+  'draft',
+  'approved',
+  'waiting_escrow_deposit',
+  'escrow_deposit_confirmed',
+  'in_progress',
+  'waiting_escrow_release',
+  'escrow_release_confirmed',
+  'completed',
+  'waiting_escrow_refund',
+  'escrow_refund_confirmed',
+  'expired',
+  'rejected',
+];
+
+const DEAL_STATUS_ICON: Record<DealStatus, typeof FileEdit> = {
+  draft: FileEdit,
+  approved: FileCheck,
+  waiting_escrow_deposit: Wallet,
+  escrow_deposit_confirmed: CircleCheck,
+  in_progress: Play,
+  waiting_escrow_release: Send,
+  escrow_release_confirmed: CircleCheck,
+  completed: CheckCircle2,
+  waiting_escrow_refund: Wallet,
+  escrow_refund_confirmed: CircleCheck,
+  expired: Clock,
+  rejected: XCircle,
+};
+
+function DealStatusRoadmap({
+  currentStatus,
+}: {
+  currentStatus: DealStatus | string;
+}) {
+  const [tappedLabel, setTappedLabel] = useState<string | null>(null);
+  const current = currentStatus as DealStatus;
+  const currentIndex = DEAL_STATUS_ROADMAP.indexOf(current);
+
+  const handleTap = (status: DealStatus) => {
+    const label = DEAL_STATUS_LABEL[status];
+    setTappedLabel(label);
+    setTimeout(() => setTappedLabel(null), 2500);
+  };
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center overflow-x-auto pb-2">
+        {DEAL_STATUS_ROADMAP.map((status, i) => {
+          const Icon = DEAL_STATUS_ICON[status];
+          const label = DEAL_STATUS_LABEL[status];
+          const isCurrent = status === current;
+          const isPast = currentIndex >= 0 && i < currentIndex;
+          return (
+            <div key={status} className="flex flex-shrink-0 items-center">
+              <button
+                type="button"
+                onClick={() => handleTap(status)}
+                title={label}
+                className="flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-muted/50"
+              >
+                <span
+                  className={
+                    'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ' +
+                    (isCurrent
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : isPast
+                        ? 'border-muted-foreground/50 bg-muted text-muted-foreground'
+                        : 'border-muted bg-muted/50 text-muted-foreground')
+                  }
+                >
+                  <Icon size={18} />
+                </span>
+              </button>
+              {i < DEAL_STATUS_ROADMAP.length - 1 && (
+                <div
+                  className={
+                    'mx-0.5 h-0.5 w-3 flex-shrink-0 rounded ' +
+                    (i < currentIndex ? 'bg-muted-foreground/50' : 'bg-muted/50')
+                  }
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {tappedLabel && (
+        <p className="text-center text-xs font-medium text-primary">Status: {tappedLabel}</p>
+      )}
+    </div>
+  );
+}
 
 /** TON logo (official style). White in SVG; use currentColor so it matches text (black in light theme, white in dark). */
 function TonLogoIcon({ className }: { className?: string }) {
@@ -347,9 +443,7 @@ export default function DealDetailPage() {
 
             <Card>
               <CardContent className="space-y-2 p-4">
-                <p className="text-sm">
-                  <strong>Status:</strong> {getDealStatusLabel(deal.status)}
-                </p>
+                <DealStatusRoadmap currentStatus={deal.status} />
                 <div className="flex flex-wrap gap-3 text-sm">
                   <span className={lessorSigned ? 'text-muted-foreground' : ''}>
                     Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}

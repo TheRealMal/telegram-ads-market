@@ -8,7 +8,7 @@ import type { Listing } from '@/types';
 import { ListingCard } from '@/components/ListingCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsListWithPill, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MyListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -55,10 +55,20 @@ export default function MyListingsPage() {
         )}
         {authed && (
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="mb-4 grid w-full grid-cols-2">
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="inactive">Inactive</TabsTrigger>
-            </TabsList>
+            <TabsListWithPill className="glass-pill mb-4 grid w-full grid-cols-2 gap-0.5 rounded-full border-0 bg-white/72 p-1 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
+              <TabsTrigger
+                value="active"
+                className="rounded-full border-0 data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                Active
+              </TabsTrigger>
+              <TabsTrigger
+                value="inactive"
+                className="rounded-full border-0 data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                Inactive
+              </TabsTrigger>
+            </TabsListWithPill>
             <TabsContent value="active" className="space-y-4">
               {active.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">No active listings.</p>

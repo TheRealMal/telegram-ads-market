@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsListWithPill, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { ListingCard } from '@/components/ListingCard';
@@ -67,7 +67,7 @@ export default function MarketplacePage() {
       <div className="mx-auto max-w-4xl px-4 py-4">
         <div className="relative">
         <div className="flex gap-2 mb-4">
-          <div className="relative flex-1">
+          <div className="glass-pill relative flex-1 overflow-hidden rounded-full bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
             <Search
               size={18}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -76,24 +76,24 @@ export default function MarketplacePage() {
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="border-0 bg-transparent pl-10 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
             />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
+          <button
+            type="button"
             onClick={() => setShowFilters((v) => !v)}
             className={
-              showFilters
-                ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background'
-                : ''
+              'glass-pill flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48 ' +
+              (showFilters
+                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background text-primary'
+                : 'text-muted-foreground hover:text-foreground')
             }
           >
             <SlidersHorizontal size={18} />
-          </Button>
+          </button>
         </div>
         {showFilters && (
-          <div className="absolute left-0 right-0 top-10 z-20 space-y-4 rounded-lg border border-border bg-background shadow-lg p-4">
+          <div className="absolute left-0 right-0 top-12 z-20 space-y-4 rounded-lg border border-border bg-background p-4 shadow-lg">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Filters</span>
               <Button
@@ -148,10 +148,20 @@ export default function MarketplacePage() {
           </div>
         )}
         <Tabs defaultValue="channels" className="w-full">
-          <TabsList className="mb-6 grid w-full grid-cols-2">
-            <TabsTrigger value="channels">Find Channels</TabsTrigger>
-            <TabsTrigger value="advertisers">Find Advertisers</TabsTrigger>
-          </TabsList>
+          <TabsListWithPill className="glass-pill mb-6 grid w-full grid-cols-2 gap-0.5 rounded-full border-0 bg-white/72 p-1 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
+            <TabsTrigger
+              value="channels"
+              className="rounded-full border-0 data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Find Channels
+            </TabsTrigger>
+            <TabsTrigger
+              value="advertisers"
+              className="rounded-full border-0 data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Find Advertisers
+            </TabsTrigger>
+          </TabsListWithPill>
 
           <TabsContent value="channels" className="space-y-4">
             {filteredLessors.length === 0 ? (
