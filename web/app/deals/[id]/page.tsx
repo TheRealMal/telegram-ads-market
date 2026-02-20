@@ -229,7 +229,10 @@ function DealStatusRoadmap({
             <React.Fragment key={status}>
               <div className="relative z-10 flex flex-shrink-0 flex-col items-center">
                 {isCurrent && (
-                  <span className="mb-1 whitespace-nowrap text-xs text-primary dark:text-white">
+                  <span
+                    className="absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap text-sm font-semibold text-primary dark:text-white"
+                    style={{ pointerEvents: 'none' }}
+                  >
                     {label}
                   </span>
                 )}

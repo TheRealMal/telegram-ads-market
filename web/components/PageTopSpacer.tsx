@@ -17,7 +17,7 @@ export function PageTopSpacer() {
   if (!show) return null;
 
   return (
-    <div className="sticky top-0 z-30 shrink-0 bg-background" style={{ minHeight: '5rem' }}>
+    <div className="sticky top-0 z-30 shrink-0 bg-background" style={{ minHeight: '5.25rem' }}>
       <div
         className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-b from-transparent to-background"
         aria-hidden
