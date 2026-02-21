@@ -26,6 +26,14 @@ init_certs: ## Initialize the certificates
 start: ## Start the server
 	docker compose up -d
 
+rollout_web: ## Rebuild web and deploy updated containers
+	docker compose build web
+	docker compose up web -d --force-recreate
+
+rollout_back: ## Rebuild backend and deploy updated containers
+	docker compose build api
+	docker compose up api bot usetbot blockchain_observer -d --force-recreate
+
 stop: ## Stop the server
 	docker compose down
 
