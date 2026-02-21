@@ -16,7 +16,11 @@ export function ChannelCard({ channel, onRefreshClick, refreshDisabled }: Channe
         <Link href={`/profile/channels/${channel.id}`} className="m-3 flex flex-1 min-w-0 items-center gap-3 cursor-pointer">
           {channel.photo ? (
             <img
-              src={channel.photo}
+              src={
+                channel.photo.startsWith('http') || channel.photo.startsWith('data:')
+                  ? channel.photo
+                  : `data:image/jpeg;base64,${channel.photo}`
+              }
               alt=""
               className="h-10 w-10 shrink-0 rounded-full object-cover"
             />

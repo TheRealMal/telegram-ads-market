@@ -114,6 +114,14 @@ func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel)
 	return nil
 }
 
+// UpdateChannelPhoto updates only the photo column (base64 string) for the channel.
+func (r *repository) UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE market.channel SET photo = @photo, updated_at = NOW() WHERE id = @channel_id`,
+		pgx.NamedArgs{"channel_id": channelID, "photo": photo})
+	return err
+}
+
 func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO market.channel_stats (channel_id, stats)

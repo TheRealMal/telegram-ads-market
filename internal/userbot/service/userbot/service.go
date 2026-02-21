@@ -22,6 +22,7 @@ import (
 type marketRepository interface {
 	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
 	UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error
+	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
 	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
 	DeleteChannelAdmins(ctx context.Context, channelID int64) error
 	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error

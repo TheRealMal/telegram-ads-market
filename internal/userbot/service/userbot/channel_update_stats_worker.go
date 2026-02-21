@@ -110,6 +110,7 @@ func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *s
 			continue
 		}
 		logger.Info("channel stats updated", "channel_id", ev.ChannelID)
+		s.updateChannelPhotoFromTelegram(ctx, ev.ChannelID, ch.AccessHash)
 		ids = append(ids, ev.ID)
 	}
 	if len(ids) > 0 {

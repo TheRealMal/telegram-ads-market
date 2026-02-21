@@ -91,7 +91,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 
 			channelSvc := channelservice.NewChannelService(repo, channelUpdateStatsEventSvc)
 			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc, telegramNotifyEventSvc)
-
+			dealPostMessageSvc := dealpostmessage.NewService(repo)
 			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
 			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)
 			if errPreload := dealSvc.ExpireTimedOutDeposits(preloadCtx, time.Now().Add(-1*time.Hour)); errPreload != nil {
@@ -102,7 +102,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			go escrowSvc.Worker(ctxRun)
 			go escrowSvc.DepositStreamWorker(ctxRun, escrowDepositEventSvc)
 			go escrowSvc.ReleaseRefundWorker(ctxRun)
-			go dealpostmessage.RunPassedWorker(ctxRun, repo)
+			go dealPostMessageSvc.RunPassedWorker(ctxRun)
 			go dealSvc.RunCompletedWorker(ctxRun)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)

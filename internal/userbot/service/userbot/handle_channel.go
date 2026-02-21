@@ -45,7 +45,12 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		}
 	}
 
-	return s.syncChannelAdmins(ctx, update.ChannelID, channelEnt.AccessHash)
+	if err := s.syncChannelAdmins(ctx, update.ChannelID, channelEnt.AccessHash); err != nil {
+		return err
+	}
+
+	s.updateChannelPhotoFromTelegram(ctx, update.ChannelID, channelEnt.AccessHash)
+	return nil
 }
 
 // syncChannelAdmins fetches current admins from Telegram and replaces channel_admin rows for the channel.
