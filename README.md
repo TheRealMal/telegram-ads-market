@@ -136,3 +136,5 @@ Frontend sources are placed into `web` directory, fully written with AI on React
     - [ ] Story post
     - [ ] Add images to posts
     - [ ] Preview post in telegram messages button
+- [ ] Send collected comission to treasury inside escrow release tx
+- [ ] Collect escrow release time, incoming and outgoing transactions (db schema ready)
