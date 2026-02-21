@@ -12,7 +12,6 @@ import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry 
 import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
 import type { Deal, Listing } from '@/types';
 import { getDealStatusLabel } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
@@ -20,6 +19,7 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { BarChart3, MessageCircle, FileEdit, FileCheck, Wallet, CircleCheck, Play, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import type { DealStatus } from '@/types';
 import { DEAL_STATUS_LABEL } from '@/types';
+import { HandshakeDealSign } from '@/components/HandshakeDealSign';
 
 /** Order of statuses for the roadmap (main flow + terminal). */
 const DEAL_STATUS_ROADMAP: DealStatus[] = [
@@ -606,291 +606,274 @@ export default function DealDetailPage() {
           <div className="page-with-nav">
       <PageTopSpacer />
       <div className="mx-auto max-w-3xl px-4 py-4">
-        <div className="w-full">
-          <div className="mb-4">
-            {/* Wallet: above details card, minimal UI */}
-            {(isLessor || isLessee) && (
-              <div className="mb-4 flex w-full max-w-md flex-col gap-1">
-                <div className="flex w-full items-center justify-between gap-2">
-                  {!wallet ? (
-                    <>
-                      <span className="text-sm text-muted-foreground">Wallet</span>
-                      <button
-                        type="button"
-                        onClick={() => tonConnectUI.openModal()}
-                        className="shrink-0 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                      >
-                        <span>Connect</span>
-                        <TonLogoIcon className="h-[1em] w-auto shrink-0" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-mono text-sm tabular-nums">{truncateAddressDisplay(rawAddress || '')}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const authRes = await auth();
-                          if (authRes.ok && authRes.data) {
-                            setAuthToken(authRes.data);
-                            await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
-                          }
-                          walletSyncedRef.current = false;
-                          dealPayoutSyncedRef.current = false;
-                          tonConnectUI.disconnect();
-                        }}
-                        className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
-                      >
-                        Disconnect
-                      </button>
-                    </>
-                  )}
-                </div>
-                {deal.status === 'draft' && !wallet && (
-                  <p className="text-center text-xs text-muted-foreground">You need to connect wallet to make a deal.</p>
+        <div className="w-full space-y-4">
+          {/* Wallet */}
+          {(isLessor || isLessee) && (
+            <div className="flex w-full max-w-md flex-col gap-1">
+              <div className="flex w-full items-center justify-between gap-2">
+                {!wallet ? (
+                  <>
+                    <span className="text-sm text-muted-foreground">Wallet</span>
+                    <button
+                      type="button"
+                      onClick={() => tonConnectUI.openModal()}
+                      className="shrink-0 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                    >
+                      <span>Connect</span>
+                      <TonLogoIcon className="h-[1em] w-auto shrink-0" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-mono text-sm tabular-nums">{truncateAddressDisplay(rawAddress || '')}</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const authRes = await auth();
+                        if (authRes.ok && authRes.data) {
+                          setAuthToken(authRes.data);
+                          await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
+                        }
+                        walletSyncedRef.current = false;
+                        dealPayoutSyncedRef.current = false;
+                        tonConnectUI.disconnect();
+                      }}
+                      className="shrink-0 text-sm text-red-600 hover:text-red-700 hover:underline"
+                    >
+                      Disconnect
+                    </button>
+                  </>
                 )}
               </div>
-            )}
+              {deal.status === 'draft' && !wallet && (
+                <p className="text-center text-xs text-muted-foreground">You need to connect wallet to make a deal.</p>
+              )}
+            </div>
+          )}
 
-            <Card>
-              <CardContent className="space-y-2 p-4">
-                <DealStatusRoadmap currentStatus={deal.status} />
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <span className={lessorSigned ? 'text-muted-foreground' : ''}>
-                    Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}
-                  </span>
-                  <span className={lesseeSigned ? 'text-muted-foreground' : ''}>
-                    Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(canSignAsLessor || canSignAsLessee) && (
-                    <>
-                      {!bothPayoutsSet && (
-                        <span className="text-sm text-muted-foreground">Waiting for both parties to set payout address.</span>
-                      )}
-                      {canSignNow && (
-                        <Button
-                          size="sm"
-                          onClick={handleSignDeal}
-                          disabled={signing || rejecting}
-                        >
-                          {signing ? 'Signing…' : canSignAsLessor ? 'Sign as lessor' : 'Sign as lessee'}
-                        </Button>
-                      )}
-                    </>
+          {/* Row: Jump into chat + View channel stats (each takes full width if alone) */}
+          <div className="flex flex-wrap gap-2">
+            {deal.status !== 'rejected' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2"
+                onClick={handleJumpIntoChat}
+                disabled={chatLinkLoading}
+              >
+                <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                {chatLinkLoading ? 'Opening…' : 'Jump into chat'}
+              </Button>
+            )}
+            {deal.status === 'draft' && isLessee && (deal.channel_id ?? listing?.channel_id) != null && (
+              <Link
+                href={`/profile/channels/${deal.channel_id ?? listing?.channel_id}`}
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
+              >
+                <BarChart3 size={18} />
+                View channel stats
+              </Link>
+            )}
+          </div>
+
+          {/* Deposit to escrow - under Jump into chat for waiting_escrow_deposit */}
+          {deal.status === 'waiting_escrow_deposit' && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+              {isLessor && (
+                <p className="text-muted-foreground">Waiting for lessee escrow deposit.</p>
+              )}
+              {isLessee && deal.escrow_address != null && (
+                <div className="space-y-2">
+                  <p className="font-medium">Deposit to escrow</p>
+                  <p className="text-muted-foreground">
+                    Amount: {deal.escrow_amount != null
+                      ? `${(deal.escrow_amount / 1e9).toFixed(4)} TON`
+                      : formatPriceValue(deal.price)}
+                  </p>
+                  <p className="break-all font-mono text-xs">{formatAddressForDisplay(deal.escrow_address)}</p>
+                  {!wallet ? (
+                    <p className="py-3 text-center text-sm text-muted-foreground">Connect wallet to proceed.</p>
+                  ) : !deal.lessee_payout_address || !addressesEqual(rawAddress ?? '', deal.lessee_payout_address) ? (
+                    <p className="py-3 text-center text-sm text-muted-foreground">Connect original wallet to proceed.</p>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={handleDepositEscrow}
+                      disabled={depositing || !deal.escrow_amount || deal.escrow_amount <= 0}
+                    >
+                      {depositing ? 'Opening wallet…' : 'Deposit via wallet'}
+                    </Button>
+                  )}
+                  {depositError && (
+                    <p className="text-xs text-destructive">{depositError}</p>
                   )}
                 </div>
-                {deal.status === 'waiting_escrow_deposit' && (
-                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-                    {isLessor && (
-                      <p className="text-muted-foreground">Waiting for lessee escrow deposit.</p>
-                    )}
-                    {isLessee && deal.escrow_address != null && (
-                      <div className="space-y-2">
-                        <p className="font-medium">Deposit to escrow</p>
-                        <p className="text-muted-foreground">
-                          Amount: {deal.escrow_amount != null
-                            ? `${(deal.escrow_amount / 1e9).toFixed(4)} TON`
-                            : formatPriceValue(deal.price)}
-                        </p>
-                        <p className="break-all font-mono text-xs">{formatAddressForDisplay(deal.escrow_address)}</p>
-                        {!wallet ? (
-                          <p className="py-3 text-center text-sm text-muted-foreground">Connect wallet to proceed.</p>
-                        ) : !deal.lessee_payout_address || !addressesEqual(rawAddress ?? '', deal.lessee_payout_address) ? (
-                          <p className="py-3 text-center text-sm text-muted-foreground">Connect original wallet to proceed.</p>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={handleDepositEscrow}
-                            disabled={depositing || !deal.escrow_amount || deal.escrow_amount <= 0}
-                          >
-                            {depositing ? 'Opening wallet…' : 'Deposit via wallet'}
-                          </Button>
-                        )}
-                        {depositError && (
-                          <p className="text-xs text-destructive">{depositError}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <p className="text-sm">
-                  <strong>Type:</strong> {deal.type}
-                </p>
-                <p className="text-sm">
-                  <strong>Duration:</strong> {formatPriceKey(String(deal.duration))}
-                </p>
-                <p className="text-sm">
-                  <strong>Price:</strong> {formatPriceValue(deal.price)}
-                </p>
-                <p className="text-sm">
-                  <strong>Listing:</strong>{' '}
-                  <Link
-                    href={`/listings/${deal.listing_id}`}
-                    className="text-primary underline hover:no-underline"
-                  >
-                    #{deal.listing_id}
-                  </Link>
-                </p>
-                {deal.status === 'draft' && isLessee && (deal.channel_id ?? listing?.channel_id) != null && (
-                  <Link
-                    href={`/profile/channels/${deal.channel_id ?? listing?.channel_id}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
-                  >
-                    <BarChart3 size={18} />
-                    View channel stats
-                  </Link>
-                )}
-                {deal.status !== 'waiting_escrow_deposit' && deal.escrow_address && (
-                  <p className="text-sm">
-                    <strong>Escrow:</strong> {formatAddressForDisplay(deal.escrow_address)}
-                  </p>
-                )}
-                {deal.escrow_release_time && (
-                  <p className="text-sm">
-                    <strong>Release:</strong> {new Date(deal.escrow_release_time).toLocaleString()}
-                  </p>
-                )}
-                {deal.status !== 'rejected' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="inline-flex items-center gap-2"
-                    onClick={handleJumpIntoChat}
-                    disabled={chatLinkLoading}
-                  >
-                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                    {chatLinkLoading ? 'Opening…' : 'Jump into chat'}
-                  </Button>
-                )}
-                {(getDealMessage(deal.details as Record<string, unknown>) || getDealPostedAt(deal.details as Record<string, unknown>)) && (
-                  <div className="mt-2">
-                    <strong className="text-sm">Post text</strong>
-                    {getDealMessage(deal.details as Record<string, unknown>) && (
-                      <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-muted/50 p-2 text-sm">
-                        {getDealMessage(deal.details as Record<string, unknown>)}
-                      </p>
-                    )}
-                    {getDealPostedAt(deal.details as Record<string, unknown>) && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Posted: {formatPostedAt(getDealPostedAt(deal.details as Record<string, unknown>))}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {deal.status === 'draft' && listing && (() => {
-                  const priceRows = parseListingPrices(listing.prices);
-                  if (priceRows.length === 0) return null;
-                  const row = priceRows[draftPriceIndex] ?? priceRows[0];
-                  return (
-                    <div className="mt-4 space-y-3 border-t border-border pt-4">
-                      <p className="text-sm font-medium">Edit draft</p>
-                      {priceRows.length > 1 && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Price option</Label>
-                          <select
-                            value={draftPriceIndex}
-                            onChange={(e) => setDraftPriceIndex(Number(e.target.value))}
-                            className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                          >
-                            {priceRows.map((r, i) => (
-                              <option key={i} value={i}>{formatPriceEntry(r.duration, r.price)}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Post text</Label>
-                        <textarea
-                          value={draftMessage}
-                          onChange={(e) => setDraftMessage(e.target.value)}
-                          placeholder="Text of the post..."
-                          rows={3}
-                          className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Date and time of posting</Label>
-                        <input
-                          type="datetime-local"
-                          value={draftPostedAt}
-                          onChange={(e) => {
-                            setDraftPostedAt(e.target.value);
-                            setDraftPostedAtError(null);
-                          }}
-                          className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                        />
-                        {draftPostedAtError && (
-                          <p className="mt-1 text-xs text-destructive">{draftPostedAtError}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          size="sm"
-                          disabled={draftSaving}
-                          onClick={async () => {
-                            let postedAtVal: string | undefined;
-                            if (draftPostedAt.trim()) {
-                              try {
-                                const d = new Date(draftPostedAt.trim());
-                                if (Number.isNaN(d.getTime())) {
-                                  setDraftPostedAtError('Invalid date and time');
-                                  return;
-                                }
-                                postedAtVal = d.toISOString();
-                              } catch {
-                                setDraftPostedAtError('Invalid date and time');
-                                return;
-                              }
-                            }
-                            setDraftPostedAtError(null);
-                            const authRes = await auth();
-                            if (!authRes.ok || !authRes.data) return;
-                            setAuthToken(authRes.data);
-                            const r = priceRows[draftPriceIndex] ?? priceRows[0];
-                            const type = r.duration + 'hr';
-                            const duration = parseInt(r.duration, 10) || 24;
-                            setDraftSaving(true);
-                            const res = await api<Deal>(`/api/v1/market/deals/${id}`, {
-                              method: 'PATCH',
-                              body: JSON.stringify({
-                                type,
-                                duration,
-                                price: r.price,
-                                details: {
-                                  message: draftMessage.trim() || undefined,
-                                  posted_at: postedAtVal,
-                                },
-                              }),
-                            });
-                            setDraftSaving(false);
-                            if (res.ok && res.data) setDeal(res.data);
-                            else alert(res.error_code || 'Failed to update');
-                          }}
-                        >
-                          {draftSaving ? 'Saving…' : 'Save draft'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={handleRejectDeal}
-                          disabled={signing || rejecting || draftSaving}
-                        >
-                          {rejecting ? 'Rejecting…' : 'Reject deal'}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <p className="pt-2 text-xs text-muted-foreground">
-                  Updated {new Date(deal.updated_at).toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
+              )}
+            </div>
+          )}
+
+          <DealStatusRoadmap currentStatus={deal.status} />
+          <div className="flex flex-wrap gap-3 text-sm">
+            <span className={lessorSigned ? 'text-muted-foreground' : ''}>
+              Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}
+            </span>
+            <span className={lesseeSigned ? 'text-muted-foreground' : ''}>
+              Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
+            </span>
           </div>
+
+          {/* Type, Duration, Price, Listing, Post date, Post text */}
+          <p className="text-sm">
+            <strong>Type:</strong> Post
+          </p>
+          <p className="text-sm">
+            <strong>Duration:</strong> {formatPriceKey(String(deal.duration))}
+          </p>
+          <p className="text-sm">
+            <strong>Price:</strong> {formatPriceValue(deal.price)}
+          </p>
+          <p className="text-sm">
+            <strong>Listing:</strong>{' '}
+            <Link
+              href={`/listings/${deal.listing_id}`}
+              className="text-primary underline hover:no-underline"
+            >
+              #{deal.listing_id}
+            </Link>
+          </p>
+          {getDealPostedAt(deal.details as Record<string, unknown>) && (
+            <p className="text-sm">
+              <strong>Post date:</strong> {formatPostedAt(getDealPostedAt(deal.details as Record<string, unknown>))}
+            </p>
+          )}
+          {getDealMessage(deal.details as Record<string, unknown>) && (
+            <div>
+              <p className="text-sm font-medium">Post text</p>
+              <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-muted/50 p-2 text-sm">
+                {getDealMessage(deal.details as Record<string, unknown>)}
+              </p>
+            </div>
+          )}
+
+          {/* Draft: handshake (tap to sign) + tip */}
+          {deal.status === 'draft' && (isLessor || isLessee) && (
+            <HandshakeDealSign
+              lessorSigned={lessorSigned}
+              lesseeSigned={lesseeSigned}
+              canSignNow={!!canSignNow}
+              signing={!!signing}
+              onSignDeal={handleSignDeal}
+            />
+          )}
+
+          {deal.status === 'draft' && listing && (() => {
+            const priceRows = parseListingPrices(listing.prices);
+            if (priceRows.length === 0) return null;
+            return (
+              <div className="mt-4 space-y-3 border-t border-border pt-4">
+                <p className="text-sm font-medium">Edit draft</p>
+                {priceRows.length > 1 && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Price option</Label>
+                    <select
+                      value={draftPriceIndex}
+                      onChange={(e) => setDraftPriceIndex(Number(e.target.value))}
+                      className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                    >
+                      {priceRows.map((r, i) => (
+                        <option key={i} value={i}>{formatPriceEntry(r.duration, r.price)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Post text</Label>
+                  <textarea
+                    value={draftMessage}
+                    onChange={(e) => setDraftMessage(e.target.value)}
+                    placeholder="Text of the post..."
+                    rows={3}
+                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Date and time of posting</Label>
+                  <input
+                    type="datetime-local"
+                    value={draftPostedAt}
+                    onChange={(e) => {
+                      setDraftPostedAt(e.target.value);
+                      setDraftPostedAtError(null);
+                    }}
+                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  />
+                  {draftPostedAtError && (
+                    <p className="mt-1 text-xs text-destructive">{draftPostedAtError}</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    disabled={draftSaving}
+                    onClick={async () => {
+                      let postedAtVal: string | undefined;
+                      if (draftPostedAt.trim()) {
+                        try {
+                          const d = new Date(draftPostedAt.trim());
+                          if (Number.isNaN(d.getTime())) {
+                            setDraftPostedAtError('Invalid date and time');
+                            return;
+                          }
+                          postedAtVal = d.toISOString();
+                        } catch {
+                          setDraftPostedAtError('Invalid date and time');
+                          return;
+                        }
+                      }
+                      setDraftPostedAtError(null);
+                      const authRes = await auth();
+                      if (!authRes.ok || !authRes.data) return;
+                      setAuthToken(authRes.data);
+                      const r = priceRows[draftPriceIndex] ?? priceRows[0];
+                      const type = r.duration + 'hr';
+                      const duration = parseInt(r.duration, 10) || 24;
+                      setDraftSaving(true);
+                      const res = await api<Deal>(`/api/v1/market/deals/${id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                          type,
+                          duration,
+                          price: r.price,
+                          details: {
+                            message: draftMessage.trim() || undefined,
+                            posted_at: postedAtVal,
+                          },
+                        }),
+                      });
+                      setDraftSaving(false);
+                      if (res.ok && res.data) setDeal(res.data);
+                      else alert(res.error_code || 'Failed to update');
+                    }}
+                  >
+                    {draftSaving ? 'Saving…' : 'Save draft'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={handleRejectDeal}
+                    disabled={signing || rejecting || draftSaving}
+                  >
+                    {rejecting ? 'Rejecting…' : 'Reject deal'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+          <p className="text-xs text-muted-foreground">
+            Updated {new Date(deal.updated_at).toLocaleString()}
+          </p>
         </div>
       </div>
           </div>
