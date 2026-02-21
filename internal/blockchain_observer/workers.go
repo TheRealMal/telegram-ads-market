@@ -45,13 +45,17 @@ func (o *Observer) startRedisEventsHandler(ctx context.Context) {
 			}
 			switch msg.Channel {
 			case expiredCh:
+				if msg.Payload == "rate_limiter" {
+					continue
+				}
 				addr, err := address.ParseRawAddr(msg.Payload)
 				if err != nil {
 					o.log.Error("expired key not a valid address", "key", msg.Payload, "error", err)
 					continue
 				}
+				o.log.Info("expired key", "key", msg.Payload)
 				o.removeAddress(WalletAddress(addr.Data()))
-				if err := o.dealExpirer.SetDealStatusExpiredByEscrowAddress(ctx, msg.Payload); err != nil {
+				if err := o.dealRepository.SetDealStatusExpiredByEscrowAddress(ctx, msg.Payload); err != nil {
 					o.log.Error("set deal expired", "address", msg.Payload, "error", err)
 				} else {
 					o.log.Info("deal marked expired", "address", msg.Payload)
