@@ -26,6 +26,7 @@ type Listing struct {
 	ChannelID        *int64          `json:"channel_id,omitempty"`
 	ChannelTitle     *string         `json:"channel_title,omitempty"`
 	ChannelUsername  *string         `json:"channel_username,omitempty"`
+	ChannelPhoto     *string         `json:"channel_photo,omitempty"`
 	ChannelFollowers *int64          `json:"channel_followers,omitempty"`
 	Type             ListingType     `json:"type"`
 	Prices           json.RawMessage `json:"prices"`

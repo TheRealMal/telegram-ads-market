@@ -169,9 +169,21 @@ export default function ListingDetailPage() {
                 {listing.status}
               </Badge>
             </div>
-            {(listing.channel_title != null || listing.channel_username != null) && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Channel:{' '}
+            {(listing.channel_title != null || listing.channel_username != null || listing.channel_photo != null) && (
+              <div className="mt-2 flex items-center gap-3">
+                {listing.channel_photo && (
+                  <img
+                    src={
+                      listing.channel_photo.startsWith('http') || listing.channel_photo.startsWith('data:')
+                        ? listing.channel_photo
+                        : `data:image/jpeg;base64,${listing.channel_photo}`
+                    }
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-full object-cover"
+                  />
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Channel:{' '}
                 {listing.channel_username ? (
                   <a
                     href={`https://t.me/${listing.channel_username}`}
@@ -184,7 +196,8 @@ export default function ListingDetailPage() {
                 ) : (
                   listing.channel_title ?? '—'
                 )}
-              </p>
+                </p>
+              </div>
             )}
             {listing.channel_followers != null && listing.channel_followers > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">

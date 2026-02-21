@@ -16,6 +16,7 @@ export interface Listing {
   channel_id?: number;
   channel_title?: string;
   channel_username?: string;
+  channel_photo?: string;
   channel_followers?: number;
   type: ListingType;
   prices: Record<string, unknown>;

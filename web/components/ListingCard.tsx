@@ -28,9 +28,21 @@ export function ListingCard({ listing, showApply = false }: ListingCardProps) {
       <Link href={`/listings/${listing.id}`}>
         <CardContent className="py-1 px-4">
           <div className="mb-3 flex items-start gap-3">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-muted text-lg text-muted-foreground">
-              #
-            </div>
+            {listing.channel_photo ? (
+              <img
+                src={
+                  listing.channel_photo.startsWith('http') || listing.channel_photo.startsWith('data:')
+                    ? listing.channel_photo
+                    : `data:image/jpeg;base64,${listing.channel_photo}`
+                }
+                alt=""
+                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-muted text-lg text-muted-foreground">
+                #
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <h3 className="truncate font-semibold">Listing #{listing.id}</h3>
               {(listing.channel_title != null || listing.channel_username != null) ? (

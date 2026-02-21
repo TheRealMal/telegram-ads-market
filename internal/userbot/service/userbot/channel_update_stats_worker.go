@@ -101,15 +101,13 @@ func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *s
 			ids = append(ids, ev.ID)
 			continue
 		}
-		if !ch.AdminRights.CanViewStats {
-			ids = append(ids, ev.ID)
-			continue
+		if ch.AdminRights.CanViewStats {
+			slog.Info("updating channel stats", "channel_id", ev.ChannelID)
+			if err := s.UpdateChannelStats(ctx, ev.ChannelID, ch.AccessHash, 0); err != nil {
+				logger.Error("update channel stats", "channel_id", ev.ChannelID, "error", err)
+				continue
+			}
 		}
-		if err := s.UpdateChannelStats(ctx, ev.ChannelID, ch.AccessHash, 0); err != nil {
-			logger.Error("update channel stats", "channel_id", ev.ChannelID, "error", err)
-			continue
-		}
-		logger.Info("channel stats updated", "channel_id", ev.ChannelID)
 		s.updateChannelPhotoFromTelegram(ctx, ev.ChannelID, ch.AccessHash)
 		ids = append(ids, ev.ID)
 	}

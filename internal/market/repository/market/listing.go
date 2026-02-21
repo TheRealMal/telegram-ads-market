@@ -28,6 +28,7 @@ type listingWithChannelRow struct {
 	listingRow
 	ChannelTitle     *string `db:"channel_title"`
 	ChannelUsername  *string `db:"channel_username"`
+	ChannelPhoto     *string `db:"channel_photo"`
 	ChannelFollowers *int64  `db:"channel_followers"`
 }
 
@@ -66,6 +67,7 @@ func listingWithChannelRowToEntity(row listingWithChannelRow) *entity.Listing {
 	l := listingRowToEntity(row.listingRow)
 	l.ChannelTitle = row.ChannelTitle
 	l.ChannelUsername = row.ChannelUsername
+	l.ChannelPhoto = row.ChannelPhoto
 	l.ChannelFollowers = row.ChannelFollowers
 	return l
 }
@@ -106,7 +108,7 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.Listing, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username,
+		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l
 		LEFT JOIN market.channel c ON c.id = l.channel_id
@@ -160,7 +162,7 @@ func (r *repository) DeleteListing(ctx context.Context, id int64) error {
 func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error) {
 	q := `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username,
+		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l
 		LEFT JOIN market.channel c ON c.id = l.channel_id
@@ -219,7 +221,7 @@ func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID in
 func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error) {
 	q := `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username,
+		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l
 		LEFT JOIN market.channel c ON c.id = l.channel_id

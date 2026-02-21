@@ -729,11 +729,11 @@ export default function DealDetailPage() {
             </p>
           )}
 
-          {/* Deposit to escrow - lessee only, only when time left; timer on the right */}
+          {/* Deposit to escrow - lessee only, only when time left; timer in fixed-width column so it doesn't affect content layout */}
           {deal.status === 'waiting_escrow_deposit' && !depositDeadlinePassed && isLessee && deal.escrow_address != null && (
             <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="space-y-2 min-w-0 flex-1">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
                   <p className="font-medium">Deposit to escrow</p>
                   <p className="text-muted-foreground">
                     Amount: {deal.escrow_amount != null
@@ -759,7 +759,7 @@ export default function DealDetailPage() {
                     <p className="text-xs text-destructive">{depositError}</p>
                   )}
                 </div>
-                <div className="shrink-0 text-right tabular-nums text-muted-foreground">
+                <div className="w-[5.5rem] shrink-0 text-right tabular-nums text-muted-foreground">
                   <p className="text-xs font-medium">Time left</p>
                   <p className="text-lg font-semibold text-foreground">{formatTimeLeftMs(depositTimeLeftMs)}</p>
                 </div>
