@@ -649,23 +649,15 @@ export default function DealDetailPage() {
           )}
 
           <DealStatusRoadmap currentStatus={deal.status} />
-          <div className="flex flex-wrap gap-3 text-sm">
-            <span className={lessorSigned ? 'text-muted-foreground' : ''}>
-              Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}
-            </span>
-            <span className={lesseeSigned ? 'text-muted-foreground' : ''}>
-              Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
-            </span>
-          </div>
 
-          {/* Row: Jump into chat + View stats (under status bar; each takes full width if alone) */}
+          {/* Row: Jump into chat + View stats (same height; each takes full width if alone) */}
           <div className="flex flex-wrap gap-2">
             {deal.status !== 'rejected' && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2"
+                className="inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2"
                 onClick={handleJumpIntoChat}
                 disabled={chatLinkLoading}
               >
@@ -676,7 +668,7 @@ export default function DealDetailPage() {
             {deal.status === 'draft' && isLessee && (deal.channel_id ?? listing?.channel_id) != null && (
               <Link
                 href={`/profile/channels/${deal.channel_id ?? listing?.channel_id}`}
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
+                className="inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
               >
                 <BarChart3 size={18} />
                 View stats
@@ -759,6 +751,8 @@ export default function DealDetailPage() {
               lessorSigned={lessorSigned}
               lesseeSigned={lesseeSigned}
               isLessor={!!isLessor}
+              bothPayoutsSet={!!bothPayoutsSet}
+              myWalletConnected={!!wallet}
               canSignNow={!!canSignNow}
               signing={!!signing}
               onSignDeal={handleSignDeal}
@@ -804,15 +798,16 @@ export default function DealDetailPage() {
                       setDraftPostedAt(e.target.value);
                       setDraftPostedAtError(null);
                     }}
-                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                    className="mt-1 w-full min-w-[18rem] max-w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                   />
                   {draftPostedAtError && (
                     <p className="mt-1 text-xs text-destructive">{draftPostedAtError}</p>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-2">
                   <Button
                     size="sm"
+                    className="min-w-0 flex-1"
                     disabled={draftSaving}
                     onClick={async () => {
                       let postedAtVal: string | undefined;
@@ -859,7 +854,7 @@ export default function DealDetailPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="min-w-0 flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={handleRejectDeal}
                     disabled={signing || rejecting || draftSaving}
                   >

@@ -117,25 +117,39 @@ function toHexColor(cssValue: string): string {
   return s;
 }
 
+const LIGHT_BG = '#ffffff';
+const LIGHT_BOTTOM_BAR = '#ffffff';
+
 /**
- * Sets Mini App background, header, and bottom bar colors from CSS theme (--background, --muted).
- * Call after theme is applied. Ensures white theme uses #ffffff for header/bg/bottom so they match.
+ * Sets Mini App background, header, and bottom bar colors from current theme.
+ * Light theme: always #ffffff for background and bottom bar so Telegram UI matches the app.
+ * Dark theme: uses CSS --background and --muted.
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_background_color
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_header_color
  * @see https://docs.telegram-mini-apps.com/platform/methods#web_app_set_bottom_bar_color
  */
 export function setTelegramThemeColors(): void {
   if (typeof document === 'undefined') return;
-  const style = getComputedStyle(document.documentElement);
-  const bgRaw = style.getPropertyValue('--background').trim();
-  const mutedRaw = style.getPropertyValue('--muted').trim();
-  const bg = toHexColor(bgRaw);
-  const bottomBar = toHexColor(mutedRaw);
+  const isDark = document.documentElement.classList.contains('dark');
+  let bg: string;
+  let bottomBar: string;
+  if (isDark) {
+    const style = getComputedStyle(document.documentElement);
+    const bgRaw = style.getPropertyValue('--background').trim();
+    const mutedRaw = style.getPropertyValue('--muted').trim();
+    bg = toHexColor(bgRaw) || LIGHT_BG;
+    bottomBar = toHexColor(mutedRaw) || LIGHT_BOTTOM_BAR;
+  } else {
+    bg = LIGHT_BG;
+    bottomBar = LIGHT_BOTTOM_BAR;
+  }
   if (bg) {
     postTelegramMethod('web_app_set_background_color', { color: bg });
     postTelegramMethod('web_app_set_header_color', { color: bg });
   }
-  if (bottomBar) postTelegramMethod('web_app_set_bottom_bar_color', { color: bottomBar });
+  if (bottomBar) {
+    postTelegramMethod('web_app_set_bottom_bar_color', { color: bottomBar });
+  }
 }
 
 export function getColorScheme(): 'light' | 'dark' {

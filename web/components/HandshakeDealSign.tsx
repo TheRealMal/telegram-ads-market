@@ -142,6 +142,8 @@ export interface HandshakeDealSignProps {
   lessorSigned: boolean;
   lesseeSigned: boolean;
   isLessor: boolean;
+  bothPayoutsSet: boolean;
+  myWalletConnected: boolean;
   canSignNow: boolean;
   signing: boolean;
   onSignDeal: () => void;
@@ -150,25 +152,31 @@ export interface HandshakeDealSignProps {
 function getTipText(
   lessorSigned: boolean,
   lesseeSigned: boolean,
-  isLessor: boolean
+  isLessor: boolean,
+  bothPayoutsSet: boolean,
+  myWalletConnected: boolean
 ): string {
   const bothSigned = lessorSigned && lesseeSigned;
   if (bothSigned) return 'Deal signed.';
   const iSigned = isLessor ? lessorSigned : lesseeSigned;
   const otherSigned = isLessor ? lesseeSigned : lessorSigned;
-  if (iSigned && !otherSigned) return "Now we're waiting for the other side to sign the deal.";
-  return 'Both sides need to connect wallet to sign. Tap here to sign the deal.';
+  if (iSigned && !otherSigned) return 'Waiting for the other side to sign deal.';
+  if (bothPayoutsSet) return 'Tap here to sign a deal.';
+  if (myWalletConnected) return 'Waiting for the other side to connect wallet.';
+  return 'Both sides need to connect wallet to sign deal.';
 }
 
 export function HandshakeDealSign({
   lessorSigned,
   lesseeSigned,
   isLessor,
+  bothPayoutsSet,
+  myWalletConnected,
   canSignNow,
   signing,
   onSignDeal,
 }: HandshakeDealSignProps) {
-  const tipText = getTipText(lessorSigned, lesseeSigned, isLessor);
+  const tipText = getTipText(lessorSigned, lesseeSigned, isLessor, bothPayoutsSet, myWalletConnected);
   return (
     <div className="flex flex-col items-center gap-2 py-4">
       <button

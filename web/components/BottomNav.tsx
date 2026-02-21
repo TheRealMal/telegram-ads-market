@@ -54,7 +54,7 @@ export function BottomNav() {
     >
       <ul
         ref={listRef}
-        className="flex h-16 w-full items-stretch rounded-full bg-white/72 dark:bg-black/48 backdrop-blur-2xl backdrop-saturate-150"
+        className="flex h-16 w-full items-stretch rounded-full bg-white/72 dark:bg-black/48 backdrop-blur-md backdrop-saturate-150"
       >
         {navItems.map((item) => {
           const Icon = item.icon;
