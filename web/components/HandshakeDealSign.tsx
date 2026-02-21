@@ -58,7 +58,7 @@ function HandshakeAnimation({ leftReady, rightReady }: HandshakeAnimationProps) 
           transform: bothReady
             ? `translateY(-50%) translateX(${TRAVEL_DIST}px)`
             : 'translateY(-50%) translateX(0px)',
-          opacity: leftReady && !handsJoined ? 1 : 0,
+          opacity: handsJoined ? 0 : (leftReady ? 1 : 0.5),
           transition: [
             'transform 0.5s cubic-bezier(0.34,1.2,0.64,1)',
             'opacity 0.28s ease',
@@ -79,7 +79,7 @@ function HandshakeAnimation({ leftReady, rightReady }: HandshakeAnimationProps) 
           transform: bothReady
             ? `translateY(-50%) translateX(-${TRAVEL_DIST}px)`
             : 'translateY(-50%) translateX(0px)',
-          opacity: rightReady && !handsJoined ? 1 : 0,
+          opacity: handsJoined ? 0 : (rightReady ? 1 : 0.5),
           transition: [
             'transform 0.5s cubic-bezier(0.34,1.2,0.64,1)',
             'opacity 0.28s ease',
@@ -141,18 +141,34 @@ function HandshakeAnimation({ leftReady, rightReady }: HandshakeAnimationProps) 
 export interface HandshakeDealSignProps {
   lessorSigned: boolean;
   lesseeSigned: boolean;
+  isLessor: boolean;
   canSignNow: boolean;
   signing: boolean;
   onSignDeal: () => void;
 }
 
+function getTipText(
+  lessorSigned: boolean,
+  lesseeSigned: boolean,
+  isLessor: boolean
+): string {
+  const bothSigned = lessorSigned && lesseeSigned;
+  if (bothSigned) return 'Deal signed.';
+  const iSigned = isLessor ? lessorSigned : lesseeSigned;
+  const otherSigned = isLessor ? lesseeSigned : lessorSigned;
+  if (iSigned && !otherSigned) return "Now we're waiting for the other side to sign the deal.";
+  return 'Both sides need to connect wallet to sign. Tap here to sign the deal.';
+}
+
 export function HandshakeDealSign({
   lessorSigned,
   lesseeSigned,
+  isLessor,
   canSignNow,
   signing,
   onSignDeal,
 }: HandshakeDealSignProps) {
+  const tipText = getTipText(lessorSigned, lesseeSigned, isLessor);
   return (
     <div className="flex flex-col items-center gap-2 py-4">
       <button
@@ -165,7 +181,7 @@ export function HandshakeDealSign({
         <HandshakeAnimation leftReady={lessorSigned} rightReady={lesseeSigned} />
       </button>
       <p className="max-w-xs text-center text-xs text-muted-foreground">
-        Both sides need to connect wallet to sign. Tap here to sign the deal.
+        {tipText}
       </p>
     </div>
   );

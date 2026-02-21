@@ -645,13 +645,20 @@ export default function DealDetailPage() {
                   </>
                 )}
               </div>
-              {deal.status === 'draft' && !wallet && (
-                <p className="text-center text-xs text-muted-foreground">You need to connect wallet to make a deal.</p>
-              )}
             </div>
           )}
 
-          {/* Row: Jump into chat + View channel stats (each takes full width if alone) */}
+          <DealStatusRoadmap currentStatus={deal.status} />
+          <div className="flex flex-wrap gap-3 text-sm">
+            <span className={lessorSigned ? 'text-muted-foreground' : ''}>
+              Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}
+            </span>
+            <span className={lesseeSigned ? 'text-muted-foreground' : ''}>
+              Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
+            </span>
+          </div>
+
+          {/* Row: Jump into chat + View stats (under status bar; each takes full width if alone) */}
           <div className="flex flex-wrap gap-2">
             {deal.status !== 'rejected' && (
               <Button
@@ -672,12 +679,12 @@ export default function DealDetailPage() {
                 className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent"
               >
                 <BarChart3 size={18} />
-                View channel stats
+                View stats
               </Link>
             )}
           </div>
 
-          {/* Deposit to escrow - under Jump into chat for waiting_escrow_deposit */}
+          {/* Deposit to escrow - under buttons for waiting_escrow_deposit */}
           {deal.status === 'waiting_escrow_deposit' && (
             <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
               {isLessor && (
@@ -713,16 +720,6 @@ export default function DealDetailPage() {
             </div>
           )}
 
-          <DealStatusRoadmap currentStatus={deal.status} />
-          <div className="flex flex-wrap gap-3 text-sm">
-            <span className={lessorSigned ? 'text-muted-foreground' : ''}>
-              Lessor: {lessorSigned ? '✓ Signed' : 'Pending'}
-            </span>
-            <span className={lesseeSigned ? 'text-muted-foreground' : ''}>
-              Lessee: {lesseeSigned ? '✓ Signed' : 'Pending'}
-            </span>
-          </div>
-
           {/* Type, Duration, Price, Listing, Post date, Post text */}
           <p className="text-sm">
             <strong>Type:</strong> Post
@@ -756,11 +753,12 @@ export default function DealDetailPage() {
             </div>
           )}
 
-          {/* Draft: handshake (tap to sign) + tip */}
-          {deal.status === 'draft' && (isLessor || isLessee) && (
+          {/* Handshake: draft (tap to sign) and approved until waiting_escrow_deposit */}
+          {(deal.status === 'draft' || deal.status === 'approved') && (isLessor || isLessee) && (
             <HandshakeDealSign
               lessorSigned={lessorSigned}
               lesseeSigned={lesseeSigned}
+              isLessor={!!isLessor}
               canSignNow={!!canSignNow}
               signing={!!signing}
               onSignDeal={handleSignDeal}
