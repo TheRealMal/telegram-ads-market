@@ -22,9 +22,12 @@ import { HandshakeDealSign } from '@/components/HandshakeDealSign';
 
 export type RoadmapAlignment = 'left' | 'middle' | 'right';
 
-/** Per-current-status segment and alignment. alignment = where current status sits in the bar. */
-function getRoadmapSegment(current: DealStatus): { segment: DealStatus[]; alignment: RoadmapAlignment } {
-  const segment: DealStatus[] = (() => {
+/** Segment item: [status, completed]. completed = this step is reached (current or past). */
+export type SegmentItem = [DealStatus, boolean];
+
+/** Per-current-status segment with completion and alignment. */
+function getRoadmapSegment(current: DealStatus): { segment: SegmentItem[]; alignment: RoadmapAlignment } {
+  const statuses: DealStatus[] = (() => {
     switch (current) {
       case 'draft':
         return ['draft', 'approved', 'waiting_escrow_deposit'];
@@ -54,9 +57,12 @@ function getRoadmapSegment(current: DealStatus): { segment: DealStatus[]; alignm
         return ['draft', 'approved', 'waiting_escrow_deposit'];
     }
   })();
-  const idx = segment.indexOf(current);
+  const currentIdx = statuses.indexOf(current);
+  const safeIdx = currentIdx >= 0 ? currentIdx : 0;
+  const segment: SegmentItem[] = statuses.map((s, i) => [s, i <= safeIdx]);
+  const completedCount = segment.filter(([, c]) => c).length;
   const alignment: RoadmapAlignment =
-    idx <= 0 ? 'left' : idx >= segment.length - 1 ? 'right' : 'middle';
+    completedCount === segment.length ? 'right' : completedCount === 1 ? 'left' : 'middle';
   return { segment, alignment };
 }
 
@@ -83,7 +89,8 @@ function DealStatusRoadmap({
   const [tooltip, setTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
   const current = currentStatus as DealStatus;
   const { segment, alignment } = getRoadmapSegment(current);
-  const segmentCurrentIndex = segment.indexOf(current);
+  const completedCount = segment.filter(([, c]) => c).length;
+  const segmentCurrentIndex = segment.findIndex(([s]) => s === current);
   const effectiveIndex = segmentCurrentIndex >= 0 ? segmentCurrentIndex : 0;
 
   const justify =
@@ -102,9 +109,10 @@ function DealStatusRoadmap({
     setTimeout(() => setTooltip(null), 2500);
   };
 
-  const showLeftLine = effectiveIndex > 0;
-  // Always show right line + three dots (when 2 statuses, the "third" is the straight line then dots)
-  const showRightLine = segment.length > 0;
+  // All completed -> left line+dots, no right. Only first completed -> no left line, right line+dots. Two completed -> both lines.
+  const showLeftLine = completedCount >= 2;
+  const showRightLine = completedCount < segment.length;
+  const showFillerConnectorAfterLast = showRightLine && segment.length === 2;
 
   // viewBox 0 0 100 24: line thickness = dot (4 units); inflow = bigger bulge at circle (12 units), taper over 10 units
   const LINE_TOP = 10;
@@ -225,20 +233,17 @@ function DealStatusRoadmap({
         )}
 
         {/* Circles and connectors from segment */}
-        {segment.map((status, idx) => {
+        {segment.map(([status, completed], idx) => {
           const Icon = DEAL_STATUS_ICON[status];
           const label = getDealStatusLabel(status);
           const isCurrent = status === current;
-          const isPast = effectiveIndex >= 0 && idx < effectiveIndex;
-          const isPastOrCurrent = isCurrent || isPast;
           const nextIdx = idx + 1;
-          const nextIsPastOrCurrent = nextIdx <= effectiveIndex;
-          const isFutureSegment = !nextIsPastOrCurrent;
+          const nextCompleted = nextIdx < segment.length && segment[nextIdx]![1];
           const connectorColor =
-            nextIsPastOrCurrent
+            completed && (nextIdx >= segment.length || nextCompleted)
               ? 'text-foreground dark:text-white'
               : 'text-muted-foreground/70';
-          const isCurrentToNext = isCurrent && nextIdx > effectiveIndex;
+          const isCurrentToNext = isCurrent && nextIdx < segment.length && !segment[nextIdx]![1];
           return (
             <React.Fragment key={status}>
               <div className="relative z-10 flex flex-shrink-0 flex-col items-center">
@@ -261,7 +266,7 @@ function DealStatusRoadmap({
                       'flex items-center justify-center rounded-full border-0 transition-colors ' +
                       (isCurrent ? 'h-10 w-10' : 'h-9 w-9') +
                       ' ' +
-                      (isPastOrCurrent
+                      (completed
                         ? 'bg-primary text-primary-foreground dark:bg-white dark:text-black'
                         : 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground')
                     }
@@ -276,9 +281,9 @@ function DealStatusRoadmap({
                   className="flex-1 min-w-[24px] max-w-[80px]"
                   useGradient={isCurrentToNext}
                   gradientId={`connector-grad-${status}-${idx}`}
-                  useMutedFill={isFutureSegment && !isCurrentToNext}
+                  useMutedFill={!nextCompleted && !isCurrent}
                 />
-              ) : showRightLine ? (
+              ) : showFillerConnectorAfterLast ? (
                 <Connector
                   colorClass="text-muted-foreground/70"
                   className="flex-1 min-w-[24px] max-w-[80px]"
