@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { LISTING_CATEGORIES } from '@/lib/constants';
 import type { Channel, Listing } from '@/types';
@@ -35,9 +35,8 @@ export default function CreateListingPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    auth().then((res) => {
-      if (res.ok && res.data) {
-        setAuthToken(res.data);
+    ensureValidToken().then((token) => {
+      if (token) {
         setAuthed(true);
       } else {
         setAuthed(false);
@@ -77,12 +76,11 @@ export default function CreateListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const authRes = await auth();
-    if (!authRes.ok || !authRes.data) {
+    const token = await ensureValidToken();
+    if (!token) {
       setError('Open from Telegram to create a listing.');
       return;
     }
-    setAuthToken(authRes.data);
 
     const pricePairs: [string, number][] = [];
     for (const row of prices) {

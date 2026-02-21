@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import type { Listing } from '@/types';
 import { ListingCard } from '@/components/ListingCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
@@ -16,9 +16,8 @@ export default function MyListingsPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    auth().then((res) => {
-      if (res.ok && res.data) {
-        setAuthToken(res.data);
+    ensureValidToken().then((token) => {
+      if (token) {
         setAuthed(true);
       } else {
         setAuthed(false);

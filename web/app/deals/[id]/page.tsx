@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import { useTelegramBackButton, openTelegramLink } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
 import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
@@ -452,9 +452,8 @@ export default function DealDetailPage() {
   useEffect(() => {
     if (!rawAddress || walletSyncedRef.current) return;
     (async () => {
-      const authRes = await auth();
-      if (!authRes.ok || !authRes.data) return;
-      setAuthToken(authRes.data);
+      const token = await ensureValidToken();
+      if (!token) return;
       const res = await api<{ status: string }>('/api/v1/market/me/wallet', {
         method: 'PUT',
         body: JSON.stringify({ wallet_address: rawAddress }),
@@ -469,9 +468,8 @@ export default function DealDetailPage() {
     const isSide = (currentUserId === deal.lessor_id || currentUserId === deal.lessee_id) && deal.status === 'draft';
     if (!isSide) return;
     (async () => {
-      const authRes = await auth();
-      if (!authRes.ok || !authRes.data) return;
-      setAuthToken(authRes.data);
+      const token = await ensureValidToken();
+      if (!token) return;
       const res = await api<Deal>(`/api/v1/market/deals/${id}/payout-address`, {
         method: 'PUT',
         body: JSON.stringify({ wallet_address: rawAddress }),
@@ -547,12 +545,11 @@ export default function DealDetailPage() {
   }, []);
 
   const handleJumpIntoChat = async () => {
-    const authRes = await auth();
-    if (!authRes.ok || !authRes.data) {
+    const token = await ensureValidToken();
+    if (!token) {
       alert('Open from Telegram to use deal chat.');
       return;
     }
-    setAuthToken(authRes.data);
     setChatLinkLoading(true);
     try {
       const res = await api<{ chat_link: string }>(`/api/v1/market/deals/${id}/chat-link`, { method: 'POST' });
@@ -577,12 +574,11 @@ export default function DealDetailPage() {
   const canSignNow = (canSignAsLessor || canSignAsLessee) && wallet && bothPayoutsSet;
 
   const handleSignDeal = async () => {
-    const authRes = await auth();
-    if (!authRes.ok || !authRes.data) {
+    const token = await ensureValidToken();
+    if (!token) {
       alert('Open from Telegram to sign.');
       return;
     }
-    setAuthToken(authRes.data);
     setSigning(true);
     const res = await api<Deal>(`/api/v1/market/deals/${id}/sign`, { method: 'POST' });
     setSigning(false);
@@ -591,12 +587,11 @@ export default function DealDetailPage() {
   };
 
   const handleRejectDeal = async () => {
-    const authRes = await auth();
-    if (!authRes.ok || !authRes.data) {
+    const token = await ensureValidToken();
+    if (!token) {
       alert('Open from Telegram to reject.');
       return;
     }
-    setAuthToken(authRes.data);
     if (!confirm('Reject this deal? This cannot be undone.')) return;
     setRejecting(true);
     const res = await api<Deal>(`/api/v1/market/deals/${id}/reject`, { method: 'POST' });
@@ -675,9 +670,8 @@ export default function DealDetailPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        const authRes = await auth();
-                        if (authRes.ok && authRes.data) {
-                          setAuthToken(authRes.data);
+                        const token = await ensureValidToken();
+                        if (token) {
                           await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
                         }
                         walletSyncedRef.current = false;
@@ -880,9 +874,8 @@ export default function DealDetailPage() {
                         }
                       }
                       setDraftPostedAtError(null);
-                      const authRes = await auth();
-                      if (!authRes.ok || !authRes.data) return;
-                      setAuthToken(authRes.data);
+                      const token = await ensureValidToken();
+                      if (!token) return;
                       const r = priceRows[draftPriceIndex] ?? priceRows[0];
                       const type = r.duration + 'hr';
                       const duration = parseInt(r.duration, 10) || 24;

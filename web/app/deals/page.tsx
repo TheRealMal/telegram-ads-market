@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import type { Deal } from '@/types';
 import { DealCard } from '@/components/DealCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
@@ -13,9 +13,8 @@ export default function DealsPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    auth().then((res) => {
-      if (res.ok && res.data) {
-        setAuthToken(res.data);
+    ensureValidToken().then((token) => {
+      if (token) {
         setAuthed(true);
       } else {
         setAuthed(false);

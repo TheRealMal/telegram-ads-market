@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-react';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
 import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
 import type { Listing, Deal, Channel } from '@/types';
@@ -58,9 +58,8 @@ export default function ListingDetailPage() {
 
   useEffect(() => {
     if (!listing || !id) return;
-    auth().then((res) => {
-      if (!res.ok || !res.data) return;
-      setAuthToken(res.data);
+    ensureValidToken().then((token) => {
+      if (!token) return;
       api<Listing[]>('/api/v1/market/my-listings').then((myRes) => {
         if (myRes.ok && myRes.data) setIsOwner(myRes.data.some((l) => l.id === id));
       });
@@ -80,9 +79,8 @@ export default function ListingDetailPage() {
     setCreateDealChannelId(null);
     setShowCreateDealModal(true);
     if (listing?.type === 'lessee') {
-      const authRes = await auth();
-      if (authRes.ok && authRes.data) {
-        setAuthToken(authRes.data);
+      const token = await ensureValidToken();
+      if (token) {
         const res = await api<Channel[]>('/api/v1/market/my-channels');
         if (res.ok && res.data) setMyChannels(res.data);
         else setMyChannels([]);
@@ -93,12 +91,11 @@ export default function ListingDetailPage() {
   };
 
   const handleCreateDeal = async () => {
-    const authRes = await auth();
-    if (!authRes.ok || !authRes.data) {
+    const token = await ensureValidToken();
+    if (!token) {
       alert('Please open the app from Telegram to create a deal.');
       return;
     }
-    setAuthToken(authRes.data);
     const row = selectedPriceRow ?? priceRowsForListing[0];
     if (!row || !listing) {
       alert('No price configured for this listing.');

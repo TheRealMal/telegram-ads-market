@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { api, auth, setAuthToken } from '@/lib/api';
+import { api, ensureValidToken } from '@/lib/api';
 import { getTelegramUser } from '@/lib/initData';
 import type { Channel } from '@/types';
 import { ChannelCard } from '@/components/ChannelCard';
@@ -37,10 +37,9 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    auth()
-      .then((res) => {
-        if (res.ok && res.data) {
-          setAuthToken(res.data);
+    ensureValidToken()
+      .then((token) => {
+        if (token) {
           setHasToken(true);
         } else {
           setHasToken(false);
