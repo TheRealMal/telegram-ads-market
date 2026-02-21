@@ -18,24 +18,47 @@ import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { BarChart3, MessageCircle, FileEdit, FileCheck, Wallet, CircleCheck, Play, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import type { DealStatus } from '@/types';
-import { DEAL_STATUS_LABEL } from '@/types';
 import { HandshakeDealSign } from '@/components/HandshakeDealSign';
 
-/** Order of statuses for the roadmap (main flow + terminal). */
-const DEAL_STATUS_ROADMAP: DealStatus[] = [
-  'draft',
-  'approved',
-  'waiting_escrow_deposit',
-  'escrow_deposit_confirmed',
-  'in_progress',
-  'waiting_escrow_release',
-  'escrow_release_confirmed',
-  'completed',
-  'waiting_escrow_refund',
-  'escrow_refund_confirmed',
-  'expired',
-  'rejected',
-];
+export type RoadmapAlignment = 'left' | 'middle' | 'right';
+
+/** Per-current-status segment and alignment. alignment = where current status sits in the bar. */
+function getRoadmapSegment(current: DealStatus): { segment: DealStatus[]; alignment: RoadmapAlignment } {
+  const segment: DealStatus[] = (() => {
+    switch (current) {
+      case 'draft':
+        return ['draft', 'approved', 'waiting_escrow_deposit'];
+      case 'approved':
+        return ['draft', 'approved', 'waiting_escrow_deposit'];
+      case 'waiting_escrow_deposit':
+        return ['approved', 'waiting_escrow_deposit', 'escrow_deposit_confirmed'];
+      case 'escrow_deposit_confirmed':
+        return ['waiting_escrow_deposit', 'escrow_deposit_confirmed', 'in_progress'];
+      case 'in_progress':
+        return ['escrow_deposit_confirmed', 'in_progress', 'waiting_escrow_release'];
+      case 'waiting_escrow_release':
+        return ['in_progress', 'waiting_escrow_release', 'escrow_release_confirmed'];
+      case 'escrow_release_confirmed':
+        return ['waiting_escrow_release', 'escrow_release_confirmed', 'completed'];
+      case 'completed':
+        return ['waiting_escrow_release', 'escrow_release_confirmed', 'completed'];
+      case 'waiting_escrow_refund':
+        return ['in_progress', 'waiting_escrow_refund', 'escrow_refund_confirmed'];
+      case 'escrow_refund_confirmed':
+        return ['waiting_escrow_refund', 'escrow_refund_confirmed', 'completed'];
+      case 'expired':
+        return ['approved', 'waiting_escrow_deposit', 'expired'];
+      case 'rejected':
+        return ['draft', 'rejected'];
+      default:
+        return ['draft', 'approved', 'waiting_escrow_deposit'];
+    }
+  })();
+  const idx = segment.indexOf(current);
+  const alignment: RoadmapAlignment =
+    idx <= 0 ? 'left' : idx >= segment.length - 1 ? 'right' : 'middle';
+  return { segment, alignment };
+}
 
 const DEAL_STATUS_ICON: Record<DealStatus, typeof FileEdit> = {
   draft: FileEdit,
@@ -59,25 +82,16 @@ function DealStatusRoadmap({
 }) {
   const [tooltip, setTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
   const current = currentStatus as DealStatus;
-  const currentIndex = DEAL_STATUS_ROADMAP.indexOf(current);
-  const n = DEAL_STATUS_ROADMAP.length;
-
-  // Show only three: previous, current, next. First: current + 2 next (left). Last: 2 prev + current (right). Else: prev, current, next (center).
-  const indices: number[] =
-    currentIndex < 0
-      ? [0, 1, 2]
-      : currentIndex === 0
-        ? [0, 1, 2]
-        : currentIndex === n - 1
-          ? [n - 3, n - 2, n - 1]
-          : [currentIndex - 1, currentIndex, currentIndex + 1];
+  const { segment, alignment } = getRoadmapSegment(current);
+  const segmentCurrentIndex = segment.indexOf(current);
+  const effectiveIndex = segmentCurrentIndex >= 0 ? segmentCurrentIndex : 0;
 
   const justify =
-    currentIndex <= 0 ? 'justify-start' : currentIndex >= n - 1 ? 'justify-end' : 'justify-center';
+    alignment === 'left' ? 'justify-start' : alignment === 'right' ? 'justify-end' : 'justify-center';
 
   const handleTap = (status: DealStatus, event: React.MouseEvent<HTMLButtonElement>) => {
     if (status === current) return;
-    const label = DEAL_STATUS_LABEL[status];
+    const label = getDealStatusLabel(status);
     const rect = (event.target as HTMLElement).closest('button')?.getBoundingClientRect();
     if (!rect) return;
     setTooltip({
@@ -88,8 +102,9 @@ function DealStatusRoadmap({
     setTimeout(() => setTooltip(null), 2500);
   };
 
-  const showLeftLine = currentIndex > 0;
-  const showRightLine = currentIndex >= 0 && currentIndex < n - 1;
+  const showLeftLine = effectiveIndex > 0;
+  // Always show right line + three dots (when 2 statuses, the "third" is the straight line then dots)
+  const showRightLine = segment.length > 0;
 
   // viewBox 0 0 100 24: line thickness = dot (4 units); inflow = bigger bulge at circle (12 units), taper over 10 units
   const LINE_TOP = 10;
@@ -194,7 +209,7 @@ function DealStatusRoadmap({
   return (
     <div className="relative w-full py-4">
       <div className={`relative z-10 flex items-center ${justify} gap-0`}>
-        {/* Left: three dots by width (farthest→nearest: same, less wide, wider) + line with rounded end */}
+        {/* Left: three dots + line (always when there is a previous step) */}
         {showLeftLine && (
           <div className="flex min-w-0 flex-1 items-center justify-end gap-0">
             <span
@@ -209,22 +224,21 @@ function DealStatusRoadmap({
           </div>
         )}
 
-        {/* Three circles with exactly ONE connector between each pair (line that thickens at circles) */}
-        {indices.map((i, idx) => {
-          const status = DEAL_STATUS_ROADMAP[i];
+        {/* Circles and connectors from segment */}
+        {segment.map((status, idx) => {
           const Icon = DEAL_STATUS_ICON[status];
-          const label = DEAL_STATUS_LABEL[status];
+          const label = getDealStatusLabel(status);
           const isCurrent = status === current;
-          const isPast = currentIndex >= 0 && i < currentIndex;
+          const isPast = effectiveIndex >= 0 && idx < effectiveIndex;
           const isPastOrCurrent = isCurrent || isPast;
-          const nextIndex = idx + 1 < indices.length ? indices[idx + 1]! : -1;
-          const nextIsPastOrCurrent = nextIndex <= currentIndex;
+          const nextIdx = idx + 1;
+          const nextIsPastOrCurrent = nextIdx <= effectiveIndex;
           const isFutureSegment = !nextIsPastOrCurrent;
           const connectorColor =
             nextIsPastOrCurrent
               ? 'text-foreground dark:text-white'
               : 'text-muted-foreground/70';
-          const isCurrentToNext = isCurrent && nextIndex > currentIndex;
+          const isCurrentToNext = isCurrent && nextIdx > effectiveIndex;
           return (
             <React.Fragment key={status}>
               <div className="relative z-10 flex flex-shrink-0 flex-col items-center">
@@ -256,13 +270,19 @@ function DealStatusRoadmap({
                   </span>
                 </button>
               </div>
-              {idx < indices.length - 1 ? (
+              {idx < segment.length - 1 ? (
                 <Connector
                   colorClass={connectorColor}
                   className="flex-1 min-w-[24px] max-w-[80px]"
                   useGradient={isCurrentToNext}
                   gradientId={`connector-grad-${status}-${idx}`}
                   useMutedFill={isFutureSegment && !isCurrentToNext}
+                />
+              ) : showRightLine ? (
+                <Connector
+                  colorClass="text-muted-foreground/70"
+                  className="flex-1 min-w-[24px] max-w-[80px]"
+                  useMutedFill
                 />
               ) : null}
             </React.Fragment>
