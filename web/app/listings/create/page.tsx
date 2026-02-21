@@ -281,7 +281,7 @@ export default function CreateListingPage() {
                 <div className="flex-1">
                   <Input
                     type="text"
-                    placeholder="hours"
+                    placeholder="Hours"
                     value={row.duration}
                     onChange={(e) => updatePriceRow(index, 'duration', e.target.value)}
                   />
@@ -290,7 +290,7 @@ export default function CreateListingPage() {
                   <Input
                     type="text"
                     inputMode="decimal"
-                    placeholder="TON (e.g. 100 or 99.5)"
+                    placeholder="TON"
                     value={row.price}
                     onChange={(e) => updatePriceRow(index, 'price', e.target.value)}
                   />

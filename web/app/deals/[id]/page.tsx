@@ -361,6 +361,14 @@ function formatPostedAt(iso: string): string {
   }
 }
 
+function formatTimeLeftMs(ms: number): string {
+  if (ms <= 0) return '0:00';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function isoToDatetimeLocal(iso: string): string {
   if (!iso) return '';
   try {
@@ -400,6 +408,19 @@ export default function DealDetailPage() {
 
   const wallet = useTonWallet();
   const rawAddress = useTonAddress(false);
+
+  // Tick every second for deposit deadline countdown (updated_at + 1h)
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (deal?.status !== 'waiting_escrow_deposit') return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [deal?.status]);
+  const depositDeadlineMs = deal?.updated_at
+    ? new Date(deal.updated_at).getTime() + 60 * 60 * 1000
+    : 0;
+  const depositTimeLeftMs = Math.max(0, depositDeadlineMs - now);
+  const depositDeadlinePassed = deal?.status === 'waiting_escrow_deposit' && depositDeadlineMs > 0 && depositTimeLeftMs === 0;
   const [tonConnectUI] = useTonConnectUI();
 
   // Sync connected wallet to backend (raw format) so user can sign deals.
@@ -676,14 +697,18 @@ export default function DealDetailPage() {
             )}
           </div>
 
-          {/* Deposit to escrow - under buttons for waiting_escrow_deposit */}
-          {deal.status === 'waiting_escrow_deposit' && (
+          {/* No time left for deposit - both sides */}
+          {deal.status === 'waiting_escrow_deposit' && depositDeadlinePassed && (isLessor || isLessee) && (
+            <p className="text-sm text-destructive font-medium">
+              No time left for deposit, deal will be expired soon.
+            </p>
+          )}
+
+          {/* Deposit to escrow - lessee only, only when time left; timer on the right */}
+          {deal.status === 'waiting_escrow_deposit' && !depositDeadlinePassed && isLessee && deal.escrow_address != null && (
             <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-              {isLessor && (
-                <p className="text-muted-foreground">Waiting for lessee escrow deposit.</p>
-              )}
-              {isLessee && deal.escrow_address != null && (
-                <div className="space-y-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="space-y-2 min-w-0 flex-1">
                   <p className="font-medium">Deposit to escrow</p>
                   <p className="text-muted-foreground">
                     Amount: {deal.escrow_amount != null
@@ -698,6 +723,7 @@ export default function DealDetailPage() {
                   ) : (
                     <Button
                       size="sm"
+                      className="w-full"
                       onClick={handleDepositEscrow}
                       disabled={depositing || !deal.escrow_amount || deal.escrow_amount <= 0}
                     >
@@ -708,7 +734,11 @@ export default function DealDetailPage() {
                     <p className="text-xs text-destructive">{depositError}</p>
                   )}
                 </div>
-              )}
+                <div className="shrink-0 text-right tabular-nums text-muted-foreground">
+                  <p className="text-xs font-medium">Time left</p>
+                  <p className="text-lg font-semibold text-foreground">{formatTimeLeftMs(depositTimeLeftMs)}</p>
+                </div>
+              </div>
             </div>
           )}
 

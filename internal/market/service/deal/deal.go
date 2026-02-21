@@ -2,12 +2,17 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
+	"strings"
+	"time"
 
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
+
+const completedWorkerInterval = 30 * time.Second
 
 func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal, otherSideID int64) error {
 	d.Status = entity.DealStatusDraft
@@ -91,6 +96,9 @@ func (s *dealService) SignDeal(ctx context.Context, userID int64, dealID int64) 
 		existing.LesseePayoutAddress == nil || *existing.LesseePayoutAddress == "" {
 		return marketerrors.ErrPayoutNotSet
 	}
+	if strings.TrimSpace(domain.GetMessageFromDetails(existing.Details)) == "" {
+		return marketerrors.ErrDealDetailsMessageRequired
+	}
 	myPayout := *existing.LesseePayoutAddress
 	if userID == existing.LessorID {
 		myPayout = *existing.LessorPayoutAddress
@@ -162,4 +170,46 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	)
 
 	return nil
+}
+
+// ExpireTimedOutDeposits marks deals in waiting_escrow_deposit with updated_at before the given time as expired (e.g. on startup: olderThan = now - 1h).
+func (s *dealService) ExpireTimedOutDeposits(ctx context.Context, olderThan time.Time) error {
+	deals, err := s.dealRepo.ListDealsWaitingEscrowDepositOlderThan(ctx, olderThan)
+	if err != nil {
+		return err
+	}
+	for _, d := range deals {
+		slog.Info("expiring timed-out deposit deal", "deal_id", d.ID, "updated_at", d.UpdatedAt)
+		if err = s.dealRepo.SetDealStatusExpiredByDealID(ctx, d.ID); err != nil {
+			slog.Error("set deal status expired", "deal_id", d.ID, "error", err)
+			continue
+		}
+	}
+	return nil
+}
+
+// RunCompletedWorker moves deals from escrow_release_confirmed / escrow_refund_confirmed to completed (final status for frontend). Run in a goroutine.
+func (s *dealService) RunCompletedWorker(ctx context.Context) {
+	logger := slog.With("component", "deal_completed_worker")
+	ticker := time.NewTicker(completedWorkerInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			deals, err := s.dealRepo.ListDealsEscrowConfirmedToComplete(ctx)
+			if err != nil {
+				logger.Error("list deals to complete", "error", err)
+				continue
+			}
+			for _, d := range deals {
+				if err := s.dealRepo.SetDealStatusCompleted(ctx, d.ID); err != nil {
+					logger.Error("set deal completed", "deal_id", d.ID, "error", err)
+					continue
+				}
+				logger.Info("deal set completed", "deal_id", d.ID)
+			}
+		}
+	}
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/xssnick/tonutils-go/ton/wallet"
 )
 
-const escrowRedisTTL = 24 * time.Hour
+const escrowRedisTTL = 1 * time.Hour
 
 var ErrPayoutAddressNotSet = errors.New("payout address not set for deal")
 
@@ -39,8 +39,9 @@ type liteclient interface {
 	HasOutgoingTxTo(ctx context.Context, fromAddrRaw *address.Address, amountNanoton int64, toAddr *address.Address) (bool, error)
 }
 
-type redisSetter interface {
+type redisCache interface {
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	Del(ctx context.Context, keys ...string) error
 }
 
 type dealChatService interface {
@@ -50,14 +51,14 @@ type dealChatService interface {
 type service struct {
 	marketRepository marketRepository
 	liteclient       liteclient
-	redis            redisSetter
+	redis            redisCache
 	dealChatService  dealChatService
 
 	transactionGasNanoton int64
 	comissionMultiplier   float64
 }
 
-func NewService(marketRepository marketRepository, liteclient liteclient, redis redisSetter, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
+func NewService(marketRepository marketRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
 	return &service{
 		marketRepository:      marketRepository,
 		liteclient:            liteclient,

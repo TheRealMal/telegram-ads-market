@@ -61,6 +61,9 @@ func (s *service) processDepositEvents(ctx context.Context, eventService escrowD
 			logger.Error("set status", "deal_id", deal.ID, "error", err)
 			continue
 		}
+		if deal.EscrowAddress != nil && *deal.EscrowAddress != "" {
+			_ = s.redis.Del(ctx, *deal.EscrowAddress)
+		}
 		logger.Info("escrow deposit confirmed", "deal_id", deal.ID, "address", ev.Address)
 		ids = append(ids, ev.ID)
 	}

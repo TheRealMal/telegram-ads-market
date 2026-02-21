@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"ads-mrkt/cmd/builder"
@@ -78,6 +79,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			telegramClient := telegram.NewAPIClient(ctxRun, cfg.Telegram, redisClient)
 
 			repo := marketrepo.New(pg)
+
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
 			listingSvc := listingservice.NewListingService(repo, repo)
 			dealChatSvc := dealchatservice.NewService(repo, telegramClient, cfg.Telegram.BotUsername)
@@ -90,10 +92,18 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			channelSvc := channelservice.NewChannelService(repo, channelUpdateStatsEventSvc)
 			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc, telegramNotifyEventSvc)
 
+			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
+			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)
+			if errPreload := dealSvc.ExpireTimedOutDeposits(preloadCtx, time.Now().Add(-1*time.Hour)); errPreload != nil {
+				slog.Error("preload expire timed-out deposits", "error", errPreload)
+			}
+			preloadCancel()
+
 			go escrowSvc.Worker(ctxRun)
 			go escrowSvc.DepositStreamWorker(ctxRun, escrowDepositEventSvc)
 			go escrowSvc.ReleaseRefundWorker(ctxRun)
 			go dealpostmessage.RunPassedWorker(ctxRun, repo)
+			go dealSvc.RunCompletedWorker(ctxRun)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)

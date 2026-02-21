@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
 )
@@ -17,6 +18,10 @@ type dealRepository interface {
 	SignDealInTx(ctx context.Context, dealID int64, userID int64, sig string) error
 	SetDealPayoutAddress(ctx context.Context, dealID int64, userID int64, payoutAddressRaw string) error
 	SetDealStatusRejected(ctx context.Context, dealID int64) (bool, error)
+	ListDealsWaitingEscrowDepositOlderThan(ctx context.Context, before time.Time) ([]*entity.Deal, error)
+	SetDealStatusExpiredByDealID(ctx context.Context, dealID int64) error
+	ListDealsEscrowConfirmedToComplete(ctx context.Context) ([]*entity.Deal, error)
+	SetDealStatusCompleted(ctx context.Context, dealID int64) error
 }
 
 type userRepository interface {

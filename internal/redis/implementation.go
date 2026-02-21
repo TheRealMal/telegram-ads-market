@@ -11,6 +11,10 @@ func (c *Client) Set(ctx context.Context, key string, value interface{}, expirat
 	return c.client.Set(ctx, key, value, expiration).Err()
 }
 
+func (c *Client) Del(ctx context.Context, keys ...string) error {
+	return c.client.Del(ctx, keys...).Err()
+}
+
 func (c *Client) Decr(ctx context.Context, key string) (int64, error) {
 	return c.client.Decr(ctx, key).Result()
 }
