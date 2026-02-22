@@ -10,13 +10,19 @@ import (
 
 const refreshStatsCooldown = time.Hour
 
-type marketRepository interface {
+type channelRepository interface {
 	GetChannelByID(ctx context.Context, id int64) (*entity.Channel, error)
 	ListChannelsByAdminUserID(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	GetChannelStats(ctx context.Context, channelID int64) (json.RawMessage, error)
 	MergeStatsRequestedAt(ctx context.Context, channelID int64, requestedAtUnix int64) error
-	IsChannelHasActiveListing(ctx context.Context, channelID int64) (bool, error)
+}
+
+type channelAdminRepository interface {
 	IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error)
+}
+
+type listingRepository interface {
+	IsChannelHasActiveListing(ctx context.Context, channelID int64) (bool, error)
 }
 
 type channelUpdateStatsEventAdder interface {
@@ -24,13 +30,17 @@ type channelUpdateStatsEventAdder interface {
 }
 
 type channelService struct {
-	marketRepo            marketRepository
+	channelRepo           channelRepository
+	channelAdminRepo      channelAdminRepository
+	listingRepo           listingRepository
 	channelUpdateStatsAdder channelUpdateStatsEventAdder
 }
 
-func NewChannelService(marketRepo marketRepository, channelUpdateStatsAdder channelUpdateStatsEventAdder) *channelService {
+func NewChannelService(channelRepo channelRepository, channelAdminRepo channelAdminRepository, listingRepo listingRepository, channelUpdateStatsAdder channelUpdateStatsEventAdder) *channelService {
 	return &channelService{
-		marketRepo:             marketRepo,
+		channelRepo:             channelRepo,
+		channelAdminRepo:        channelAdminRepo,
+		listingRepo:             listingRepo,
 		channelUpdateStatsAdder: channelUpdateStatsAdder,
 	}
 }

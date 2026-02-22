@@ -11,27 +11,27 @@ import (
 
 // ListMyChannels returns all channels where the user is admin.
 func (s *channelService) ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error) {
-	return s.marketRepo.ListChannelsByAdminUserID(ctx, userID)
+	return s.channelRepo.ListChannelsByAdminUserID(ctx, userID)
 }
 
 // RequestStatsRefresh verifies the user is channel admin, rate-limits by requested_at (1 hour cooldown),
 // then merges requested_at, pushes a channel_update_stats event, and returns the channel.
 // Returns *marketerrors.ErrStatsRefreshTooSoon when within cooldown (caller should set response Data from NextAvailableAt).
 func (s *channelService) RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error) {
-	ok, err := s.marketRepo.IsChannelAdmin(ctx, userID, channelID)
+	ok, err := s.channelAdminRepo.IsChannelAdmin(ctx, userID, channelID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, marketerrors.ErrNotChannelAdmin
 	}
-	ch, err := s.marketRepo.GetChannelByID(ctx, channelID)
+	ch, err := s.channelRepo.GetChannelByID(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now().Unix()
-	raw, err := s.marketRepo.GetChannelStats(ctx, channelID)
+	raw, err := s.channelRepo.GetChannelStats(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *channelService) RequestStatsRefresh(ctx context.Context, channelID int6
 		return nil, err
 	}
 
-	if err := s.marketRepo.MergeStatsRequestedAt(ctx, channelID, now); err != nil {
+	if err := s.channelRepo.MergeStatsRequestedAt(ctx, channelID, now); err != nil {
 		return nil, err
 	}
 	if err := s.channelUpdateStatsAdder.AddChannelUpdateStatsEvent(ctx, channelID); err != nil {
@@ -80,12 +80,12 @@ func handleRawStatsRequestedAt(raw json.RawMessage, now int64) error {
 
 // GetChannelStats returns stats for the channel. Allowed only if user is channel admin or has an active listing with this channel_id.
 func (s *channelService) GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error) {
-	admin, err := s.marketRepo.IsChannelAdmin(ctx, userID, channelID)
+	admin, err := s.channelAdminRepo.IsChannelAdmin(ctx, userID, channelID)
 	if err != nil {
 		return nil, err
 	}
 	if !admin {
-		listed, err := s.marketRepo.IsChannelHasActiveListing(ctx, channelID)
+		listed, err := s.listingRepo.IsChannelHasActiveListing(ctx, channelID)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (s *channelService) GetChannelStats(ctx context.Context, channelID int64, u
 		}
 	}
 
-	raw, err := s.marketRepo.GetChannelStats(ctx, channelID)
+	raw, err := s.channelRepo.GetChannelStats(ctx, channelID)
 	if err != nil || raw == nil {
 		return nil, err
 	}
@@ -109,5 +109,5 @@ func (s *channelService) GetChannelStats(ctx context.Context, channelID int64, u
 
 // MergeStatsRequestedAt merges requested_at (unix timestamp) into the channel's stats JSON.
 func (s *channelService) MergeStatsRequestedAt(ctx context.Context, channelID int64, requestedAtUnix int64) error {
-	return s.marketRepo.MergeStatsRequestedAt(ctx, channelID, requestedAtUnix)
+	return s.channelRepo.MergeStatsRequestedAt(ctx, channelID, requestedAtUnix)
 }

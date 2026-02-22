@@ -8,7 +8,7 @@ import (
 	escrowdepositevent "ads-mrkt/internal/event/application/escrow_deposit/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/liteclient"
-	marketrepo "ads-mrkt/internal/market/repository/market"
+	"ads-mrkt/internal/market/repository/deal"
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
 
@@ -40,7 +40,7 @@ func Cmd(ctx context.Context, conf *config.Config) *cobra.Command {
 				return errors.Wrap(err, "liteclient")
 			}
 
-			dealRepo := marketrepo.New(pg)
+			dealRepo := deal.New(pg)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
 			obs := blockchain_observer.New(lc, redisClient.Client(), dealRepo, escrowDepositEventSvc, conf.Redis.DB)

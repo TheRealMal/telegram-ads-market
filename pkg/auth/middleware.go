@@ -1,16 +1,21 @@
 package auth
 
 import (
+	"ads-mrkt/pkg/auth/role"
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 )
 
 type TelegramIDContextKey struct{}
+type RoleContextKey struct{}
 
 var (
 	// TelegramIDKey is the context key for storing the Telegram user ID
 	telegramIDKey = TelegramIDContextKey{}
+	// RoleKey is the context key for storing the user role
+	roleKey = RoleContextKey{}
 )
 
 // AuthMiddleware handles JWT authentication for HTTP requests
@@ -26,7 +31,7 @@ func NewAuthMiddleware(jwtManager *JWTManager) *AuthMiddleware {
 }
 
 // WithAuth Middleware function to handle JWT authentication
-func (m *AuthMiddleware) WithAuth(next http.HandlerFunc) http.HandlerFunc {
+func (m *AuthMiddleware) WithAuth(next http.HandlerFunc, allowedRoles ...role.Role) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract token from Authorization header
 		authHeader := r.Header.Get("Authorization")
@@ -50,8 +55,20 @@ func (m *AuthMiddleware) WithAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		role, err := m.jwtManager.ExtractRole(tokenStr)
+		if err != nil {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+
+		if len(allowedRoles) > 0 && !slices.Contains(allowedRoles, role) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		// Add telegram ID to request context
 		ctx := context.WithValue(r.Context(), telegramIDKey, telegramID)
+		ctx = context.WithValue(ctx, roleKey, role)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -60,4 +77,10 @@ func (m *AuthMiddleware) WithAuth(next http.HandlerFunc) http.HandlerFunc {
 func GetTelegramID(ctx context.Context) (int64, bool) {
 	id, ok := ctx.Value(telegramIDKey).(int64)
 	return id, ok
+}
+
+// GetRole extracts the user role from the context
+func GetRole(ctx context.Context) (role.Role, bool) {
+	role, ok := ctx.Value(roleKey).(role.Role)
+	return role, ok
 }

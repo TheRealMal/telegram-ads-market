@@ -91,7 +91,7 @@ func (s *service) processPendingChannelUpdateStats(ctx context.Context, logger *
 func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *slog.Logger, events []*evententity.EventChannelUpdateStats) {
 	var ids []string
 	for _, ev := range events {
-		ch, err := s.marketRepository.GetChannelByID(ctx, ev.ChannelID)
+		ch, err := s.channelRepo.GetChannelByID(ctx, ev.ChannelID)
 		if err != nil {
 			logger.Error("get channel", "channel_id", ev.ChannelID, "error", err)
 			ids = append(ids, ev.ID)

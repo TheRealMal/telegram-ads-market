@@ -33,7 +33,7 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 	}
 	channel.AccessHash = channelEnt.AccessHash
 
-	if err = s.marketRepository.UpsertChannel(ctx, channel); err != nil {
+	if err = s.channelRepo.UpsertChannel(ctx, channel); err != nil {
 		return fmt.Errorf("failed to upsert channel id=%d: %w", update.ChannelID, err)
 	}
 
@@ -74,7 +74,7 @@ func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash i
 		return nil
 	}
 
-	if err = s.marketRepository.DeleteChannelAdmins(ctx, channelID); err != nil {
+	if err = s.channelAdminRepo.DeleteChannelAdmins(ctx, channelID); err != nil {
 		return fmt.Errorf("delete channel admins: %w", err)
 	}
 
@@ -91,7 +91,7 @@ func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash i
 		default:
 			continue
 		}
-		if err = s.marketRepository.UpsertChannelAdmin(ctx, userID, channelID, role); err != nil {
+		if err = s.channelAdminRepo.UpsertChannelAdmin(ctx, userID, channelID, role); err != nil {
 			return fmt.Errorf("upsert channel admin user_id=%d: %w", userID, err)
 		}
 		slog.Info("synced channel admin", "channel_id", channelID, "user_id", userID, "role", role)

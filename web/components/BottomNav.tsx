@@ -16,6 +16,9 @@ const navItems = [
 export function BottomNav() {
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Analytics dashboard is a direct-URL page, not in main nav
+  if (pathname.startsWith('/analytics')) return null;
   const listRef = useRef<HTMLUListElement>(null);
 
   const isActive = useCallback(

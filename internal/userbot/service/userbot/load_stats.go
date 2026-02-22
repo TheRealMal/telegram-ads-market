@@ -147,7 +147,7 @@ func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, acces
 		return fmt.Errorf("failed to marshal stats with requested_at: %w", err)
 	}
 
-	if err := s.marketRepository.UpsertChannelStats(ctx, channelID, jsonStats); err != nil {
+	if err := s.channelRepo.UpsertChannelStats(ctx, channelID, jsonStats); err != nil {
 		return fmt.Errorf("failed to upsert channel stats: %w", err)
 	}
 

@@ -19,7 +19,7 @@ const escrowRedisTTL = 1 * time.Hour
 
 var ErrPayoutAddressNotSet = errors.New("payout address not set for deal")
 
-type marketRepository interface {
+type dealRepository interface {
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealByEscrowAddress(ctx context.Context, escrowAddress string) (*entity.Deal, error)
 	ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error)
@@ -29,6 +29,9 @@ type marketRepository interface {
 	SetDealStatusEscrowDepositConfirmed(ctx context.Context, dealID int64) error
 	SetDealStatusEscrowReleaseConfirmed(ctx context.Context, dealID int64) error
 	SetDealStatusEscrowRefundConfirmed(ctx context.Context, dealID int64) error
+}
+
+type dealActionLockRepository interface {
 	TakeDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (string, error)
 	ReleaseDealActionLock(ctx context.Context, lockID string, status entity.DealActionLockStatus) error
 	GetLastDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (*entity.DealActionLock, error)
@@ -49,28 +52,29 @@ type dealChatService interface {
 }
 
 type service struct {
-	marketRepository marketRepository
-	liteclient       liteclient
-	redis            redisCache
-	dealChatService  dealChatService
-
-	transactionGasNanoton int64
-	comissionMultiplier   float64
+	dealRepo              dealRepository
+	dealActionLockRepo     dealActionLockRepository
+	liteclient             liteclient
+	redis                  redisCache
+	dealChatService        dealChatService
+	transactionGasNanoton  int64
+	comissionMultiplier    float64
 }
 
-func NewService(marketRepository marketRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
+func NewService(dealRepo dealRepository, dealActionLockRepo dealActionLockRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
 	return &service{
-		marketRepository:      marketRepository,
-		liteclient:            liteclient,
-		redis:                 redis,
-		dealChatService:       dealChatService,
+		dealRepo:             dealRepo,
+		dealActionLockRepo:   dealActionLockRepo,
+		liteclient:           liteclient,
+		redis:                redis,
+		dealChatService:     dealChatService,
 		transactionGasNanoton: int64(transactionGasTON * nanotonPerTON),
-		comissionMultiplier:   1 + (commissionPercent / 100.0),
+		comissionMultiplier:  1 + (commissionPercent / 100.0),
 	}
 }
 
 func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
-	deal, err := s.marketRepository.GetDealByID(ctx, dealID)
+	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return err
 	}
@@ -91,7 +95,7 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 	}
 
 	rawAddr := wallet.Address().StringRaw()
-	if err = s.marketRepository.SetDealEscrowAddress(ctx, dealID, rawAddr, strings.Join(seed, " ")); err != nil {
+	if err = s.dealRepo.SetDealEscrowAddress(ctx, dealID, rawAddr, strings.Join(seed, " ")); err != nil {
 		return err
 	}
 	if err = s.redis.Set(ctx, rawAddr, "1", escrowRedisTTL); err != nil {
@@ -104,7 +108,7 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 // Takes a 5-minute lock, sends deal.EscrowAmount (nanoton) to the payout address, then marks lock and deal status.
 // Deal must have lessor_payout_address (release) or lessee_payout_address (refund) set.
 func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger, dealID int64, release bool) error {
-	deal, err := s.marketRepository.GetDealByID(ctx, dealID)
+	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return err
 	}
@@ -151,35 +155,35 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 	}
 
 	// If the last lock for this action is Locked and expired, previous run may have transferred then crashed: try to find outgoing tx by amount and recover.
-	lastLock, lerr := s.marketRepository.GetLastDealActionLock(ctx, dealID, actionType)
+	lastLock, lerr := s.dealActionLockRepo.GetLastDealActionLock(ctx, dealID, actionType)
 	if lerr == nil && lastLock != nil && lastLock.Status == entity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
 		found, _ := s.liteclient.HasOutgoingTxTo(ctx, escrowAddr, amountNanoton, toAddr)
 		if found {
 			if release {
-				if err = s.marketRepository.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
+				if err = s.dealRepo.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
 					return err
 				}
 			} else {
-				if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
+				if err = s.dealRepo.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
 					return err
 				}
 			}
-			_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusCompleted)
+			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusCompleted)
 			_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
 			logger.Info("escrow release/refund recovered from expired lock", "deal_id", dealID, "release", release)
 			return nil
 		}
-		_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
 	}
 
 	err = func() error {
-		lockID, err := s.marketRepository.TakeDealActionLock(ctx, dealID, actionType)
+		lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, dealID, actionType)
 		if err != nil {
 			return err
 		}
 		dealACtionLockStatus := entity.DealActionLockStatusFailed
 		defer func() {
-			_ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, dealACtionLockStatus)
+			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, dealACtionLockStatus)
 		}()
 
 		if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
@@ -188,11 +192,11 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 		}
 
 		if release {
-			if err = s.marketRepository.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
+			if err = s.dealRepo.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
 				return err
 			}
 		} else {
-			if err = s.marketRepository.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
+			if err = s.dealRepo.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
 				return err
 			}
 		}

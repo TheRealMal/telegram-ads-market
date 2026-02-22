@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"ads-mrkt/cmd/builder"
+	analyticshttp "ads-mrkt/internal/analytics/application/http"
+	analyticsrepo "ads-mrkt/internal/analytics/repository"
+	analyticsservice "ads-mrkt/internal/analytics/service"
 	"ads-mrkt/internal/config"
 	channelupdateevent "ads-mrkt/internal/event/application/channel_update_stats/event"
 	escrowdepositevent "ads-mrkt/internal/event/application/escrow_deposit/event"
@@ -14,7 +17,14 @@ import (
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/liteclient"
 	"ads-mrkt/internal/market/application/market/http"
-	marketrepo "ads-mrkt/internal/market/repository/market"
+	"ads-mrkt/internal/market/repository/channel"
+	"ads-mrkt/internal/market/repository/channel_admin"
+	"ads-mrkt/internal/market/repository/deal"
+	"ads-mrkt/internal/market/repository/deal_action_lock"
+	"ads-mrkt/internal/market/repository/deal_forum_topic"
+	"ads-mrkt/internal/market/repository/deal_post_message"
+	"ads-mrkt/internal/market/repository/listing"
+	"ads-mrkt/internal/market/repository/user"
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
@@ -78,20 +88,30 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			// Telegram API client (for welcome message + middleware secret token)
 			telegramClient := telegram.NewAPIClient(ctxRun, cfg.Telegram, redisClient)
 
-			repo := marketrepo.New(pg)
+			listingRepo := listing.New(pg)
+			channelRepo := channel.New(pg)
+			userRepo := user.New(pg)
+			channelAdminRepo := channel_admin.New(pg)
+			dealRepo := deal.New(pg)
+			dealPostMessageRepo := deal_post_message.New(pg)
+			dealActionLockRepo := deal_action_lock.New(pg)
+			dealForumTopicRepo := deal_forum_topic.New(pg)
 
-			userSvc := userservice.NewUserService(cfg.Telegram.Token, repo)
-			listingSvc := listingservice.NewListingService(repo, repo)
-			dealChatSvc := dealchatservice.NewService(repo, telegramClient, cfg.Telegram.BotUsername)
-			escrowSvc := escrowservice.NewService(repo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
+			analyticsRepo := analyticsrepo.New(pg)
+			analyticsSvc := analyticsservice.New(analyticsRepo, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
+
+			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
+			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
+			escrowSvc := escrowservice.NewService(dealRepo, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
 			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
 			telegramNotifyEventSvc := telegramnotifyevent.NewService(eventRepo)
 
-			channelSvc := channelservice.NewChannelService(repo, channelUpdateStatsEventSvc)
-			dealSvc := dealservice.NewDealService(repo, repo, escrowSvc, telegramNotifyEventSvc)
-			dealPostMessageSvc := dealpostmessage.NewService(repo)
+			channelSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
+			dealSvc := dealservice.NewDealService(dealRepo, userRepo, escrowSvc, telegramNotifyEventSvc)
+			dealPostMessageSvc := dealpostmessage.NewService(dealPostMessageRepo)
 			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
 			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)
 			if errPreload := dealSvc.ExpireTimedOutDeposits(preloadCtx, time.Now().Add(-1*time.Hour)); errPreload != nil {
@@ -104,6 +124,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			go escrowSvc.ReleaseRefundWorker(ctxRun)
 			go dealPostMessageSvc.RunPassedWorker(ctxRun)
 			go dealSvc.RunCompletedWorker(ctxRun)
+			go analyticsSvc.Run(ctxRun)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)
@@ -117,7 +138,8 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return nil
 			})
 
-			router := marketrouter.NewRouter(cfg.Server, handler, authMiddleware)
+			analyticsHandler := analyticshttp.NewHandler(analyticsSvc)
+			router := marketrouter.NewRouter(cfg.Server, handler, authMiddleware, analyticsHandler)
 
 			go srv.Start(ctxRun, router.GetRoutes())
 

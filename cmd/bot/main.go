@@ -11,7 +11,8 @@ import (
 	eventtelegram "ads-mrkt/internal/event/application/telegram_update/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
-	marketrepo "ads-mrkt/internal/market/repository/market"
+	"ads-mrkt/internal/market/repository/deal"
+	"ads-mrkt/internal/market/repository/deal_forum_topic"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
@@ -69,8 +70,9 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return errors.Wrap(err, "postgres")
 			}
 
-			marketRepo := marketrepo.New(pg)
-			dealChatSvc := dealchatservice.NewService(marketRepo, telegramClient, cfg.Telegram.BotUsername)
+			dealRepo := deal.New(pg)
+			dealForumTopicRepo := deal_forum_topic.New(pg)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
 
 			// Bot updates service
 			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc)

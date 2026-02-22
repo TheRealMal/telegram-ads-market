@@ -42,7 +42,7 @@ func (s *service) processDepositEvents(ctx context.Context, eventService escrowD
 	}
 	var ids []string
 	for _, ev := range events {
-		deal, err := s.marketRepository.GetDealByEscrowAddress(ctx, ev.Address)
+		deal, err := s.dealRepo.GetDealByEscrowAddress(ctx, ev.Address)
 		if err != nil {
 			logger.Error("get deal", "address", ev.Address, "error", err)
 			ids = append(ids, ev.ID)
@@ -57,7 +57,7 @@ func (s *service) processDepositEvents(ctx context.Context, eventService escrowD
 			ids = append(ids, ev.ID)
 			continue
 		}
-		if err := s.marketRepository.SetDealStatusEscrowDepositConfirmed(ctx, deal.ID); err != nil {
+		if err := s.dealRepo.SetDealStatusEscrowDepositConfirmed(ctx, deal.ID); err != nil {
 			logger.Error("set status", "deal_id", deal.ID, "error", err)
 			continue
 		}

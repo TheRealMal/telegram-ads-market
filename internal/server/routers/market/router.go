@@ -5,6 +5,7 @@ import (
 
 	"ads-mrkt/internal/server"
 	serverconfig "ads-mrkt/internal/server/config"
+	"ads-mrkt/pkg/auth/role"
 )
 
 type handler interface {
@@ -32,21 +33,29 @@ type handler interface {
 }
 
 type authMiddleware interface {
-	WithAuth(next http.HandlerFunc) http.HandlerFunc
+	WithAuth(next http.HandlerFunc, allowedRoles ...role.Role) http.HandlerFunc
+}
+
+// AnalyticsHandler serves analytics snapshot endpoints (optional).
+type AnalyticsHandler interface {
+	GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
 
 type Router struct {
 	Config serverconfig.Config
 
-	handler        handler
-	authMiddleware authMiddleware
+	handler          handler
+	authMiddleware   authMiddleware
+	analyticsHandler AnalyticsHandler // optional; when set, registers /api/v1/analytics/* routes
 }
 
-func NewRouter(config serverconfig.Config, handler handler, authMiddleware authMiddleware) *Router {
+func NewRouter(config serverconfig.Config, handler handler, authMiddleware authMiddleware, analyticsHandler AnalyticsHandler) *Router {
 	return &Router{
-		Config:         config,
-		handler:        handler,
-		authMiddleware: authMiddleware,
+		Config:           config,
+		handler:          handler,
+		authMiddleware:   authMiddleware,
+		analyticsHandler: analyticsHandler,
 	}
 }
 
@@ -250,6 +259,27 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.GetOrCreateDealChatLink),
 				http.MethodPost,
 			),
+		),
+		"/api/v1",
+	))
+
+	mux.HandleFunc("GET /api/v1/analytics/snapshot/latest", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.analyticsHandler.GetLatestSnapshot),
+				http.MethodGet,
+			),
+			role.AdminRole,
+		),
+		"/api/v1",
+	))
+	mux.HandleFunc("GET /api/v1/analytics/snapshot/history", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.analyticsHandler.GetSnapshotHistory),
+				http.MethodGet,
+			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))

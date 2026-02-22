@@ -17,8 +17,11 @@ type telegramForum interface {
 	CopyMessage(ctx context.Context, fromChatID int64, messageID int64, toChatID int64, toMessageThreadID *int64) (copiedMessageID int64, err error)
 }
 
-type marketRepository interface {
+type dealRepository interface {
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
+}
+
+type dealForumTopicRepository interface {
 	InsertDealForumTopic(ctx context.Context, t *entity.DealForumTopic) error
 	GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*entity.DealForumTopic, error)
 	GetDealForumTopicByChatAndThread(ctx context.Context, chatID int64, messageThreadID int64) (*entity.DealForumTopic, string, error)
@@ -26,17 +29,19 @@ type marketRepository interface {
 }
 
 type service struct {
-	marketRepo    marketRepository
-	telegramForum telegramForum
-	botUsername   string
+	dealRepo       dealRepository
+	forumTopicRepo dealForumTopicRepository
+	telegramForum  telegramForum
+	botUsername    string
 }
 
 // NewService creates the deal chat service. Topics are created in each user's chat (lessor/lessee user id). botUsername is used for the "Jump into chat" link. Pass empty to disable.
-func NewService(marketRepo marketRepository, telegramForum telegramForum, botUsername string) *service {
+func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, botUsername string) *service {
 	return &service{
-		marketRepo:    marketRepo,
-		telegramForum: telegramForum,
-		botUsername:   strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
+		dealRepo:       dealRepo,
+		forumTopicRepo: forumTopicRepo,
+		telegramForum:  telegramForum,
+		botUsername:    strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
 	}
 }
 
@@ -45,7 +50,7 @@ func (s *service) GetOrCreateDealForumChat(ctx context.Context, dealID int64, us
 	if s.telegramForum == nil {
 		return "", ErrForumNotConfigured
 	}
-	deal, err := s.marketRepo.GetDealByID(ctx, dealID)
+	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +61,7 @@ func (s *service) GetOrCreateDealForumChat(ctx context.Context, dealID int64, us
 		return "", marketerrors.ErrUnauthorizedSide
 	}
 
-	existing, err := s.marketRepo.GetDealForumTopicByDealID(ctx, dealID)
+	existing, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
 	if err != nil {
 		return "", fmt.Errorf("get deal forum topic: %w", err)
 	}
@@ -81,7 +86,7 @@ func (s *service) GetOrCreateDealForumChat(ctx context.Context, dealID int64, us
 		LessorMessageThreadID: lessorThreadID,
 		LesseeMessageThreadID: lesseeThreadID,
 	}
-	if err = s.marketRepo.InsertDealForumTopic(ctx, t); err != nil {
+	if err = s.forumTopicRepo.InsertDealForumTopic(ctx, t); err != nil {
 		_ = s.telegramForum.DeleteForumTopic(ctx, deal.LessorID, lessorThreadID)
 		_ = s.telegramForum.DeleteForumTopic(ctx, deal.LesseeID, lesseeThreadID)
 		return "", fmt.Errorf("insert deal forum topic: %w", err)
@@ -110,13 +115,13 @@ func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error 
 	if s.telegramForum == nil {
 		return nil
 	}
-	t, err := s.marketRepo.GetDealForumTopicByDealID(ctx, dealID)
+	t, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
 	if err != nil || t == nil {
 		return err
 	}
 	_ = s.telegramForum.DeleteForumTopic(ctx, t.LessorChatID, t.LessorMessageThreadID)
 	_ = s.telegramForum.DeleteForumTopic(ctx, t.LesseeChatID, t.LesseeMessageThreadID)
-	return s.marketRepo.DeleteDealForumTopic(ctx, dealID)
+	return s.forumTopicRepo.DeleteDealForumTopic(ctx, dealID)
 }
 
 // CopyMessageToOtherTopic copies a message from one side's topic to the other. chatID and messageThreadID identify the sender's chat and topic.
@@ -124,7 +129,7 @@ func (s *service) CopyMessageToOtherTopic(ctx context.Context, chatID int64, mes
 	if s.telegramForum == nil {
 		return nil
 	}
-	t, side, err := s.marketRepo.GetDealForumTopicByChatAndThread(ctx, chatID, messageThreadID)
+	t, side, err := s.forumTopicRepo.GetDealForumTopicByChatAndThread(ctx, chatID, messageThreadID)
 	if err != nil || t == nil {
 		return err
 	}

@@ -1,13 +1,30 @@
-package repository
+package user
 
 import (
 	"context"
 	"errors"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/pkg/auth/role"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 type userRow struct {
 	ID            int64   `db:"id"`
@@ -19,13 +36,13 @@ type userRow struct {
 	ReferrerID    int64   `db:"referrer_id"`
 	AllowsPM      bool    `db:"allows_pm"`
 	WalletAddress *string `db:"wallet_address"`
+	Role          string  `db:"role"`
 }
 
 func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
-	// Not updating referrer_id as it's not updatable
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO market.user (id, username, photo, first_name, last_name, locale, referrer_id, allows_pm)
-		VALUES (@id, @username, @photo, @first_name, @last_name, @locale, @referrer_id, @allows_pm)
+		INSERT INTO market.user (id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, role)
+		VALUES (@id, @username, @photo, @first_name, @last_name, @locale, @referrer_id, @allows_pm, @role)
 		ON CONFLICT (id) DO UPDATE SET
 			username = EXCLUDED.username,
 			photo = EXCLUDED.photo,
@@ -43,13 +60,14 @@ func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
 			"locale":      u.Locale,
 			"referrer_id": u.ReferrerID,
 			"allows_pm":   u.AllowsPM,
+			"role":        string(u.Role),
 		})
 	return err
 }
 
 func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, wallet_address
+		SELECT id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, wallet_address, role
 		FROM market.user WHERE id = @id`,
 		pgx.NamedArgs{"id": id})
 	if err != nil {
@@ -65,7 +83,7 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 		return nil, err
 	}
 
-	return &entity.User{
+	u := &entity.User{
 		ID:            row.ID,
 		Username:      row.Username,
 		Photo:         row.Photo,
@@ -75,7 +93,9 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 		ReferrerID:    row.ReferrerID,
 		AllowsPM:      row.AllowsPM,
 		WalletAddress: row.WalletAddress,
-	}, nil
+		Role:          role.Role(row.Role),
+	}
+	return u, nil
 }
 
 func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
@@ -85,7 +105,6 @@ func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddr
 	return err
 }
 
-// ClearUserWallet removes the user's linked wallet (disconnect).
 func (r *repository) ClearUserWallet(ctx context.Context, userID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.user SET wallet_address = NULL, updated_at = NOW() WHERE id = @id`,

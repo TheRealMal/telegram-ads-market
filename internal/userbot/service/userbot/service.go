@@ -19,20 +19,34 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-type marketRepository interface {
+type channelRepository interface {
 	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
 	UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error
 	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
 	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
+}
+
+type channelAdminRepository interface {
 	DeleteChannelAdmins(ctx context.Context, channelID int64) error
 	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error
-	// Deal post message workers
-	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
+}
+
+type listingRepository interface {
 	GetListingByID(ctx context.Context, id int64) (*marketentity.Listing, error)
+}
+
+type dealRepository interface {
+	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
+}
+
+type dealPostMessageRepository interface {
 	CreateDealPostMessageAndSetDealInProgress(ctx context.Context, m *marketentity.DealPostMessage) error
 	UpdateDealPostMessageStatus(ctx context.Context, id int64, status marketentity.DealPostMessageStatus) error
 	UpdateDealPostMessageStatusAndNextCheck(ctx context.Context, id int64, status marketentity.DealPostMessageStatus, nextCheck time.Time) error
 	ListDealPostMessageExistsWithNextCheckBefore(ctx context.Context, before time.Time) ([]*marketentity.DealPostMessage, error)
+}
+
+type dealActionLockRepository interface {
 	TakeDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (string, error)
 	ReleaseDealActionLock(ctx context.Context, lockID string, status marketentity.DealActionLockStatus) error
 	GetLastDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (*marketentity.DealActionLock, error)
@@ -47,7 +61,12 @@ type channelUpdateStatsEventService interface {
 
 type service struct {
 	stateStorage               updates.StateStorage
-	marketRepository           marketRepository
+	channelRepo                channelRepository
+	channelAdminRepo           channelAdminRepository
+	listingRepo                listingRepository
+	dealRepo                   dealRepository
+	dealPostMessageRepo        dealPostMessageRepository
+	dealActionLockRepo         dealActionLockRepository
 	channelUpdateStatsEventSvc channelUpdateStatsEventService
 	telegramClient             *telegram.Client
 	authFlow                   auth.Flow
@@ -55,10 +74,15 @@ type service struct {
 	userID                     int64
 }
 
-func New(cfg config.Config, stateStorage updates.StateStorage, marketRepository marketRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService) *service {
+func New(cfg config.Config, stateStorage updates.StateStorage, channelRepo channelRepository, channelAdminRepo channelAdminRepository, listingRepo listingRepository, dealRepo dealRepository, dealPostMessageRepo dealPostMessageRepository, dealActionLockRepo dealActionLockRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService) *service {
 	s := &service{
 		stateStorage:               stateStorage,
-		marketRepository:           marketRepository,
+		channelRepo:                channelRepo,
+		channelAdminRepo:           channelAdminRepo,
+		listingRepo:                listingRepo,
+		dealRepo:                   dealRepo,
+		dealPostMessageRepo:        dealPostMessageRepo,
+		dealActionLockRepo:         dealActionLockRepo,
 		channelUpdateStatsEventSvc: channelUpdateStatsEventSvc,
 	}
 

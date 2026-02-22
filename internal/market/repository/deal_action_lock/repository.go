@@ -1,4 +1,4 @@
-package repository
+package deal_action_lock
 
 import (
 	"context"
@@ -8,9 +8,25 @@ import (
 	"ads-mrkt/internal/market/domain/entity"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
 const dealActionLockTTL = 5 * time.Minute
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 type dealActionLockRow struct {
 	ID         string    `db:"id"`
@@ -82,7 +98,6 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 	return row.ID, nil
 }
 
-// GetLastDealActionLock returns the most recent lock (by created_at) for the given deal and action type, if any.
 func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (*entity.DealActionLock, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, deal_id, action_type, status, expire_at, created_at, updated_at
@@ -117,8 +132,6 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 	}, nil
 }
 
-// GetExpiredDealActionLock returns the ID of an expired lock (status=locked, expire_at <= now) for the given deal and action type, if any.
-// Used to detect "lock was held, app crashed after posting, lock expired" and recover by finding the message in the channel.
 func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (lockID string, ok bool, err error) {
 	lock, err := r.GetLastDealActionLock(ctx, dealID, actionType)
 	if err != nil || lock == nil {
@@ -130,7 +143,6 @@ func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64,
 	return lock.ID, true, nil
 }
 
-// ReleaseDealActionLock sets the lock status to completed or failed.
 func (r *repository) ReleaseDealActionLock(ctx context.Context, lockID string, status entity.DealActionLockStatus) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal_action_lock SET status = @status, updated_at = NOW() WHERE id = @id`,

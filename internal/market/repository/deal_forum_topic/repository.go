@@ -1,4 +1,4 @@
-package repository
+package deal_forum_topic
 
 import (
 	"context"
@@ -8,7 +8,23 @@ import (
 	"ads-mrkt/internal/market/domain/entity"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 func (r *repository) InsertDealForumTopic(ctx context.Context, t *entity.DealForumTopic) error {
 	_, err := r.db.Exec(ctx, `
@@ -61,7 +77,6 @@ func (r *repository) GetDealForumTopicByDealID(ctx context.Context, dealID int64
 	}, nil
 }
 
-// GetDealForumTopicByChatAndThread returns the deal topic and which side ("lessor" or "lessee") for the given chat and thread.
 func (r *repository) GetDealForumTopicByChatAndThread(ctx context.Context, chatID int64, messageThreadID int64) (*entity.DealForumTopic, string, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT deal_id, lessor_chat_id, lessee_chat_id, lessor_message_thread_id, lessee_message_thread_id, created_at, updated_at

@@ -7,6 +7,7 @@ import (
 
 	apperrors "ads-mrkt/internal/errors"
 	"ads-mrkt/pkg/auth"
+	"ads-mrkt/pkg/auth/role"
 
 	_ "ads-mrkt/internal/server/templates/response"
 )
@@ -53,7 +54,7 @@ func (h *handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 		}
 	}
 
-	token, err := h.jwtManager.GenerateToken(user.ID)
+	token, err := h.jwtManager.GenerateToken(user.ID, role.Role(user.Role))
 	if err != nil {
 		return nil, apperrors.ServiceError{
 			Err:     err,

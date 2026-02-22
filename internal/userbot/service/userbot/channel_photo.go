@@ -22,7 +22,7 @@ func (s *service) updateChannelPhotoFromTelegram(ctx context.Context, channelID,
 		return
 	}
 	photoBase64 := base64.StdEncoding.EncodeToString(photoBytes)
-	if err := s.marketRepository.UpdateChannelPhoto(ctx, channelID, photoBase64); err != nil {
+	if err := s.channelRepo.UpdateChannelPhoto(ctx, channelID, photoBase64); err != nil {
 		slog.Error("update channel photo", "channel_id", channelID, "error", err)
 		return
 	}

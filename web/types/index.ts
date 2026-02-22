@@ -90,3 +90,34 @@ export interface Deal {
   created_at: string;
   updated_at: string;
 }
+
+// Analytics (admin-only)
+export interface AnalyticsSnapshot {
+  id: number;
+  recorded_at: string;
+  listings_count: number;
+  deals_count: number;
+  deals_by_status: Record<string, number>;
+  deal_amounts_by_status_ton: Record<string, number>;
+  commission_earned_nanoton: number;
+  users_count: number;
+  avg_listings_per_user: number;
+}
+
+export interface LatestSnapshotResponse {
+  snapshot: AnalyticsSnapshot | null;
+}
+
+export interface AnalyticsHistoryResponse {
+  period: string;
+  from: string;
+  to: string;
+  timestamps: number[];
+  listings_count: number[];
+  deals_count: number[];
+  users_count: number[];
+  commission_earned_nanoton: number[];
+  avg_listings_per_user: number[];
+  deals_by_status: Record<string, number[]>;
+  deal_amounts_by_status_ton: Record<string, number[]>;
+}

@@ -35,18 +35,18 @@ func (s *service) RunDealPostSenderWorker(ctx context.Context) {
 }
 
 func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger) {
-	deals, err := s.marketRepository.ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx)
+	deals, err := s.dealRepo.ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx)
 	if err != nil {
 		logger.Error("list deals", "error", err)
 		return
 	}
 	for _, deal := range deals {
-		listing, err := s.marketRepository.GetListingByID(ctx, deal.ListingID)
+		listing, err := s.listingRepo.GetListingByID(ctx, deal.ListingID)
 		if err != nil || listing == nil || listing.ChannelID == nil {
 			logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
 			continue
 		}
-		channel, err := s.marketRepository.GetChannelByID(ctx, *listing.ChannelID)
+		channel, err := s.channelRepo.GetChannelByID(ctx, *listing.ChannelID)
 		if err != nil || channel == nil {
 			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
 			continue
@@ -62,7 +62,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 		}
 
 		// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
-		lastLock, err := s.marketRepository.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+		lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
 		if err != nil {
 			logger.Error("get last lock", "deal_id", deal.ID, "error", err)
 			continue
@@ -80,25 +80,25 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 					NextCheck:   nextCheck,
 					UntilTs:     untilTs,
 				}
-				if err := s.marketRepository.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+				if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
 					logger.Error("recover create deal_post_message", "deal_id", deal.ID, "error", err)
-					_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+					_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
 					continue
 				}
-				_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusCompleted)
+				_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusCompleted)
 				logger.Info("recovered post from channel", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", foundMsgID)
 				continue
 			}
-			_ = s.marketRepository.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
 		}
 
-		lockID, err := s.marketRepository.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+		lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
 		if err != nil {
 			logger.Debug("skip deal, lock not acquired", "deal_id", deal.ID, "error", err)
 			continue
 		}
 		releaseLock := func(status marketentity.DealActionLockStatus) {
-			_ = s.marketRepository.ReleaseDealActionLock(ctx, lockID, status)
+			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, status)
 		}
 
 		msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text)
@@ -118,7 +118,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			NextCheck:   nextCheck,
 			UntilTs:     untilTs,
 		}
-		if err := s.marketRepository.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+		if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
 			logger.Error("create deal_post_message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
 			continue
@@ -172,14 +172,14 @@ func (s *service) RunDealPostCheckerWorker(ctx context.Context) {
 }
 
 func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logger) {
-	list, err := s.marketRepository.ListDealPostMessageExistsWithNextCheckBefore(ctx, time.Now())
+	list, err := s.dealPostMessageRepo.ListDealPostMessageExistsWithNextCheckBefore(ctx, time.Now())
 	if err != nil {
 		logger.Error("list", "error", err)
 		return
 	}
 
 	for _, m := range list {
-		channel, err := s.marketRepository.GetChannelByID(ctx, m.ChannelID)
+		channel, err := s.channelRepo.GetChannelByID(ctx, m.ChannelID)
 		if err != nil || channel == nil {
 			continue
 		}
@@ -189,16 +189,16 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 			continue
 		}
 		if !exists {
-			_ = s.marketRepository.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusDeleted)
+			_ = s.dealPostMessageRepo.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusDeleted)
 			logger.Info("message deleted", "id", m.ID, "deal_id", m.DealID)
 			continue
 		}
 		nextCheck := m.NextCheck.Add(postCheckAdvanceHour)
 		if nextCheck.After(m.UntilTs) {
-			_ = s.marketRepository.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusPassed)
+			_ = s.dealPostMessageRepo.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusPassed)
 			logger.Info("passed", "id", m.ID, "deal_id", m.DealID)
 		} else {
-			_ = s.marketRepository.UpdateDealPostMessageStatusAndNextCheck(ctx, m.ID, marketentity.DealPostMessageStatusExists, nextCheck)
+			_ = s.dealPostMessageRepo.UpdateDealPostMessageStatusAndNextCheck(ctx, m.ID, marketentity.DealPostMessageStatusExists, nextCheck)
 		}
 	}
 }

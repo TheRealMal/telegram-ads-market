@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/pkg/auth/role"
 )
 
 // AuthUser verifies Telegram Mini App init data, upserts the user into market.user, and returns the user.
@@ -26,6 +27,7 @@ func (s *userService) AuthUser(ctx context.Context, initDataStr string, referrer
 		Locale:     initData.User.LanguageCode,
 		ReferrerID: referrerID,
 		AllowsPM:   initData.User.AllowsWriteToPM,
+		Role:       role.UserRole,
 	}
 	if err := s.userRepo.UpsertUser(ctx, u); err != nil {
 		return nil, fmt.Errorf("upsert user: %w", err)

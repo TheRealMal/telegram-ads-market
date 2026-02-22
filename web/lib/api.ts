@@ -13,21 +13,40 @@ function getAuthToken(): string | null {
   return localStorage.getItem(JWT_STORAGE_KEY);
 }
 
-/** Decode JWT payload and check exp (seconds since epoch). Returns true if missing or expired. */
-function isJwtExpired(token: string): boolean {
+/** JWT payload shape (matches backend pkg/auth Claims). */
+interface JwtPayload {
+  exp?: number;
+  role?: string;
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return true;
+    if (parts.length !== 3) return null;
     const payload = parts[1];
     const decoded = JSON.parse(
       atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    ) as { exp?: number };
-    const exp = decoded.exp;
-    if (typeof exp !== 'number') return false;
-    return Date.now() / 1000 >= exp - JWT_EXPIRY_BUFFER_SEC;
+    ) as JwtPayload;
+    return decoded;
   } catch {
-    return true;
+    return null;
   }
+}
+
+/** Decode JWT payload and check exp (seconds since epoch). Returns true if missing or expired. */
+function isJwtExpired(token: string): boolean {
+  const decoded = decodeJwtPayload(token);
+  if (!decoded) return true;
+  const exp = decoded.exp;
+  if (typeof exp !== 'number') return false;
+  return Date.now() / 1000 >= exp - JWT_EXPIRY_BUFFER_SEC;
+}
+
+/** Returns the user role from a valid JWT (e.g. "admin", "user"). Null if missing or invalid. */
+export function getRoleFromToken(token: string | null): string | null {
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  return payload?.role ?? null;
 }
 
 /** Returns a valid token from storage or refreshes via auth() and stores it. */

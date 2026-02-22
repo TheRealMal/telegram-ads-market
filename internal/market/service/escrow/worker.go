@@ -21,7 +21,7 @@ func (s *service) Worker(ctx context.Context) {
 	defer ticker.Stop()
 
 	run := func(ctx context.Context) {
-		deals, err := s.marketRepository.ListDealsApprovedWithoutEscrow(ctx)
+		deals, err := s.dealRepo.ListDealsApprovedWithoutEscrow(ctx)
 		if err != nil {
 			logger.Error("escrow worker: list approved deals without escrow", "error", err)
 			return
@@ -63,9 +63,9 @@ func (s *service) ReleaseRefundWorker(ctx context.Context) {
 			var deals []*entity.Deal
 			var err error
 			if release {
-				deals, err = s.marketRepository.ListDealsWaitingEscrowRelease(ctx)
+				deals, err = s.dealRepo.ListDealsWaitingEscrowRelease(ctx)
 			} else {
-				deals, err = s.marketRepository.ListDealsWaitingEscrowRefund(ctx)
+				deals, err = s.dealRepo.ListDealsWaitingEscrowRefund(ctx)
 			}
 			if err != nil {
 				logger.Error("list deals", "release", release, "error", err)

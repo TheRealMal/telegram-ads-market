@@ -1,4 +1,4 @@
-package repository
+package channel
 
 import (
 	"context"
@@ -8,7 +8,23 @@ import (
 	"ads-mrkt/internal/market/domain/entity"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 type channelRow struct {
 	ID          int64           `db:"id"`
@@ -56,7 +72,6 @@ func (r *repository) GetChannelByID(ctx context.Context, id int64) (*entity.Chan
 	return channelRowToEntity(row)
 }
 
-// ListChannelsByAdminUserID returns all channels where the user is in channel_admin.
 func (r *repository) ListChannelsByAdminUserID(ctx context.Context, userID int64) ([]*entity.Channel, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT c.id, c.access_hash, c.admin_rights, c.title, c.username, c.photo
@@ -108,13 +123,9 @@ func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel)
 		"photo":        channel.Photo,
 		"access_hash":  channel.AccessHash,
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-// UpdateChannelPhoto updates only the photo column (base64 string) for the channel.
 func (r *repository) UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.channel SET photo = @photo, updated_at = NOW() WHERE id = @channel_id`,
@@ -133,17 +144,13 @@ func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, st
 		"channel_id": channelID,
 		"stats":      stats,
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 type channelStatsRow struct {
 	Stats json.RawMessage `db:"stats"`
 }
 
-// GetChannelStats returns the stats JSON for a channel, or nil if none.
 func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json.RawMessage, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT stats FROM market.channel_stats WHERE channel_id = @channel_id`,
@@ -163,8 +170,6 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 	return row.Stats, nil
 }
 
-// MergeStatsRequestedAt updates the channel_stats row by merging requested_at (unix timestamp) into the existing stats JSON.
-// If no row exists, creates one with stats = {"requested_at": requestedAtUnix}.
 func (r *repository) MergeStatsRequestedAt(ctx context.Context, channelID int64, requestedAtUnix int64) error {
 	raw, err := r.GetChannelStats(ctx, channelID)
 	if err != nil {

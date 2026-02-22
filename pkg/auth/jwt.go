@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"ads-mrkt/pkg/auth/role"
 	"fmt"
 	"time"
 
@@ -9,7 +10,8 @@ import (
 
 // Claims represents the JWT claims structure
 type Claims struct {
-	TelegramID int64 `json:"telegram_id"`
+	TelegramID int64     `json:"telegram_id"`
+	Role       role.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -28,9 +30,10 @@ func NewJWTManager(secretKey string, tokenDuration time.Duration) *JWTManager {
 }
 
 // GenerateToken creates a new JWT token for a given Telegram user ID
-func (m *JWTManager) GenerateToken(telegramID int64) (string, error) {
+func (m *JWTManager) GenerateToken(telegramID int64, role role.Role) (string, error) {
 	claims := Claims{
 		TelegramID: telegramID,
+		Role:       role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.tokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -78,6 +81,15 @@ func (m *JWTManager) ExtractTelegramID(tokenStr string) (int64, error) {
 		return 0, fmt.Errorf("session_expired")
 	}
 	return claims.TelegramID, nil
+}
+
+// ExtractRole extracts Role from token string
+func (m *JWTManager) ExtractRole(tokenStr string) (role.Role, error) {
+	claims, err := m.ValidateToken(tokenStr)
+	if err != nil {
+		return role.EmptyRole, err
+	}
+	return claims.Role, nil
 }
 
 // IsExpired checks if the token is expired

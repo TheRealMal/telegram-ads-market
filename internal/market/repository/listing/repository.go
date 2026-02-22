@@ -1,4 +1,4 @@
-package repository
+package listing
 
 import (
 	"context"
@@ -9,7 +9,23 @@ import (
 	"ads-mrkt/internal/market/domain/entity"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 type listingRow struct {
 	ID          int64           `db:"id"`
@@ -152,13 +168,11 @@ func (r *repository) UpdateListing(ctx context.Context, l *entity.Listing) error
 	return err
 }
 
-// DeleteListing deletes a listing by ID.
 func (r *repository) DeleteListing(ctx context.Context, id int64) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM market.listing WHERE id = @id`, pgx.NamedArgs{"id": id})
 	return err
 }
 
-// ListListingsByUserID returns listings for a user (optional filter by type).
 func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error) {
 	q := `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
@@ -196,7 +210,6 @@ type listingExistsRow struct {
 	One int `db:"one"`
 }
 
-// IsChannelHasActiveListing returns true if the channel has at least one active listing.
 func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID int64) (bool, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT 1 AS one FROM market.listing
@@ -217,7 +230,6 @@ func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID in
 	return true, nil
 }
 
-// ListListingsAll returns active listings only (optional filter by type, categories, min followers). Used for public discovery.
 func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error) {
 	q := `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,

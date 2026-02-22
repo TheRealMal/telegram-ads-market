@@ -1,26 +1,38 @@
-package repository
+package channel_admin
 
 import (
 	"context"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type database interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
+	EndTx(ctx context.Context, err error, source string) error
+}
+
+type repository struct {
+	db database
+}
+
+func New(db database) *repository {
+	return &repository{db: db}
+}
 
 type channelAdminExistsRow struct {
 	One int `db:"one"`
 }
 
-// DeleteChannelAdmins removes all admin records for the given channel.
-// Used when syncing admins from Telegram so the DB reflects current state.
 func (r *repository) DeleteChannelAdmins(ctx context.Context, channelID int64) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM market.channel_admin WHERE channel_id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID})
 	return err
 }
 
-// UpsertChannelAdmin inserts or updates a channel admin. Role must be 'owner' or 'admin' (market.role).
-// Ensures the user exists in market.user via CTE (insert with minimal fields if missing) so the channel_admin FK is satisfied.
 func (r *repository) UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error {
 	_, err := r.db.Exec(ctx, `
 		WITH ensure_user AS (
@@ -40,8 +52,6 @@ func (r *repository) UpsertChannelAdmin(ctx context.Context, userID, channelID i
 	return err
 }
 
-// IsChannelAdmin returns true if the user is an admin (owner or admin role) of the channel.
-// Lessors can only be admins of channels.
 func (r *repository) IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT 1 AS one FROM market.channel_admin
