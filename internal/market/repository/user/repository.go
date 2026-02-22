@@ -39,8 +39,12 @@ type userRow struct {
 	Role          string  `db:"role"`
 }
 
+type roleRow struct {
+	Role string `db:"role"`
+}
+
 func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
-	_, err := r.db.Exec(ctx, `
+	rows, err := r.db.Query(ctx, `
 		INSERT INTO market.user (id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, role)
 		VALUES (@id, @username, @photo, @first_name, @last_name, @locale, @referrer_id, @allows_pm, @role)
 		ON CONFLICT (id) DO UPDATE SET
@@ -50,7 +54,8 @@ func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
 			last_name = EXCLUDED.last_name,
 			locale = EXCLUDED.locale,
 			allows_pm = EXCLUDED.allows_pm,
-			updated_at = NOW()`,
+			updated_at = NOW()
+		RETURNING role`,
 		pgx.NamedArgs{
 			"id":          u.ID,
 			"username":    u.Username,
@@ -62,7 +67,17 @@ func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
 			"allows_pm":   u.AllowsPM,
 			"role":        string(u.Role),
 		})
-	return err
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[roleRow])
+	if err != nil {
+		return err
+	}
+	u.Role = role.Role(row.Role)
+	return nil
 }
 
 func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, error) {
