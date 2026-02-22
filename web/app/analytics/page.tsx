@@ -52,6 +52,24 @@ const PIE_COLORS = [
   '#14b8a6',
 ];
 
+const RADIAN = Math.PI / 180;
+function renderPieLabelInside(
+  props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; name: string; value: number; percent: number },
+  valueFormat?: (v: number) => string
+) {
+  const { cx, cy, midAngle, innerRadius, outerRadius, name, value, percent } = props;
+  if (percent < 0.06) return null;
+  const r = (innerRadius + outerRadius) / 2;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  const text = valueFormat ? `${name}: ${valueFormat(value)}` : `${name}: ${value}`;
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={500}>
+      {text}
+    </text>
+  );
+}
+
 function SnapshotCards({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   if (!snapshot) {
     return (
@@ -144,7 +162,7 @@ function DealsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) 
               cx="50%"
               cy="50%"
               outerRadius="80%"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={(p) => renderPieLabelInside(p)}
             >
               {data.map((_, i) => (
                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -155,7 +173,10 @@ function DealsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) 
                 backgroundColor: 'var(--card)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
+                color: 'var(--card-foreground)',
               }}
+              itemStyle={{ color: 'var(--card-foreground)' }}
+              labelStyle={{ color: 'var(--card-foreground)' }}
               formatter={(value: number) => [value, 'Deals']}
             />
           </PieChart>
@@ -188,7 +209,7 @@ function DealAmountsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | nu
               cx="50%"
               cy="50%"
               outerRadius="80%"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={(p) => renderPieLabelInside(p, (v) => `${v.toFixed(2)} TON`)}
             >
               {data.map((_, i) => (
                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -199,7 +220,10 @@ function DealAmountsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | nu
                 backgroundColor: 'var(--card)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
+                color: 'var(--card-foreground)',
               }}
+              itemStyle={{ color: 'var(--card-foreground)' }}
+              labelStyle={{ color: 'var(--card-foreground)' }}
               formatter={(value: number) => [`${value.toFixed(2)} TON`, 'Amount']}
             />
           </PieChart>
