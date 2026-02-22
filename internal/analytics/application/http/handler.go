@@ -16,25 +16,38 @@ type AnalyticsService interface {
 	ListSnapshots(ctx context.Context, from, to time.Time) ([]*domain.Snapshot, error)
 }
 
+// SnapshotResponse is the API snapshot with commission in TON.
+type SnapshotResponse struct {
+	ID                     int64              `json:"id"`
+	RecordedAt             string             `json:"recorded_at"`
+	ListingsCount          int64              `json:"listings_count"`
+	DealsCount             int64              `json:"deals_count"`
+	DealsByStatus          map[string]int64   `json:"deals_by_status"`
+	DealAmountsByStatusTON map[string]float64 `json:"deal_amounts_by_status_ton"`
+	CommissionEarnedTON    float64            `json:"commission_earned_ton"`
+	UsersCount             int64              `json:"users_count"`
+	AvgListingsPerUser     float64            `json:"avg_listings_per_user"`
+}
+
 // LatestSnapshotResponse is the response for GET /api/v1/analytics/snapshot/latest.
 type LatestSnapshotResponse struct {
-	Snapshot *domain.Snapshot `json:"snapshot"`
+	Snapshot *SnapshotResponse `json:"snapshot"`
 }
 
 // HistoryResponse is the response for GET /api/v1/analytics/snapshot/history.
 // Each field is a slice of values; index i corresponds to timestamps[i] for all series.
 type HistoryResponse struct {
-	Period                  string               `json:"period"`     // week, month, year
-	From                    string               `json:"from"`       // RFC3339
-	To                      string               `json:"to"`         // RFC3339
-	Timestamps              []int64              `json:"timestamps"` // Unix seconds; index i = time for all value series at i
-	ListingsCount           []int64              `json:"listings_count"`
-	DealsCount              []int64              `json:"deals_count"`
-	UsersCount              []int64              `json:"users_count"`
-	CommissionEarnedNanoton []int64              `json:"commission_earned_nanoton"`
-	AvgListingsPerUser      []float64            `json:"avg_listings_per_user"`
-	DealsByStatus           map[string][]int64   `json:"deals_by_status"`            // status -> series of counts
-	DealAmountsByStatusTON  map[string][]float64 `json:"deal_amounts_by_status_ton"` // status -> series of sums in TON
+	Period                 string               `json:"period"`     // week, month, year
+	From                   string               `json:"from"`      // RFC3339
+	To                     string               `json:"to"`        // RFC3339
+	Timestamps             []int64              `json:"timestamps"` // Unix seconds; index i = time for all value series at i
+	ListingsCount          []int64              `json:"listings_count"`
+	DealsCount             []int64              `json:"deals_count"`
+	UsersCount             []int64              `json:"users_count"`
+	CommissionEarnedTON    []float64            `json:"commission_earned_ton"`
+	AvgListingsPerUser     []float64            `json:"avg_listings_per_user"`
+	DealsByStatus          map[string][]int64   `json:"deals_by_status"`            // status -> series of counts
+	DealAmountsByStatusTON map[string][]float64 `json:"deal_amounts_by_status_ton"` // status -> series of sums in TON
 }
 
 const (
@@ -66,13 +79,30 @@ func NewHandler(svc AnalyticsService) *handler {
 // @Success	200	{object}	response.Template{data=LatestSnapshotResponse}	"Latest snapshot (snapshot field null when none)"
 // @Failure	500	{object}	response.Template{data=string}				"Internal error"
 // @Router		/analytics/snapshot/latest [get]
+const nanotonPerTON = 1e9
+
 func (h *handler) GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	ctx := r.Context()
 	snap, err := h.svc.GetLatestSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &LatestSnapshotResponse{Snapshot: snap}, nil
+	if snap == nil {
+		return &LatestSnapshotResponse{Snapshot: nil}, nil
+	}
+	return &LatestSnapshotResponse{
+		Snapshot: &SnapshotResponse{
+			ID:                     snap.ID,
+			RecordedAt:             snap.RecordedAt,
+			ListingsCount:          snap.ListingsCount,
+			DealsCount:             snap.DealsCount,
+			DealsByStatus:          snap.DealsByStatus,
+			DealAmountsByStatusTON: snap.DealAmountsByStatusTON,
+			CommissionEarnedTON:    float64(snap.CommissionEarnedNanoton) / nanotonPerTON,
+			UsersCount:             snap.UsersCount,
+			AvgListingsPerUser:     snap.AvgListingsPerUser,
+		},
+	}, nil
 }
 
 // GetSnapshotHistory returns time-series for line charts: value slices plus timestamps (index i = time for all series at i).
@@ -108,17 +138,17 @@ func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (in
 	}
 
 	resp := &HistoryResponse{
-		Period:                  period,
-		From:                    from.Format(time.RFC3339),
-		To:                      to.Format(time.RFC3339),
-		Timestamps:              make([]int64, 0, len(list)),
-		ListingsCount:           make([]int64, 0, len(list)),
-		DealsCount:              make([]int64, 0, len(list)),
-		UsersCount:              make([]int64, 0, len(list)),
-		CommissionEarnedNanoton: make([]int64, 0, len(list)),
-		AvgListingsPerUser:      make([]float64, 0, len(list)),
-		DealsByStatus:           make(map[string][]int64),
-		DealAmountsByStatusTON:  make(map[string][]float64),
+		Period:                 period,
+		From:                   from.Format(time.RFC3339),
+		To:                     to.Format(time.RFC3339),
+		Timestamps:             make([]int64, 0, len(list)),
+		ListingsCount:          make([]int64, 0, len(list)),
+		DealsCount:             make([]int64, 0, len(list)),
+		UsersCount:             make([]int64, 0, len(list)),
+		CommissionEarnedTON:    make([]float64, 0, len(list)),
+		AvgListingsPerUser:     make([]float64, 0, len(list)),
+		DealsByStatus:          make(map[string][]int64),
+		DealAmountsByStatusTON: make(map[string][]float64),
 	}
 
 	// Collect all status keys for map-based series
@@ -145,7 +175,7 @@ func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (in
 		resp.ListingsCount = append(resp.ListingsCount, snap.ListingsCount)
 		resp.DealsCount = append(resp.DealsCount, snap.DealsCount)
 		resp.UsersCount = append(resp.UsersCount, snap.UsersCount)
-		resp.CommissionEarnedNanoton = append(resp.CommissionEarnedNanoton, snap.CommissionEarnedNanoton)
+		resp.CommissionEarnedTON = append(resp.CommissionEarnedTON, float64(snap.CommissionEarnedNanoton)/nanotonPerTON)
 		resp.AvgListingsPerUser = append(resp.AvgListingsPerUser, snap.AvgListingsPerUser)
 		for k := range statusKeys {
 			v := int64(0)

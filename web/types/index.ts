@@ -99,7 +99,7 @@ export interface AnalyticsSnapshot {
   deals_count: number;
   deals_by_status: Record<string, number>;
   deal_amounts_by_status_ton: Record<string, number>;
-  commission_earned_nanoton: number;
+  commission_earned_ton: number;
   users_count: number;
   avg_listings_per_user: number;
 }
@@ -116,7 +116,7 @@ export interface AnalyticsHistoryResponse {
   listings_count: number[];
   deals_count: number[];
   users_count: number[];
-  commission_earned_nanoton: number[];
+  commission_earned_ton: number[];
   avg_listings_per_user: number[];
   deals_by_status: Record<string, number[]>;
   deal_amounts_by_status_ton: Record<string, number[]>;

@@ -8,8 +8,8 @@ type Snapshot struct {
 	RecordedAt              string             `json:"recorded_at"` // RFC3339
 	ListingsCount           int64              `json:"listings_count"`
 	DealsCount              int64              `json:"deals_count"`
-	DealsByStatus           map[string]int64   `json:"deals_by_status"`          // status -> count
-	DealAmountsByStatusTON  map[string]float64  `json:"deal_amounts_by_status_ton"` // status -> sum in TON
+	DealsByStatus           map[string]int64   `json:"deals_by_status"`            // status -> count
+	DealAmountsByStatusTON  map[string]float64 `json:"deal_amounts_by_status_ton"` // status -> sum in TON
 	CommissionEarnedNanoton int64              `json:"commission_earned_nanoton"`
 	UsersCount              int64              `json:"users_count"`
 	AvgListingsPerUser      float64            `json:"avg_listings_per_user"`

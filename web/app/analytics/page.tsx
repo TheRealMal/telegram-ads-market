@@ -11,6 +11,7 @@ import type {
   AnalyticsSnapshot,
   LatestSnapshotResponse,
 } from '@/types';
+import { getDealStatusLabel } from '@/types';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import {
@@ -22,17 +23,34 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'unauthorized' | 'admin';
 
 const ADMIN_ROLE = 'admin';
 
-function formatNanotonToTon(nanoton: number): string {
-  if (nanoton == null || Number.isNaN(nanoton)) return '—';
-  const ton = nanoton / 1e9;
+function formatTon(ton: number): string {
+  if (ton == null || Number.isNaN(ton)) return '—';
   return ton >= 1 ? `${ton.toFixed(1)} TON` : `${(ton * 1000).toFixed(2)} mTON`;
 }
+
+const PIE_COLORS = [
+  'var(--primary)',
+  '#22c55e',
+  '#3b82f6',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+  '#84cc16',
+  '#f97316',
+  '#6366f1',
+  '#14b8a6',
+];
 
 function SnapshotCards({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   if (!snapshot) {
@@ -42,33 +60,150 @@ function SnapshotCards({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
       </p>
     );
   }
+  const recordedAt = snapshot.recorded_at
+    ? new Date(snapshot.recorded_at).toLocaleString(undefined, {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      })
+    : '—';
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Listings
-        </p>
-        <p className="mt-1 text-2xl font-semibold">{snapshot.listings_count}</p>
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Listings
+          </p>
+          <p className="mt-1 text-2xl font-semibold">{snapshot.listings_count}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Deals
+          </p>
+          <p className="mt-1 text-2xl font-semibold">{snapshot.deals_count}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Users
+          </p>
+          <p className="mt-1 text-2xl font-semibold">{snapshot.users_count}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Commission earned
+          </p>
+          <p className="mt-1 text-2xl font-semibold">
+            {formatTon(snapshot.commission_earned_ton)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Avg listings / user
+          </p>
+          <p className="mt-1 text-2xl font-semibold">
+            {snapshot.avg_listings_per_user != null && !Number.isNaN(snapshot.avg_listings_per_user)
+              ? snapshot.avg_listings_per_user.toFixed(2)
+              : '—'}
+          </p>
+        </div>
       </div>
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Deals
-        </p>
-        <p className="mt-1 text-2xl font-semibold">{snapshot.deals_count}</p>
+      <p className="text-xs text-muted-foreground">Last snapshot: {recordedAt}</p>
+    </div>
+  );
+}
+
+function mapToPieData(data: Record<string, number>): { name: string; value: number }[] {
+  return Object.entries(data)
+    .filter(([, v]) => v != null && Number(v) > 0)
+    .map(([status, value]) => ({
+      name: getDealStatusLabel(status),
+      value: Number(value),
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function DealsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
+  if (!snapshot?.deals_by_status || Object.keys(snapshot.deals_by_status).length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="mb-4 text-lg font-semibold">Deals by status</h2>
+        <p className="text-center text-sm text-muted-foreground">No deal status data.</p>
       </div>
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Users
-        </p>
-        <p className="mt-1 text-2xl font-semibold">{snapshot.users_count}</p>
+    );
+  }
+  const data = mapToPieData(snapshot.deals_by_status);
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <h2 className="mb-4 text-lg font-semibold">Deals by status</h2>
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius="80%"
+              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            >
+              {data.map((_, i) => (
+                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}
+              formatter={(value: number) => [value, 'Deals']}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </div>
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Commission earned
-        </p>
-        <p className="mt-1 text-2xl font-semibold">
-          {formatNanotonToTon(snapshot.commission_earned_nanoton)}
-        </p>
+    </div>
+  );
+}
+
+function DealAmountsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
+  if (!snapshot?.deal_amounts_by_status_ton || Object.keys(snapshot.deal_amounts_by_status_ton).length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="mb-4 text-lg font-semibold">Deal amounts by status (TON)</h2>
+        <p className="text-center text-sm text-muted-foreground">No amount data.</p>
+      </div>
+    );
+  }
+  const data = mapToPieData(snapshot.deal_amounts_by_status_ton);
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <h2 className="mb-4 text-lg font-semibold">Deal amounts by status (TON)</h2>
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius="80%"
+              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            >
+              {data.map((_, i) => (
+                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}
+              formatter={(value: number) => [`${value.toFixed(2)} TON`, 'Amount']}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -101,6 +236,8 @@ function HistoryCharts({
     listings: history.listings_count[i] ?? 0,
     deals: history.deals_count[i] ?? 0,
     users: history.users_count[i] ?? 0,
+    commission_ton: history.commission_earned_ton[i] ?? 0,
+    avg_listings: history.avg_listings_per_user[i] ?? 0,
   }));
 
   return (
@@ -142,6 +279,8 @@ function HistoryCharts({
             <Line type="monotone" dataKey="listings" stroke="var(--primary)" name="Listings" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="deals" stroke="#22c55e" name="Deals" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="users" stroke="#3b82f6" name="Users" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="commission_ton" stroke="#f59e0b" name="Commission (TON)" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="avg_listings" stroke="#8b5cf6" name="Avg listings/user" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -224,6 +363,10 @@ export default function AnalyticsPage() {
           {showDashboard && (
             <div className="space-y-6">
               <SnapshotCards snapshot={latest} />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <DealsByStatusPie snapshot={latest} />
+                <DealAmountsByStatusPie snapshot={latest} />
+              </div>
               <HistoryCharts
                 history={history}
                 period={period}
