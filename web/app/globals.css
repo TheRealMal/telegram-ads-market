@@ -259,8 +259,8 @@
   content: "";
   position: absolute;
   top: 0;
-  left: 0;
-  right: 2.5rem;
+  left: 0.5rem;
+  right: calc(2.5rem - 2px);
   height: 1px;
   background: rgba(0, 0, 0, 0.06);
   pointer-events: none;

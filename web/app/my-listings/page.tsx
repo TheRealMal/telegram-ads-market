@@ -88,7 +88,7 @@ export default function MyListingsPage() {
       {/* FAB: create listing, above tab bar */}
       <Link
         href="/listings/create"
-        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-colors hover:bg-muted hover:text-foreground"
+        className="glass-pill fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-white/72 text-muted-foreground shadow-none backdrop-blur-xl backdrop-saturate-150 transition-colors hover:bg-white/80 hover:text-foreground dark:bg-black/48 dark:hover:bg-black/56"
         aria-label="Create listing"
       >
         <Plus size={24} strokeWidth={2} />

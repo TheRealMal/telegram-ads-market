@@ -310,7 +310,11 @@ export default function CreateListingPage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button
+          type="submit"
+          className="glass-pill w-full border-0 bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 hover:bg-white/80 dark:bg-black/48 dark:hover:bg-black/56"
+          disabled={submitting}
+        >
           {submitting ? 'Creating…' : 'Create listing'}
         </Button>
       </form>
