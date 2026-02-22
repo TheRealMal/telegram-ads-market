@@ -114,13 +114,14 @@ function DealStatusRoadmap({
   const showRightLine = completedCount < segment.length;
   const showFillerConnectorAfterLast = showRightLine && segment.length === 2;
 
-  // viewBox 0 0 100 24: line thickness = dot (4 units); inflow = bigger bulge at circle (12 units), taper over 10 units
+  // viewBox 0 0 100 24: line thickness = dot (4 units); inflow = bigger bulge at circle (14 units), taper over 10 units
   const LINE_TOP = 10;
   const LINE_BOTTOM = 14;
-  const INFLOW_TOP = 6;
-  const INFLOW_BOTTOM = 18;
+  const INFLOW_TOP = 5;
+  const INFLOW_BOTTOM = 19;
   const INFLOW_UNITS = 10;
-  const CAP_R = 2; // round cap at line end (before dots), radius 2
+  const INFLOW_CP = INFLOW_UNITS * 0.3; // quadratic bezier control point offset for concave taper
+  const CAP_R = 2;
 
   /** Line as thick as dots, thickening at both ends (water-drop inflow). Optional gradient: current → future (muted). Future-only segments use muted fill. */
   const Connector = ({
@@ -137,8 +138,15 @@ function DealStatusRoadmap({
     useMutedFill?: boolean;
   }) => {
     const d = [
-      `M 0 ${INFLOW_TOP} L ${INFLOW_UNITS} ${LINE_TOP} L ${100 - INFLOW_UNITS} ${LINE_TOP} L 100 ${INFLOW_TOP}`,
-      `L 100 ${INFLOW_BOTTOM} L ${100 - INFLOW_UNITS} ${LINE_BOTTOM} L ${INFLOW_UNITS} ${LINE_BOTTOM} L 0 ${INFLOW_BOTTOM} Z`,
+      `M 0 ${INFLOW_TOP}`,
+      `Q ${INFLOW_CP} ${LINE_TOP}, ${INFLOW_UNITS} ${LINE_TOP}`,
+      `L ${100 - INFLOW_UNITS} ${LINE_TOP}`,
+      `Q ${100 - INFLOW_CP} ${LINE_TOP}, 100 ${INFLOW_TOP}`,
+      `L 100 ${INFLOW_BOTTOM}`,
+      `Q ${100 - INFLOW_CP} ${LINE_BOTTOM}, ${100 - INFLOW_UNITS} ${LINE_BOTTOM}`,
+      `L ${INFLOW_UNITS} ${LINE_BOTTOM}`,
+      `Q ${INFLOW_CP} ${LINE_BOTTOM}, 0 ${INFLOW_BOTTOM}`,
+      `Z`,
     ].join(' ');
     const pathFill =
       useGradient ? `url(#${gradientId})` : useMutedFill ? 'var(--muted)' : undefined;
@@ -177,8 +185,14 @@ function DealStatusRoadmap({
   /** Line with inflow at right (meets first circle); rounded cap at left (before dots). */
   const LeftLineWithFlare = () => {
     const d = [
-      `M ${CAP_R} ${LINE_TOP} L ${100 - INFLOW_UNITS} ${LINE_TOP} L 100 ${INFLOW_TOP} L 100 ${INFLOW_BOTTOM} L ${100 - INFLOW_UNITS} ${LINE_BOTTOM} L ${CAP_R} ${LINE_BOTTOM}`,
-      `A ${CAP_R} ${CAP_R} 0 0 1 ${CAP_R} ${LINE_TOP} Z`,
+      `M ${CAP_R} ${LINE_TOP}`,
+      `L ${100 - INFLOW_UNITS} ${LINE_TOP}`,
+      `Q ${100 - INFLOW_CP} ${LINE_TOP}, 100 ${INFLOW_TOP}`,
+      `L 100 ${INFLOW_BOTTOM}`,
+      `Q ${100 - INFLOW_CP} ${LINE_BOTTOM}, ${100 - INFLOW_UNITS} ${LINE_BOTTOM}`,
+      `L ${CAP_R} ${LINE_BOTTOM}`,
+      `A ${CAP_R} ${CAP_R} 0 0 1 ${CAP_R} ${LINE_TOP}`,
+      `Z`,
     ].join(' ');
     return (
       <div className="flex min-w-0 flex-1 items-center justify-end" style={{ marginRight: '-4px' }} aria-hidden>
@@ -197,8 +211,14 @@ function DealStatusRoadmap({
   /** Line with inflow at left (meets last circle); rounded cap at right (before dots). */
   const RightLineWithFlare = () => {
     const d = [
-      `M 0 ${INFLOW_TOP} L 0 ${INFLOW_BOTTOM} L ${INFLOW_UNITS} ${LINE_BOTTOM} L ${100 - CAP_R} ${LINE_BOTTOM}`,
-      `A ${CAP_R} ${CAP_R} 0 0 0 ${100 - CAP_R} ${LINE_TOP} L ${INFLOW_UNITS} ${LINE_TOP} Z`,
+      `M 0 ${INFLOW_TOP}`,
+      `L 0 ${INFLOW_BOTTOM}`,
+      `Q ${INFLOW_CP} ${LINE_BOTTOM}, ${INFLOW_UNITS} ${LINE_BOTTOM}`,
+      `L ${100 - CAP_R} ${LINE_BOTTOM}`,
+      `A ${CAP_R} ${CAP_R} 0 0 0 ${100 - CAP_R} ${LINE_TOP}`,
+      `L ${INFLOW_UNITS} ${LINE_TOP}`,
+      `Q ${INFLOW_CP} ${LINE_TOP}, 0 ${INFLOW_TOP}`,
+      `Z`,
     ].join(' ');
     return (
       <div className="flex min-w-0 flex-1 items-center justify-start" style={{ marginLeft: '-4px' }} aria-hidden>
