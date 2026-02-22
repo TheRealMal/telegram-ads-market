@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Tabs, TabsContent, TabsListWithPill, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
@@ -18,9 +18,39 @@ export default function MarketplacePage() {
   const [lesseeListings, setLesseeListings] = useState<Listing[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [filterExiting, setFilterExiting] = useState(false);
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterMinFollowers, setFilterMinFollowers] = useState('');
+  const filterPanelRef = useRef<HTMLDivElement>(null);
+
+  const filterPanelVisible = showFilters || filterExiting;
+
+  const closeFilters = useCallback(() => {
+    if (!showFilters || filterExiting) return;
+    setShowFilters(false);
+    setFilterExiting(true);
+  }, [showFilters, filterExiting]);
+
+  const toggleFilters = useCallback(() => {
+    if (filterExiting) return;
+    if (showFilters) {
+      closeFilters();
+    } else {
+      setShowFilters(true);
+    }
+  }, [showFilters, filterExiting, closeFilters]);
+
+  useEffect(() => {
+    if (!showFilters || filterExiting) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (filterPanelRef.current?.contains(e.target as Node)) return;
+      closeFilters();
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showFilters, filterExiting, closeFilters]);
 
   useEffect(() => {
     const paramsLessor = new URLSearchParams();
@@ -35,7 +65,6 @@ export default function MarketplacePage() {
     if (filterCategories.length > 0) paramsLessee.set('categories', filterCategories.join(','));
 
     const load = async () => {
-      setLoading(true);
       try {
         const [lessors, lessees] = await Promise.all([
           api<Listing[]>(`/api/v1/market/listings?${paramsLessor.toString()}`),
@@ -60,93 +89,130 @@ export default function MarketplacePage() {
   const filteredLessors = filterBySearch(lessorListings);
   const filteredLessees = filterBySearch(lesseeListings);
 
+  const handleSearchFocus = useCallback(() => {
+    setSearchFocused(true);
+    if (showFilters && !filterExiting) closeFilters();
+  }, [showFilters, filterExiting, closeFilters]);
+
   return (
     <>
       <div className={`page-with-nav ${loading ? 'opacity-0' : 'opacity-100'}`}>
       <PageTopSpacer />
       <div className="mx-auto max-w-4xl px-4 py-4">
         <div className="relative">
-        <div className="flex gap-2 mb-4">
-          <div className="glass-pill relative flex-1 overflow-hidden rounded-full bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-0 bg-transparent pl-10 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className={
-              'glass-pill flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48 ' +
-              (showFilters
-                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background text-primary'
-                : 'text-muted-foreground hover:text-foreground')
-            }
-          >
-            <SlidersHorizontal size={18} />
-          </button>
-        </div>
-        {showFilters && (
-          <div className="absolute left-0 right-0 top-12 z-20 space-y-4 rounded-lg border border-border bg-background p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Filters</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setFilterCategories([]);
-                  setFilterMinFollowers('');
-                }}
-              >
-                <X size={14} className="mr-1" />
-                Clear
-              </Button>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Categories</Label>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {LISTING_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() =>
-                      setFilterCategories((prev) =>
-                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-                      )
-                    }
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                      filterCategories.includes(cat)
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-background hover:bg-muted'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="min-followers" className="text-xs text-muted-foreground">
-                Min. channel followers
-              </Label>
+          {/* Search bar + filter button row */}
+          <div className="mb-4 flex items-center">
+            {/* Search bar — expands to full width when focused */}
+            <div className="glass-pill flex flex-1 items-center bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
+              <Search
+                size={18}
+                className="ml-3 shrink-0 text-muted-foreground"
+              />
               <Input
-                id="min-followers"
-                type="number"
-                min={0}
-                placeholder="e.g. 1000"
-                value={filterMinFollowers}
-                onChange={(e) => setFilterMinFollowers(e.target.value)}
-                className="mt-1 max-w-[140px]"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={handleSearchFocus}
+                onBlur={() => setSearchFocused(false)}
+                className="flex-1 min-w-0 border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </div>
+
+            {/* Filter button — shrinks away when search is focused */}
+            <button
+              type="button"
+              onClick={toggleFilters}
+              className={`glass-pill flex h-10 shrink-0 items-center justify-center bg-white/72 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48 overflow-hidden${
+                showFilters ? ' filter-btn-open' : ''
+              } ${
+                filterPanelVisible
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              } ${
+                searchFocused
+                  ? 'w-0 opacity-0 ml-0 p-0 pointer-events-none'
+                  : 'w-10 ml-2'
+              }`}
+            >
+              <SlidersHorizontal size={18} />
+            </button>
           </div>
-        )}
+
+          {/* Filter dropdown */}
+          {filterPanelVisible && (
+            <div
+              ref={filterPanelRef}
+              className={`absolute left-0 right-0 top-10 z-20 ${
+                filterExiting ? 'filter-panel-exit' : 'filter-panel-enter'
+              }`}
+              onAnimationEnd={() => {
+                if (filterExiting) setFilterExiting(false);
+              }}
+            >
+              {/* Extension strip — bridges button to panel seamlessly */}
+              <div className="flex justify-end">
+                <div
+                  className="relative z-[1] w-10 bg-background glass-panel-extension"
+                  style={{ marginTop: '-1px', marginBottom: '-1px', height: '10px' }}
+                />
+              </div>
+              {/* Panel body */}
+              <div className="glass-panel-connected-bottom rounded-lg rounded-tr-none bg-background p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Filters</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterCategories([]);
+                      setFilterMinFollowers('');
+                    }}
+                  >
+                    <X size={14} className="mr-1" />
+                    Clear
+                  </Button>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Categories</Label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {LISTING_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() =>
+                          setFilterCategories((prev) =>
+                            prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+                          )
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          filterCategories.includes(cat)
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background hover:bg-muted'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="min-followers" className="text-xs text-muted-foreground">
+                    Min. channel followers
+                  </Label>
+                  <Input
+                    id="min-followers"
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 1000"
+                    value={filterMinFollowers}
+                    onChange={(e) => setFilterMinFollowers(e.target.value)}
+                    className="mt-1 max-w-[140px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
         <Tabs defaultValue="channels" className="w-full">
           <TabsListWithPill className="glass-pill mb-6 grid w-full grid-cols-2 gap-0.5 rounded-full border-0 bg-white/72 p-1 shadow-none backdrop-blur-xl backdrop-saturate-150 dark:bg-black/48">
             <TabsTrigger

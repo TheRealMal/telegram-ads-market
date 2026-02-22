@@ -30,7 +30,7 @@
 .dark {
   --background: #0a0a0a;
   --foreground: #fafafa;
-  --card: #171717;
+  --card: #0f0f0f;
   --card-foreground: #fafafa;
   --popover: #171717;
   --popover-foreground: #fafafa;
@@ -179,6 +179,149 @@
     0 0 0 1px rgba(255, 255, 255, 0.06),
     inset 0 0 28px -6px rgba(0, 0, 0, 0.35),
     0 4px 16px -4px rgba(0, 0, 0, 0.3);
+}
+.glass-pill.filter-btn-open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-width: 1px;
+  border-color: rgba(0, 0, 0, 0.06);
+  border-bottom-color: transparent;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+    0 0 0 1px transparent,
+    inset 0 0 24px -6px rgba(0, 0, 0, 0.06),
+    0 4px 16px -4px rgba(0, 0, 0, 0.08);
+}
+.dark .glass-pill.filter-btn-open {
+  border-color: rgba(255, 255, 255, 0.06);
+  border-bottom-color: transparent;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px transparent,
+    inset 0 0 28px -6px rgba(0, 0, 0, 0.35),
+    0 4px 16px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* Dropdown panel in same glass style (united with filter button) */
+.glass-panel {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    inset 0 0 24px -6px rgba(0, 0, 0, 0.06),
+    0 8px 24px -8px rgba(0, 0, 0, 0.12);
+}
+.dark .glass-panel {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 28px -6px rgba(0, 0, 0, 0.35),
+    0 8px 24px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* When filter form is open: button (top Y) has flat bottom, no bottom radius/border */
+.glass-panel-connected-top {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: none;
+  border-radius: 9999px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 24px -6px rgba(0, 0, 0, 0.06);
+}
+.dark .glass-panel-connected-top {
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 28px -6px rgba(0, 0, 0, 0.35);
+}
+/* Extension strip below button (use same bg/backdrop as button; left/right border only) */
+.glass-panel-extension {
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: none;
+  border-bottom: none;
+}
+.dark .glass-panel-extension {
+  border-left-color: rgba(255, 255, 255, 0.06);
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+/* Form: top border only where the button is NOT (not in button column); has top-left radius */
+.glass-panel-connected-bottom {
+  position: relative;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: none;
+  box-shadow:
+    inset 0 0 24px -6px rgba(0, 0, 0, 0.06),
+    0 8px 24px -8px rgba(0, 0, 0, 0.12);
+}
+.glass-panel-connected-bottom::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 2.5rem;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+.dark .glass-panel-connected-bottom::before {
+  background: rgba(255, 255, 255, 0.06);
+}
+.dark .glass-panel-connected-bottom {
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 28px -6px rgba(0, 0, 0, 0.35),
+    0 8px 24px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* Filter panel: rollout from top-right when appearing */
+@keyframes filter-panel-rollout {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.filter-panel-enter {
+  transform-origin: top right;
+  animation: filter-panel-rollout 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Filter panel: roll in toward top-right when disappearing */
+@keyframes filter-panel-rollin {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+.filter-panel-exit {
+  transform-origin: top right;
+  animation: filter-panel-rollin 0.28s cubic-bezier(0.8, 0.2, 0.2, 1) forwards;
+}
+
+/* Specular highlight border at 125° (rim light: light from upper-left, bright on top/left edges) */
+.specular-border-125 {
+  border: none;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.04),
+    inset -1px 0 0 0 rgba(0, 0, 0, 0.04);
+}
+.dark .specular-border-125 {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.15),
+    inset -1px 0 0 0 rgba(0, 0, 0, 0.12);
 }
 
 /* Prevent iOS zoom on input focus: font-size < 16px triggers auto-zoom */
