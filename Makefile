@@ -32,7 +32,7 @@ rollout_web: ## Rebuild web and deploy updated containers
 
 rollout_back: ## Rebuild backend and deploy updated containers
 	docker compose build api
-	docker compose up api bot usetbot blockchain_observer -d --force-recreate
+	docker compose up api bot userbot blockchain_observer -d --force-recreate
 
 stop: ## Stop the server
 	docker compose down
