@@ -11,7 +11,6 @@ import (
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
-	"ads-mrkt/pkg/auth"
 )
 
 func splitComma(s string) []string {
@@ -22,6 +21,62 @@ func splitComma(s string) []string {
 		}
 	}
 	return out
+}
+
+func parseListListingsQuery(r *http.Request) (typ *entity.ListingType, categories []string, minFollowers *int64) {
+	if t := r.URL.Query().Get("type"); t != "" {
+		tp := entity.ListingType(t)
+		typ = &tp
+	}
+	if c := r.URL.Query().Get("categories"); c != "" {
+		for _, s := range splitComma(c) {
+			if s != "" {
+				categories = append(categories, s)
+			}
+		}
+	}
+	if m := r.URL.Query().Get("min_followers"); m != "" {
+		if n, err := strconv.ParseInt(m, 10, 64); err == nil && n >= 0 {
+			minFollowers = &n
+		}
+	}
+	return typ, categories, minFollowers
+}
+
+func mergeListingWithUpdate(existing *entity.Listing, id int64, req *model.UpdateListingRequest) (*entity.Listing, error) {
+	if len(req.Prices) > 0 {
+		if err := domain.ValidateListingPrices(req.Prices); err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+	}
+	if req.Categories != nil {
+		if err := domain.ValidateListingCategories(*req.Categories); err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+	}
+
+	l := *existing
+	l.ID = id
+	if req.Status != nil {
+		l.Status = entity.ListingStatus(*req.Status)
+	}
+	if req.Type != nil {
+		l.Type = entity.ListingType(*req.Type)
+	}
+	if req.Prices != nil {
+		pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
+		}
+		l.Prices = pricesNanoton
+	}
+	if req.Categories != nil {
+		l.Categories = model.CategoriesToRaw(*req.Categories)
+	}
+	if req.Description != nil {
+		l.Description = *req.Description
+	}
+	return &l, nil
 }
 
 // @Security	JWT
@@ -36,9 +91,9 @@ func splitComma(s string) []string {
 // @Failure	403		{object}	response.Template{data=string}			"Forbidden"
 // @Router		/market/listings [post]
 func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 
 	var req model.CreateListingRequest
@@ -82,9 +137,9 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 // @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [get]
 func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	id, err := parsePathID(r, "id")
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
 	}
 
 	l, err := h.listingService.GetListing(r.Context(), id)
@@ -106,25 +161,7 @@ func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{
 // @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of listings"
 // @Router		/market/listings [get]
 func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	var typ *entity.ListingType
-	if t := r.URL.Query().Get("type"); t != "" {
-		tp := entity.ListingType(t)
-		typ = &tp
-	}
-	var categories []string
-	if c := r.URL.Query().Get("categories"); c != "" {
-		for _, s := range splitComma(c) {
-			if s != "" {
-				categories = append(categories, s)
-			}
-		}
-	}
-	var minFollowers *int64
-	if m := r.URL.Query().Get("min_followers"); m != "" {
-		if n, err := strconv.ParseInt(m, 10, 64); err == nil && n >= 0 {
-			minFollowers = &n
-		}
-	}
+	typ, categories, minFollowers := parseListListingsQuery(r)
 	list, err := h.listingService.ListListingsAll(r.Context(), typ, categories, minFollowers)
 	if err != nil {
 		return nil, toServiceError(err)
@@ -141,15 +178,11 @@ func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interfac
 // @Failure	401		{object}	response.Template{data=string}				"Unauthorized"
 // @Router		/market/my-listings [get]
 func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
-	var typ *entity.ListingType
-	if t := r.URL.Query().Get("type"); t != "" {
-		tp := entity.ListingType(t)
-		typ = &tp
-	}
+	typ, _, _ := parseListListingsQuery(r)
 	list, err := h.listingService.ListListingsByUserID(r.Context(), userID, typ)
 	if err != nil {
 		return nil, toServiceError(err)
@@ -171,14 +204,13 @@ func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interf
 // @Failure	404		{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [patch]
 func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	existing, err := h.listingService.GetListing(r.Context(), id)
@@ -190,41 +222,12 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
-	if len(req.Prices) > 0 {
-		if err := domain.ValidateListingPrices(req.Prices); err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-		}
-	}
-	if req.Categories != nil {
-		if err := domain.ValidateListingCategories(*req.Categories); err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-		}
+	l, err := mergeListingWithUpdate(existing, id, &req)
+	if err != nil {
+		return nil, err
 	}
 
-	l := *existing
-	l.ID = id
-	if req.Status != nil {
-		l.Status = entity.ListingStatus(*req.Status)
-	}
-	// Channel cannot be changed after creation (keep existing)
-	if req.Type != nil {
-		l.Type = entity.ListingType(*req.Type)
-	}
-	if req.Prices != nil {
-		pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
-		if err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
-		}
-		l.Prices = pricesNanoton
-	}
-	if req.Categories != nil {
-		l.Categories = model.CategoriesToRaw(*req.Categories)
-	}
-	if req.Description != nil {
-		l.Description = *req.Description
-	}
-
-	if err := h.listingService.UpdateListing(r.Context(), userID, &l); err != nil {
+	if err := h.listingService.UpdateListing(r.Context(), userID, l); err != nil {
 		return nil, toServiceError(err)
 	}
 	updated, _ := h.listingService.GetListing(r.Context(), id)
@@ -243,14 +246,13 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 // @Failure	404		{object}	response.Template{data=string}			"Not found"
 // @Router		/market/listings/{id} [delete]
 func (h *handler) DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	if err := h.listingService.DeleteListing(r.Context(), userID, id); err != nil {

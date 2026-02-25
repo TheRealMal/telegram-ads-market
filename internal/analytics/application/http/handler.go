@@ -36,40 +36,42 @@ func NewHandler(svc AnalyticsService) *handler {
 	return &handler{svc: svc}
 }
 
-//
+const nanotonPerTON = 1e9
+
+func snapshotToResponse(snap *domain.Snapshot) *model.SnapshotResponse {
+	if snap == nil {
+		return nil
+	}
+	return &model.SnapshotResponse{
+		ID:                     snap.ID,
+		RecordedAt:             snap.RecordedAt,
+		ListingsCount:          snap.ListingsCount,
+		DealsCount:             snap.DealsCount,
+		DealsByStatus:          snap.DealsByStatus,
+		DealAmountsByStatusTON: snap.DealAmountsByStatusTON,
+		CommissionEarnedTON:    float64(snap.CommissionEarnedNanoton) / nanotonPerTON,
+		UsersCount:             snap.UsersCount,
+		AvgListingsPerUser:     snap.AvgListingsPerUser,
+	}
+}
+
 // @Tags		Analytics
 // @Summary	Get latest analytics snapshot
 // @Produce	json
 // @Success	200	{object}	response.Template{data=LatestSnapshotResponse}	"Latest snapshot (snapshot field null when none)"
 // @Failure	500	{object}	response.Template{data=string}				"Internal error"
 // @Router		/analytics/snapshot/latest [get]
-const nanotonPerTON = 1e9
-
 func (h *handler) GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	ctx := r.Context()
-	snap, err := h.svc.GetLatestSnapshot(ctx)
+	snap, err := h.svc.GetLatestSnapshot(r.Context())
 	if err != nil {
 		return nil, err
 	}
 	if snap == nil {
 		return &model.LatestSnapshotResponse{Snapshot: nil}, nil
 	}
-	return &model.LatestSnapshotResponse{
-		Snapshot: &model.SnapshotResponse{
-			ID:                     snap.ID,
-			RecordedAt:             snap.RecordedAt,
-			ListingsCount:          snap.ListingsCount,
-			DealsCount:             snap.DealsCount,
-			DealsByStatus:          snap.DealsByStatus,
-			DealAmountsByStatusTON: snap.DealAmountsByStatusTON,
-			CommissionEarnedTON:    float64(snap.CommissionEarnedNanoton) / nanotonPerTON,
-			UsersCount:             snap.UsersCount,
-			AvgListingsPerUser:     snap.AvgListingsPerUser,
-		},
-	}, nil
+	return &model.LatestSnapshotResponse{Snapshot: snapshotToResponse(snap)}, nil
 }
 
-//
 // @Tags		Analytics
 // @Summary	Get analytics snapshot history for charts
 // @Produce	json
@@ -79,7 +81,6 @@ func (h *handler) GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (int
 // @Failure	500	{object}	response.Template{data=string}				"Internal error"
 // @Router		/analytics/snapshot/history [get]
 func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	ctx := r.Context()
 	period := r.URL.Query().Get("period")
 	if period == "" {
 		period = periodWeek
@@ -92,14 +93,17 @@ func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (in
 	from := now.AddDate(0, 0, -days)
 	to := now
 
-	list, err := h.svc.ListSnapshots(ctx, from, to)
+	list, err := h.svc.ListSnapshots(r.Context(), from, to)
 	if err != nil {
 		return nil, err
 	}
 	if list == nil {
 		list = []*domain.Snapshot{}
 	}
+	return buildHistoryResponse(list, period, from, to), nil
+}
 
+func buildHistoryResponse(list []*domain.Snapshot, period string, from, to time.Time) *model.HistoryResponse {
 	resp := &model.HistoryResponse{
 		Period:                 period,
 		From:                   from.Format(time.RFC3339),
@@ -154,6 +158,5 @@ func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (in
 			resp.DealAmountsByStatusTON[k] = append(resp.DealAmountsByStatusTON[k], v)
 		}
 	}
-
-	return resp, nil
+	return resp
 }

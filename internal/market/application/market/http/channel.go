@@ -3,13 +3,11 @@ package http
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	apperrors "ads-mrkt/internal/errors"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 	_ "ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
-	"ads-mrkt/pkg/auth"
 )
 
 // @Security	JWT
@@ -20,9 +18,9 @@ import (
 // @Failure	401	{object}	response.Template{data=string}				"Unauthorized"
 // @Router		/market/my-channels [get]
 func (h *handler) ListMyChannels(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 	list, err := h.channelService.ListMyChannels(r.Context(), userID)
 	if err != nil {
@@ -43,17 +41,13 @@ func (h *handler) ListMyChannels(w http.ResponseWriter, r *http.Request) (interf
 // @Failure	404	{object}	response.Template{data=string}			"Not found"
 // @Router		/market/channels/{id}/refresh [get]
 func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		return nil, apperrors.ServiceError{Err: nil, Message: "id required", Code: apperrors.ErrorCodeBadRequest}
-	}
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 	ch, err := h.channelService.RequestStatsRefresh(r.Context(), id, userID)
 	if err != nil {
@@ -86,17 +80,13 @@ func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interf
 // @Failure	404	{object}	response.Template{data=string}	"Not found"
 // @Router		/market/channels/{id}/stats [get]
 func (h *handler) GetChannelStats(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		return nil, apperrors.ServiceError{Err: nil, Message: "id required", Code: apperrors.ErrorCodeBadRequest}
-	}
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 	stats, err := h.channelService.GetChannelStats(r.Context(), id, userID)
 	if err != nil {

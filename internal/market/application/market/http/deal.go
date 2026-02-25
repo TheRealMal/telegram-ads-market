@@ -1,17 +1,93 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	apperrors "ads-mrkt/internal/errors"
 	"ads-mrkt/internal/market/application/market/http/model"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
-	"ads-mrkt/pkg/auth"
 )
+
+func resolveLessorLessee(listing *entity.Listing, userID int64) (lessorID, lesseeID int64, err error) {
+	switch listing.Type {
+	case entity.ListingTypeLessor:
+		return listing.UserID, userID, nil
+	case entity.ListingTypeLessee:
+		return userID, listing.UserID, nil
+	default:
+		return 0, 0, apperrors.ServiceError{Err: nil, Message: "invalid listing type", Code: apperrors.ErrorCodeBadRequest}
+	}
+}
+
+func resolveDealChannelID(listing *entity.Listing, req *model.CreateDealRequest) (*int64, error) {
+	switch listing.Type {
+	case entity.ListingTypeLessor:
+		return listing.ChannelID, nil
+	case entity.ListingTypeLessee:
+		if req.ChannelID == nil {
+			return nil, apperrors.ServiceError{Err: nil, Message: "channel_id is required when applying to a lessee listing", Code: apperrors.ErrorCodeBadRequest}
+		}
+		return req.ChannelID, nil
+	default:
+		return nil, nil
+	}
+}
+
+func buildDealFromCreateRequest(req *model.CreateDealRequest, lessorID, lesseeID int64, dealChannelID *int64, canonDetails json.RawMessage) *entity.Deal {
+	return &entity.Deal{
+		ListingID: req.ListingID,
+		LessorID:  lessorID,
+		LesseeID:  lesseeID,
+		ChannelID: dealChannelID,
+		Type:      req.Type,
+		Duration:  req.Duration,
+		Price:     domain.TONToNanoton(req.Price),
+		Details:   canonDetails,
+	}
+}
+
+func applyUpdateDealDraftRequest(existing *entity.Deal, id int64, req *model.UpdateDealDraftRequest) (*entity.Deal, error) {
+	d := *existing
+	d.ID = id
+	if req.Type != nil {
+		d.Type = *req.Type
+	}
+	if req.Duration != nil {
+		d.Duration = *req.Duration
+	}
+	if req.Price != nil {
+		d.Price = domain.TONToNanoton(*req.Price)
+	}
+	if req.Details != nil {
+		canonDetails, err := domain.ValidateDealDetails(req.Details)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+		d.Details = canonDetails
+	}
+	return &d, nil
+}
+
+func (h *handler) validateDealPriceMatchesListing(ctx context.Context, existing, d *entity.Deal, req *model.UpdateDealDraftRequest) error {
+	if req.Type == nil && req.Duration == nil && req.Price == nil {
+		return nil
+	}
+	listing, err := h.listingService.GetListing(ctx, existing.ListingID)
+	if err != nil {
+		return toServiceError(err)
+	}
+	if listing == nil {
+		return apperrors.ServiceError{Err: nil, Message: "listing not found", Code: apperrors.ErrorCodeNotFound}
+	}
+	if !domain.DealPriceMatchesListing(listing.Prices, d.Type, d.Duration, d.Price) {
+		return apperrors.ServiceError{Err: nil, Message: "type, duration and price must match one of the listing's price options", Code: apperrors.ErrorCodeBadRequest}
+	}
+	return nil
+}
 
 // @Security	JWT
 // @Tags		Market
@@ -26,9 +102,9 @@ import (
 // @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals [post]
 func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 
 	var req model.CreateDealRequest
@@ -50,30 +126,13 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, apperrors.ServiceError{Err: nil, Message: "type, duration and price must match one of the listing's price options", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	var lessorID, lesseeID int64
-	switch listing.Type {
-	case entity.ListingTypeLessor:
-		lessorID = listing.UserID
-		lesseeID = userID
-	case entity.ListingTypeLessee:
-		lessorID = userID
-		lesseeID = listing.UserID
-	default:
-		return nil, apperrors.ServiceError{Err: nil, Message: "invalid listing type", Code: apperrors.ErrorCodeBadRequest}
+	lessorID, lesseeID, err := resolveLessorLessee(listing, userID)
+	if err != nil {
+		return nil, err
 	}
-
-	// Deal channel: lessor listing → from listing (listing owner = lessor = channel owner); lessee listing → from request (deal creator = lessor = channel owner).
-	var dealChannelID *int64
-	switch listing.Type {
-	case entity.ListingTypeLessor:
-		if listing.ChannelID != nil {
-			dealChannelID = listing.ChannelID
-		}
-	case entity.ListingTypeLessee:
-		if req.ChannelID == nil {
-			return nil, apperrors.ServiceError{Err: nil, Message: "channel_id is required when applying to a lessee listing", Code: apperrors.ErrorCodeBadRequest}
-		}
-		dealChannelID = req.ChannelID
+	dealChannelID, err := resolveDealChannelID(listing, &req)
+	if err != nil {
+		return nil, err
 	}
 
 	details := req.Details
@@ -84,16 +143,8 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
 	}
-	d := &entity.Deal{
-		ListingID: req.ListingID,
-		LessorID:  lessorID,
-		LesseeID:  lesseeID,
-		ChannelID: dealChannelID,
-		Type:      req.Type,
-		Duration:  req.Duration,
-		Price:     domain.TONToNanoton(req.Price),
-		Details:   canonDetails,
-	}
+
+	d := buildDealFromCreateRequest(&req, lessorID, lesseeID, dealChannelID, canonDetails)
 	if err := h.dealService.CreateDeal(r.Context(), d, listing.UserID); err != nil {
 		return nil, toServiceError(err)
 	}
@@ -111,14 +162,13 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [get]
 func (h *handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	d, err := h.dealService.GetDealForUser(r.Context(), id, userID)
@@ -141,18 +191,13 @@ func (h *handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, 
 // @Failure	401			{object}	response.Template{data=string}			"Unauthorized"
 // @Router		/market/listings/{listing_id}/deals [get]
 func (h *handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	listingIDStr := r.PathValue("listing_id")
-	if listingIDStr == "" {
-		return nil, apperrors.ServiceError{Err: nil, Message: "listing_id required", Code: apperrors.ErrorCodeBadRequest}
-	}
-	listingID, err := strconv.ParseInt(listingIDStr, 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid listing_id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	listingID, err := parsePathID(r, "listing_id")
+	if err != nil {
+		return nil, err
 	}
 
 	list, err := h.dealService.GetDealsByListingIDForUser(r.Context(), listingID, userID)
@@ -170,9 +215,9 @@ func (h *handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (
 // @Failure	401	{object}	response.Template{data=string}			"Unauthorized"
 // @Router		/market/my-deals [get]
 func (h *handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 	list, err := h.dealService.GetDealsByUserID(r.Context(), userID)
 	if err != nil {
@@ -195,14 +240,13 @@ func (h *handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface
 // @Failure	404		{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id} [patch]
 func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	existing, err := h.dealService.GetDeal(r.Context(), id)
@@ -215,39 +259,15 @@ func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	d := *existing
-	d.ID = id
-	if req.Type != nil {
-		d.Type = *req.Type
+	d, err := applyUpdateDealDraftRequest(existing, id, &req)
+	if err != nil {
+		return nil, err
 	}
-	if req.Duration != nil {
-		d.Duration = *req.Duration
-	}
-	if req.Price != nil {
-		d.Price = domain.TONToNanoton(*req.Price)
-	}
-	if req.Details != nil {
-		canonDetails, err := domain.ValidateDealDetails(req.Details)
-		if err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-		}
-		d.Details = canonDetails
+	if err := h.validateDealPriceMatchesListing(r.Context(), existing, d, &req); err != nil {
+		return nil, err
 	}
 
-	if req.Type != nil || req.Duration != nil || req.Price != nil {
-		listing, listErr := h.listingService.GetListing(r.Context(), existing.ListingID)
-		if listErr != nil {
-			return nil, toServiceError(listErr)
-		}
-		if listing == nil {
-			return nil, apperrors.ServiceError{Err: nil, Message: "listing not found", Code: apperrors.ErrorCodeNotFound}
-		}
-		if !domain.DealPriceMatchesListing(listing.Prices, d.Type, d.Duration, d.Price) {
-			return nil, apperrors.ServiceError{Err: nil, Message: "type, duration and price must match one of the listing's price options", Code: apperrors.ErrorCodeBadRequest}
-		}
-	}
-
-	if err := h.dealService.UpdateDealDraft(r.Context(), userID, &d); err != nil {
+	if err := h.dealService.UpdateDealDraft(r.Context(), userID, d); err != nil {
 		return nil, toServiceError(err)
 	}
 	updated, _ := h.dealService.GetDeal(r.Context(), id)
@@ -266,14 +286,13 @@ func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/sign [post]
 func (h *handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	if err := h.dealService.SignDeal(r.Context(), userID, id); err != nil {
@@ -299,14 +318,13 @@ func (h *handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{},
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/payout-address [put]
 func (h *handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	var req model.SetDealPayoutRequest
@@ -336,14 +354,13 @@ func (h *handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (
 // @Failure	404	{object}	response.Template{data=string}		"Not found"
 // @Router		/market/deals/{id}/reject [post]
 func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	if err := h.dealService.RejectDeal(r.Context(), userID, id); err != nil {
@@ -368,14 +385,13 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Failure	404	{object}	response.Template{data=string}	"Not found"
 // @Router		/market/deals/{id}/chat-link [post]
 func (h *handler) GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
-	}
-
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	userID, err := requireUserID(r)
 	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
+		return nil, err
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		return nil, err
 	}
 
 	chatLink, err := h.dealChatService.GetOrCreateDealForumChat(r.Context(), id, userID)

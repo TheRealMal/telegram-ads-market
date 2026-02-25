@@ -7,7 +7,6 @@ import (
 
 	apperrors "ads-mrkt/internal/errors"
 	"ads-mrkt/internal/market/application/market/http/model"
-	"ads-mrkt/pkg/auth"
 
 	_ "ads-mrkt/internal/server/templates/response"
 )
@@ -69,9 +68,9 @@ func (h *handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 // @Failure	401		{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/me/wallet [put]
 func (h *handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 
 	var req model.SetWalletRequest
@@ -96,9 +95,9 @@ func (h *handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}
 // @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
 // @Router		/market/me/wallet [delete]
 func (h *handler) DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	userID, ok := auth.GetTelegramID(r.Context())
-	if !ok {
-		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
+	userID, err := requireUserID(r)
+	if err != nil {
+		return nil, err
 	}
 	if err := h.userService.ClearWallet(r.Context(), userID); err != nil {
 		return nil, toServiceError(err)

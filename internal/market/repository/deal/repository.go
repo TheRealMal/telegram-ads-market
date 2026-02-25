@@ -319,18 +319,7 @@ func (r *repository) SignDealInTx(ctx context.Context, dealID int64, userID int6
 	if err != nil || updated == nil {
 		return err
 	}
-	lessorPayout := ""
-	if updated.LessorPayoutAddress != nil {
-		lessorPayout = *updated.LessorPayoutAddress
-	}
-	lesseePayout := ""
-	if updated.LesseePayoutAddress != nil {
-		lesseePayout = *updated.LesseePayoutAddress
-	}
-	lessorSig := domain.ComputeDealSignature(updated.Type, updated.Duration, updated.Price, updated.Details, updated.LessorID, lessorPayout, lesseePayout)
-	lesseeSig := domain.ComputeDealSignature(updated.Type, updated.Duration, updated.Price, updated.Details, updated.LesseeID, lessorPayout, lesseePayout)
-	if updated.LessorSignature != nil && updated.LesseeSignature != nil &&
-		*updated.LessorSignature == lessorSig && *updated.LesseeSignature == lesseeSig {
+	if domain.DealSignaturesMatch(updated) {
 		return r.SetDealStatusApproved(txCtx, dealID)
 	}
 	return nil
