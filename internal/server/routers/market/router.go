@@ -36,7 +36,6 @@ type authMiddleware interface {
 	WithAuth(next http.HandlerFunc, allowedRoles ...role.Role) http.HandlerFunc
 }
 
-// AnalyticsHandler serves analytics snapshot endpoints (optional).
 type AnalyticsHandler interface {
 	GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -68,7 +67,6 @@ func (r *Router) GetRoutes() http.Handler {
 
 	mux := http.NewServeMux()
 
-	// Auth (no JWT required)
 	mux.HandleFunc("POST /api/v1/market/auth", server.WithMetrics(
 		server.WithMethod(
 			server.WithJSONResponse(r.handler.AuthUser),
@@ -95,7 +93,6 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	// Listings
 	mux.HandleFunc("GET /api/v1/market/listings", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -151,7 +148,6 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	// Channels (auth required)
 	mux.HandleFunc("GET /api/v1/market/my-channels", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -180,7 +176,6 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	// Deals
 	mux.HandleFunc("POST /api/v1/market/deals", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/channel/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -26,32 +27,6 @@ func New(db database) *repository {
 	return &repository{db: db}
 }
 
-type channelRow struct {
-	ID          int64           `db:"id"`
-	AccessHash  int64           `db:"access_hash"`
-	AdminRights json.RawMessage `db:"admin_rights"`
-	Title       string          `db:"title"`
-	Username    string          `db:"username"`
-	Photo       string          `db:"photo"`
-}
-
-func channelRowToEntity(row channelRow) (*entity.Channel, error) {
-	var rights entity.AdminRights
-	if len(row.AdminRights) > 0 {
-		if err := json.Unmarshal(row.AdminRights, &rights); err != nil {
-			return nil, err
-		}
-	}
-	return &entity.Channel{
-		ID:          row.ID,
-		AccessHash:  row.AccessHash,
-		AdminRights: rights,
-		Title:       row.Title,
-		Username:    row.Username,
-		Photo:       row.Photo,
-	}, nil
-}
-
 func (r *repository) GetChannelByID(ctx context.Context, id int64) (*entity.Channel, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, access_hash, admin_rights, title, username, photo
@@ -62,14 +37,14 @@ func (r *repository) GetChannelByID(ctx context.Context, id int64) (*entity.Chan
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[channelRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ChannelRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return channelRowToEntity(row)
+	return model.ChannelRowToEntity(row)
 }
 
 func (r *repository) ListChannelsByAdminUserID(ctx context.Context, userID int64) ([]*entity.Channel, error) {
@@ -85,13 +60,13 @@ func (r *repository) ListChannelsByAdminUserID(ctx context.Context, userID int64
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[channelRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ChannelRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Channel, 0, len(slice))
 	for _, row := range slice {
-		ch, err := channelRowToEntity(row)
+		ch, err := model.ChannelRowToEntity(row)
 		if err != nil {
 			return nil, err
 		}
@@ -147,10 +122,6 @@ func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, st
 	return err
 }
 
-type channelStatsRow struct {
-	Stats json.RawMessage `db:"stats"`
-}
-
 func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json.RawMessage, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT stats FROM market.channel_stats WHERE channel_id = @channel_id`,
@@ -160,7 +131,7 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[channelStatsRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ChannelStatsRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

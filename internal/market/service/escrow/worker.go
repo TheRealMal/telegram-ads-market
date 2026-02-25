@@ -13,8 +13,6 @@ const (
 	escrowWorkerInterval = 30 * time.Second
 )
 
-// Worker runs a loop that fetches all deals in status approved without escrow and creates escrow for each.
-// Interval is the delay between runs. Run blocks until ctx is cancelled.
 func (s *service) Worker(ctx context.Context) {
 	logger := slog.With("component", "escrow_creator_worker")
 	ticker := time.NewTicker(escrowWorkerInterval)
@@ -38,7 +36,6 @@ func (s *service) Worker(ctx context.Context) {
 		}
 	}
 
-	// Run once immediately, then on ticker
 	run(ctx)
 	for {
 		select {
@@ -52,8 +49,6 @@ func (s *service) Worker(ctx context.Context) {
 
 const releaseRefundWorkerInterval = 1 * time.Minute
 
-// ReleaseRefundWorker runs a loop that processes deals in waiting_escrow_release (release to lessor)
-// and waiting_escrow_refund (refund to lessee), using locks and sending TON from escrow.
 func (s *service) ReleaseRefundWorker(ctx context.Context) {
 	logger := slog.With("component", "escrow_manager_worker")
 	ticker := time.NewTicker(releaseRefundWorkerInterval)

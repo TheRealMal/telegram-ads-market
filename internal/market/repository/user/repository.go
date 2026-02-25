@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/user/model"
 	"ads-mrkt/pkg/auth/role"
 
 	"github.com/jackc/pgx/v5"
@@ -24,23 +25,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type userRow struct {
-	ID            int64   `db:"id"`
-	Username      string  `db:"username"`
-	Photo         string  `db:"photo"`
-	FirstName     string  `db:"first_name"`
-	LastName      string  `db:"last_name"`
-	Locale        string  `db:"locale"`
-	ReferrerID    int64   `db:"referrer_id"`
-	AllowsPM      bool    `db:"allows_pm"`
-	WalletAddress *string `db:"wallet_address"`
-	Role          string  `db:"role"`
-}
-
-type roleRow struct {
-	Role string `db:"role"`
 }
 
 func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
@@ -72,7 +56,7 @@ func (r *repository) UpsertUser(ctx context.Context, u *entity.User) error {
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[roleRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.RoleRow])
 	if err != nil {
 		return err
 	}
@@ -90,27 +74,14 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[userRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.UserRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	u := &entity.User{
-		ID:            row.ID,
-		Username:      row.Username,
-		Photo:         row.Photo,
-		FirstName:     row.FirstName,
-		LastName:      row.LastName,
-		Locale:        row.Locale,
-		ReferrerID:    row.ReferrerID,
-		AllowsPM:      row.AllowsPM,
-		WalletAddress: row.WalletAddress,
-		Role:          role.Role(row.Role),
-	}
-	return u, nil
+	return model.UserRowToEntity(row), nil
 }
 
 func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddressRaw string) error {

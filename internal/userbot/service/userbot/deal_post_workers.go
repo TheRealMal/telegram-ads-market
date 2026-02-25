@@ -18,7 +18,6 @@ const (
 	postCheckAdvanceHour = time.Hour
 )
 
-// RunDealPostSenderWorker lists deals escrow_deposit_confirmed without a post message, sends the post text to the listing's channel, and creates deal_post_message.
 func (s *service) RunDealPostSenderWorker(ctx context.Context) {
 	logger := slog.With("component", "deal_post_sendr")
 	ticker := time.NewTicker(postSenderInterval)
@@ -131,7 +130,6 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 
 const lastMessagesRecoveryLimit = 20
 
-// sendChannelMessage sends a text message to the channel and returns the message ID.
 func (s *service) sendChannelMessage(ctx context.Context, channelID int64, accessHash int64, text string) (int64, error) {
 	peer := &tg.InputPeerChannel{ChannelID: channelID, AccessHash: accessHash}
 	req := &tg.MessagesSendMessageRequest{
@@ -155,7 +153,6 @@ func (s *service) sendChannelMessage(ctx context.Context, channelID int64, acces
 	return 0, nil
 }
 
-// RunDealPostCheckerWorker lists deal_post_message with status=exists and next_check <= now, checks if the message still exists, and updates status/next_check or sets passed.
 func (s *service) RunDealPostCheckerWorker(ctx context.Context) {
 	logger := slog.With("component", "deal_post_checker")
 	ticker := time.NewTicker(postCheckerInterval)
@@ -203,13 +200,11 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 	}
 }
 
-// channelMessage is a message ID and text from a channel.
 type channelMessage struct {
 	ID   int64
 	Text string
 }
 
-// getChannelHistory fetches channel history via MessagesGetHistory.
 // See https://core.telegram.org/api/offsets: offset = offsetFromID(offsetID) + addOffset; results are reverse chronological (newest first).
 // For "most recent N": offsetID=0, addOffset=0, limit=N.
 // For "around message ID": offsetID=messageID, addOffset=-halfWindow, limit=windowSize.
@@ -250,9 +245,7 @@ func (s *service) getChannelHistory(ctx context.Context, channelID int64, access
 	return out, nil
 }
 
-// getChannelMessageExists returns true if the message exists in the channel, by fetching a small window of history around that message ID (per Telegram offset semantics).
 func (s *service) getChannelMessageExists(ctx context.Context, channelID int64, accessHash int64, messageID int64) (bool, error) {
-	// "Around message MSGID": offset_id=MSGID, add_offset=-10, limit=20 (per core.telegram.org/api/offsets)
 	const windowAround = 20
 	msgs, err := s.getChannelHistory(ctx, channelID, accessHash, int(messageID), -windowAround/2, windowAround)
 	if err != nil {
@@ -266,9 +259,7 @@ func (s *service) getChannelMessageExists(ctx context.Context, channelID int64, 
 	return false, nil
 }
 
-// tryRecoverPostFromChannel fetches the last messages in the channel and returns (messageID, true) if one matches text exactly.
 func (s *service) tryRecoverPostFromChannel(ctx context.Context, channelID int64, accessHash int64, text string) (int64, bool) {
-	// "Most recent N": offset_id=0, add_offset=0, limit=N (per core.telegram.org/api/offsets)
 	msgs, err := s.getChannelHistory(ctx, channelID, accessHash, 0, 0, lastMessagesRecoveryLimit)
 	if err != nil {
 		return 0, false

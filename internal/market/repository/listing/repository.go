@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/listing/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -25,67 +25,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type listingRow struct {
-	ID          int64           `db:"id"`
-	Status      string          `db:"status"`
-	UserID      int64           `db:"user_id"`
-	ChannelID   *int64          `db:"channel_id"`
-	Type        string          `db:"type"`
-	Prices      json.RawMessage `db:"prices"`
-	Categories  json.RawMessage `db:"categories"`
-	Description *string         `db:"description"`
-	CreatedAt   time.Time       `db:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at"`
-}
-
-type listingWithChannelRow struct {
-	listingRow
-	ChannelTitle     *string `db:"channel_title"`
-	ChannelUsername  *string `db:"channel_username"`
-	ChannelPhoto     *string `db:"channel_photo"`
-	ChannelFollowers *int64  `db:"channel_followers"`
-}
-
-func stringFromPtr(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
-type listingReturnRow struct {
-	ID        int64     `db:"id"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-}
-
-func listingRowToEntity(row listingRow) *entity.Listing {
-	l := &entity.Listing{
-		ID:          row.ID,
-		Status:      entity.ListingStatus(row.Status),
-		UserID:      row.UserID,
-		ChannelID:   row.ChannelID,
-		Type:        entity.ListingType(row.Type),
-		Prices:      row.Prices,
-		Description: stringFromPtr(row.Description),
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
-	}
-	if len(row.Categories) > 0 {
-		l.Categories = row.Categories
-	}
-	return l
-}
-
-func listingWithChannelRowToEntity(row listingWithChannelRow) *entity.Listing {
-	l := listingRowToEntity(row.listingRow)
-	l.ChannelTitle = row.ChannelTitle
-	l.ChannelUsername = row.ChannelUsername
-	l.ChannelPhoto = row.ChannelPhoto
-	l.ChannelFollowers = row.ChannelFollowers
-	return l
 }
 
 func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error {
@@ -111,7 +50,7 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[listingReturnRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingReturnRow])
 	if err != nil {
 		return err
 	}
@@ -136,14 +75,14 @@ func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.List
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[listingWithChannelRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return listingWithChannelRowToEntity(row), nil
+	return model.ListingWithChannelRowToEntity(row), nil
 }
 
 func (r *repository) UpdateListing(ctx context.Context, l *entity.Listing) error {
@@ -195,19 +134,15 @@ func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[listingWithChannelRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Listing, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, listingWithChannelRowToEntity(row))
+		list = append(list, model.ListingWithChannelRowToEntity(row))
 	}
 	return list, nil
-}
-
-type listingExistsRow struct {
-	One int `db:"one"`
 }
 
 func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID int64) (bool, error) {
@@ -220,7 +155,7 @@ func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID in
 		return false, err
 	}
 	defer rows.Close()
-	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[listingExistsRow])
+	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingExistsRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
@@ -260,13 +195,13 @@ func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingTyp
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[listingWithChannelRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Listing, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, listingWithChannelRowToEntity(row))
+		list = append(list, model.ListingWithChannelRowToEntity(row))
 	}
 	return list, nil
 }

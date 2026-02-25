@@ -104,9 +104,6 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 	return nil
 }
 
-// ReleaseOrRefundEscrow performs escrow release (to lessor) or refund (to lessee) using a short-lived lock.
-// Takes a 5-minute lock, sends deal.EscrowAmount (nanoton) to the payout address, then marks lock and deal status.
-// Deal must have lessor_payout_address (release) or lessee_payout_address (refund) set.
 func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger, dealID int64, release bool) error {
 	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {

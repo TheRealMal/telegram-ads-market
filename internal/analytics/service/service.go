@@ -11,7 +11,7 @@ import (
 
 const collectInterval = 1 * time.Hour
 
-const snapshotHourUTC = 3 // snapshot is taken at 3:00 AM UTC
+const snapshotHourUTC = 3
 
 type repository interface {
 	CollectSnapshot(ctx context.Context, transactionGasNanoton int64, commissionPercent float64) (*domain.Snapshot, error)
@@ -37,7 +37,6 @@ func New(repo repository, transactionGasTON float64, commissionPercent float64) 
 	}
 }
 
-// Run starts the hourly analytics collector.
 func (s *service) Run(ctx context.Context) {
 	ticker := time.NewTicker(collectInterval)
 	defer ticker.Stop()
@@ -87,12 +86,10 @@ func (s *service) collectAndSave(ctx context.Context) {
 	)
 }
 
-// GetLatestSnapshot returns the most recent analytics snapshot, if any.
 func (s *service) GetLatestSnapshot(ctx context.Context) (*domain.Snapshot, error) {
 	return s.repo.GetLatestSnapshot(ctx)
 }
 
-// ListSnapshots returns snapshots in the given time range, ordered by recorded_at ASC.
 func (s *service) ListSnapshots(ctx context.Context, from, to time.Time) ([]*domain.Snapshot, error) {
 	return s.repo.ListSnapshots(ctx, from, to)
 }

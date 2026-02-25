@@ -8,7 +8,6 @@ import (
 	"ads-mrkt/pkg/auth/role"
 )
 
-// AuthUser verifies Telegram Mini App init data, upserts the user into market.user, and returns the user.
 func (s *userService) AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error) {
 	initData, err := parseAndVerifyInitData(s.botToken, initDataStr)
 	if err != nil {
@@ -35,7 +34,6 @@ func (s *userService) AuthUser(ctx context.Context, initDataStr string, referrer
 	return u, nil
 }
 
-// SetWallet stores the user's TON wallet address (raw format) for deal payouts.
 func (s *userService) SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
 	if walletAddressRaw == "" {
 		return fmt.Errorf("wallet address is required")
@@ -43,7 +41,6 @@ func (s *userService) SetWallet(ctx context.Context, userID int64, walletAddress
 	return s.userRepo.SetUserWallet(ctx, userID, walletAddressRaw)
 }
 
-// ClearWallet removes the user's linked wallet (disconnect).
 func (s *userService) ClearWallet(ctx context.Context, userID int64) error {
 	return s.userRepo.ClearUserWallet(ctx, userID)
 }

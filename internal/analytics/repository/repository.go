@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"ads-mrkt/internal/analytics/domain"
+	"ads-mrkt/internal/analytics/repository/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -29,41 +29,6 @@ func New(db database) *Repository {
 	return &Repository{db: db}
 }
 
-type countRow struct {
-	Count int64 `db:"count"`
-}
-
-type statusCountRow struct {
-	Status string `db:"status"`
-	Count  int64  `db:"count"`
-}
-
-type statusSumRow struct {
-	Status string `db:"status"`
-	Sum    int64  `db:"sum"`
-}
-
-type commissionRow struct {
-	Commission int64 `db:"commission"`
-}
-
-type existsRow struct {
-	Exists bool `db:"exists"`
-}
-
-type snapshotRow struct {
-	ID                      int64           `db:"id"`
-	RecordedAt              time.Time       `db:"recorded_at"`
-	ListingsCount           int64           `db:"listings_count"`
-	DealsCount              int64           `db:"deals_count"`
-	DealsByStatus           json.RawMessage `db:"deals_by_status"`
-	DealAmountsByStatusTon  json.RawMessage `db:"deal_amounts_by_status_ton"`
-	CommissionEarnedNanoton int64           `db:"commission_earned_nanoton"`
-	UsersCount              int64           `db:"users_count"`
-	AvgListingsPerUser      float64         `db:"avg_listings_per_user"`
-}
-
-// CollectSnapshot runs aggregation queries against market schema and returns a snapshot (not persisted).
 func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton int64, commissionPercent float64) (*domain.Snapshot, error) {
 	snap := &domain.Snapshot{
 		DealsByStatus:          make(map[string]int64),
@@ -75,7 +40,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[countRow])
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[model.CountRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -86,7 +51,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	row, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[countRow])
+	row, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[model.CountRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -97,7 +62,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	statusCounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[statusCountRow])
+	statusCounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.StatusCountRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -110,7 +75,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	statusSums, err := pgx.CollectRows(rows, pgx.RowToStructByName[statusSumRow])
+	statusSums, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.StatusSumRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -130,7 +95,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	commRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[commissionRow])
+	commRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[model.CommissionRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -141,7 +106,7 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 	if err != nil {
 		return nil, err
 	}
-	row, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[countRow])
+	row, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[model.CountRow])
 	rows.Close()
 	if err != nil {
 		return nil, err
@@ -199,7 +164,6 @@ func (r *Repository) InsertSnapshot(ctx context.Context, s *domain.Snapshot) err
 	return err
 }
 
-// HasSnapshotForDate returns true if at least one snapshot exists for the given UTC date.
 func (r *Repository) HasSnapshotForDate(ctx context.Context, date time.Time) (bool, error) {
 	utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	rows, err := r.db.Query(ctx, `
@@ -213,14 +177,13 @@ func (r *Repository) HasSnapshotForDate(ctx context.Context, date time.Time) (bo
 		return false, err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[existsRow])
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[model.ExistsRow])
 	if err != nil {
 		return false, err
 	}
 	return row.Exists, nil
 }
 
-// GetLatestSnapshot returns the most recent snapshot, if any.
 func (r *Repository) GetLatestSnapshot(ctx context.Context) (*domain.Snapshot, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, recorded_at, listings_count, deals_count,
@@ -234,17 +197,16 @@ func (r *Repository) GetLatestSnapshot(ctx context.Context) (*domain.Snapshot, e
 		return nil, err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[snapshotRow])
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[model.SnapshotRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return snapshotRowToDomain(row), nil
+	return model.SnapshotRowToDomain(row), nil
 }
 
-// ListSnapshots returns snapshots in the given time range, ordered by recorded_at ASC (for line charts).
 func (r *Repository) ListSnapshots(ctx context.Context, from, to time.Time) ([]*domain.Snapshot, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, recorded_at, listings_count, deals_count,
@@ -259,28 +221,13 @@ func (r *Repository) ListSnapshots(ctx context.Context, from, to time.Time) ([]*
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[snapshotRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.SnapshotRow])
 	if err != nil {
 		return nil, err
 	}
 	out := make([]*domain.Snapshot, 0, len(slice))
 	for i := range slice {
-		out = append(out, snapshotRowToDomain(slice[i]))
+		out = append(out, model.SnapshotRowToDomain(slice[i]))
 	}
 	return out, nil
-}
-
-func snapshotRowToDomain(row snapshotRow) *domain.Snapshot {
-	s := &domain.Snapshot{
-		ID:                      row.ID,
-		RecordedAt:              row.RecordedAt.Format(time.RFC3339),
-		ListingsCount:           row.ListingsCount,
-		DealsCount:              row.DealsCount,
-		CommissionEarnedNanoton: row.CommissionEarnedNanoton,
-		UsersCount:              row.UsersCount,
-		AvgListingsPerUser:      row.AvgListingsPerUser,
-	}
-	_ = json.Unmarshal(row.DealsByStatus, &s.DealsByStatus)
-	_ = json.Unmarshal(row.DealAmountsByStatusTon, &s.DealAmountsByStatusTON)
-	return s
 }

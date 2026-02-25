@@ -4,83 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	apperrors "ads-mrkt/internal/errors"
+	"ads-mrkt/internal/market/application/market/http/model"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
 	"ads-mrkt/pkg/auth"
 )
-
-// dealResponse is the API shape for a deal; price is in TON (float) for clients.
-type dealResponse struct {
-	ID                  int64             `json:"id"`
-	ListingID           int64             `json:"listing_id"`
-	LessorID            int64             `json:"lessor_id"`
-	LesseeID            int64             `json:"lessee_id"`
-	ChannelID           *int64            `json:"channel_id,omitempty"`
-	Type                string            `json:"type"`
-	Duration            int64             `json:"duration"`
-	Price               float64           `json:"price"`
-	EscrowAmount        int64             `json:"escrow_amount"`
-	Details             json.RawMessage   `json:"details"`
-	LessorSignature     *string           `json:"lessor_signature,omitempty"`
-	LesseeSignature     *string           `json:"lessee_signature,omitempty"`
-	Status              entity.DealStatus `json:"status"`
-	EscrowAddress       *string           `json:"escrow_address,omitempty"`
-	EscrowReleaseTime   *time.Time        `json:"escrow_release_time,omitempty"`
-	LessorPayoutAddress *string           `json:"lessor_payout_address,omitempty"`
-	LesseePayoutAddress *string           `json:"lessee_payout_address,omitempty"`
-	CreatedAt           time.Time         `json:"created_at,omitempty"`
-	UpdatedAt           time.Time         `json:"updated_at,omitempty"`
-}
-
-func dealToResponse(d *entity.Deal) *dealResponse {
-	if d == nil {
-		return nil
-	}
-	return &dealResponse{
-		ID:                  d.ID,
-		ListingID:           d.ListingID,
-		LessorID:            d.LessorID,
-		LesseeID:            d.LesseeID,
-		ChannelID:           d.ChannelID,
-		Type:                d.Type,
-		Duration:            d.Duration,
-		Price:               domain.NanotonToTON(d.Price),
-		EscrowAmount:        d.EscrowAmount,
-		Details:             d.Details,
-		LessorSignature:     d.LessorSignature,
-		LesseeSignature:     d.LesseeSignature,
-		Status:              d.Status,
-		EscrowAddress:       d.EscrowAddress,
-		EscrowReleaseTime:   d.EscrowReleaseTime,
-		LessorPayoutAddress: d.LessorPayoutAddress,
-		LesseePayoutAddress: d.LesseePayoutAddress,
-		CreatedAt:           d.CreatedAt,
-		UpdatedAt:           d.UpdatedAt,
-	}
-}
-
-func dealsToResponses(list []*entity.Deal) []*dealResponse {
-	out := make([]*dealResponse, len(list))
-	for i, d := range list {
-		out[i] = dealToResponse(d)
-	}
-	return out
-}
-
-// CreateDealRequest is the body for POST /api/v1/market/deals. LessorID/LesseeID are derived from listing + token.
-// For lessee-type listings, channel_id is required (channel where ad will be posted; must be owned by the deal creator).
-type CreateDealRequest struct {
-	ListingID int64           `json:"listing_id"`
-	ChannelID *int64          `json:"channel_id,omitempty"` // Required when listing type is lessee; ignored when lessor (taken from listing).
-	Type      string          `json:"type"`
-	Duration  int64           `json:"duration"`
-	Price     float64         `json:"price"`
-	Details   json.RawMessage `json:"details"`
-}
 
 // @Security	JWT
 // @Tags		Market
@@ -100,7 +31,7 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
 	}
 
-	var req CreateDealRequest
+	var req model.CreateDealRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
@@ -166,7 +97,7 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if err := h.dealService.CreateDeal(r.Context(), d, listing.UserID); err != nil {
 		return nil, toServiceError(err)
 	}
-	return dealToResponse(d), nil
+	return model.DealToResponse(d), nil
 }
 
 // @Security	JWT
@@ -197,7 +128,7 @@ func (h *handler) GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, 
 	if d == nil {
 		return nil, apperrors.ServiceError{Err: nil, Message: "not found", Code: apperrors.ErrorCodeNotFound}
 	}
-	return dealToResponse(d), nil
+	return model.DealToResponse(d), nil
 }
 
 // @Security	JWT
@@ -228,7 +159,7 @@ func (h *handler) ListDealsByListingID(w http.ResponseWriter, r *http.Request) (
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return dealsToResponses(list), nil
+	return model.DealsToResponses(list), nil
 }
 
 // @Security	JWT
@@ -247,15 +178,7 @@ func (h *handler) ListMyDeals(w http.ResponseWriter, r *http.Request) (interface
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return dealsToResponses(list), nil
-}
-
-// UpdateDealDraftRequest is the body for PATCH /api/v1/market/deals/:id (draft only)
-type UpdateDealDraftRequest struct {
-	Type     *string         `json:"type,omitempty"`
-	Duration *int64          `json:"duration,omitempty"`
-	Price    *float64        `json:"price,omitempty"`
-	Details  json.RawMessage `json:"details,omitempty"`
+	return model.DealsToResponses(list), nil
 }
 
 // @Security	JWT
@@ -287,7 +210,7 @@ func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 		return nil, toServiceError(err)
 	}
 
-	var req UpdateDealDraftRequest
+	var req model.UpdateDealDraftRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
@@ -328,7 +251,7 @@ func (h *handler) UpdateDealDraft(w http.ResponseWriter, r *http.Request) (inter
 		return nil, toServiceError(err)
 	}
 	updated, _ := h.dealService.GetDeal(r.Context(), id)
-	return dealToResponse(updated), nil
+	return model.DealToResponse(updated), nil
 }
 
 // @Security	JWT
@@ -360,12 +283,7 @@ func (h *handler) SignDeal(w http.ResponseWriter, r *http.Request) (interface{},
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return dealToResponse(updated), nil
-}
-
-// SetDealPayoutRequest is the body for PUT /api/v1/market/deals/{id}/payout-address.
-type SetDealPayoutRequest struct {
-	WalletAddress string `json:"wallet_address"` // TON address in raw format
+	return model.DealToResponse(updated), nil
 }
 
 // @Security	JWT
@@ -391,7 +309,7 @@ func (h *handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid id", Code: apperrors.ErrorCodeBadRequest}
 	}
 
-	var req SetDealPayoutRequest
+	var req model.SetDealPayoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
@@ -403,7 +321,7 @@ func (h *handler) SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (
 		return nil, toServiceError(err)
 	}
 	updated, _ := h.dealService.GetDeal(r.Context(), id)
-	return dealToResponse(updated), nil
+	return model.DealToResponse(updated), nil
 }
 
 // @Security	JWT
@@ -435,12 +353,7 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return dealToResponse(updated), nil
-}
-
-// DealChatLinkResponse is the response for get-or-create deal forum chat.
-type DealChatLinkResponse struct {
-	ChatLink string `json:"chat_link"`
+	return model.DealToResponse(updated), nil
 }
 
 // @Security	JWT
@@ -469,5 +382,5 @@ func (h *handler) GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return &DealChatLinkResponse{ChatLink: chatLink}, nil
+	return &model.DealChatLinkResponse{ChatLink: chatLink}, nil
 }

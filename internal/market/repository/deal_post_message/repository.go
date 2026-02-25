@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/deal_post_message/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -24,34 +25,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type dealPostMessageRow struct {
-	ID          int64     `db:"id"`
-	DealID      int64     `db:"deal_id"`
-	ChannelID   int64     `db:"channel_id"`
-	MessageID   int64     `db:"message_id"`
-	PostMessage string    `db:"post_message"`
-	Status      string    `db:"status"`
-	NextCheck   time.Time `db:"next_check"`
-	UntilTs     time.Time `db:"until_ts"`
-	CreatedAt   time.Time `db:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
-}
-
-func dealPostMessageRowToEntity(row dealPostMessageRow) *entity.DealPostMessage {
-	return &entity.DealPostMessage{
-		ID:          row.ID,
-		DealID:      row.DealID,
-		ChannelID:   row.ChannelID,
-		MessageID:   row.MessageID,
-		PostMessage: row.PostMessage,
-		Status:      entity.DealPostMessageStatus(row.Status),
-		NextCheck:   row.NextCheck,
-		UntilTs:     row.UntilTs,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
-	}
 }
 
 func (r *repository) CreateDealPostMessage(ctx context.Context, m *entity.DealPostMessage) error {
@@ -73,11 +46,7 @@ func (r *repository) CreateDealPostMessage(ctx context.Context, m *entity.DealPo
 		return err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[struct {
-		ID        int64     `db:"id"`
-		CreatedAt time.Time `db:"created_at"`
-		UpdatedAt time.Time `db:"updated_at"`
-	}])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealPostMessageReturnRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil // conflict, row already exists
@@ -90,8 +59,6 @@ func (r *repository) CreateDealPostMessage(ctx context.Context, m *entity.DealPo
 	return nil
 }
 
-// CreateDealPostMessageAndSetDealInProgress inserts the deal_post_message and sets the deal status to in_progress
-// (when current status is escrow_deposit_confirmed) in a single transaction.
 func (r *repository) CreateDealPostMessageAndSetDealInProgress(ctx context.Context, m *entity.DealPostMessage) error {
 	txCtx, beginErr := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if beginErr != nil {
@@ -118,11 +85,7 @@ func (r *repository) CreateDealPostMessageAndSetDealInProgress(ctx context.Conte
 		return err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[struct {
-		ID        int64     `db:"id"`
-		CreatedAt time.Time `db:"created_at"`
-		UpdatedAt time.Time `db:"updated_at"`
-	}])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealPostMessageReturnRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil // conflict, row already exists
@@ -181,13 +144,13 @@ func (r *repository) ListDealPostMessageExistsWithNextCheckBefore(ctx context.Co
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealPostMessageRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealPostMessageRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.DealPostMessage, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealPostMessageRowToEntity(row))
+		list = append(list, model.DealPostMessageRowToEntity(row))
 	}
 	return list, nil
 }
@@ -206,13 +169,13 @@ func (r *repository) ListDealPostMessageByStatus(ctx context.Context, status ent
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealPostMessageRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealPostMessageRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.DealPostMessage, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealPostMessageRowToEntity(row))
+		list = append(list, model.DealPostMessageRowToEntity(row))
 	}
 	return list, nil
 }

@@ -20,7 +20,6 @@ type escrowDepositEventService interface {
 	AckEscrowDepositMessages(ctx context.Context, group string, messageIDs []string) error
 }
 
-// DepositStreamWorker reads escrow_deposit events and sets deal status to escrow_deposit_confirmed when amount >= deal.EscrowAmount.
 func (s *service) DepositStreamWorker(ctx context.Context, eventService escrowDepositEventService) {
 	logger := slog.With("component", "escrow_deposit_worker")
 	ticker := time.NewTicker(escrowDepositPollInterval)

@@ -19,7 +19,6 @@ const (
 	channelUpdateStatsStreamMaxAge   = 7 * 24 * time.Hour
 )
 
-// RunChannelUpdateStatsWorker runs the main event loop and starts the stream cleaner and pending processor in the background.
 func (s *service) RunChannelUpdateStatsWorker(ctx context.Context) {
 	logger := slog.With("component", "channel_update_stats_worker")
 

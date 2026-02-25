@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	apperrors "ads-mrkt/internal/errors"
+	"ads-mrkt/internal/market/application/market/http/model"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	_ "ads-mrkt/internal/server/templates/response"
@@ -21,26 +22,6 @@ func splitComma(s string) []string {
 		}
 	}
 	return out
-}
-
-func categoriesToRaw(categories []string) json.RawMessage {
-	if len(categories) == 0 {
-		return json.RawMessage("[]")
-	}
-	b, _ := json.Marshal(categories)
-	return b
-}
-
-// CreateListingRequest is the body for POST /api/v1/market/listings.
-// Prices must be JSON array of [duration, price] pairs, e.g. [["24hr", 100], ["48hr", 200]].
-// Categories must be from the predefined set (see domain.ListingCategories).
-type CreateListingRequest struct {
-	Status      string          `json:"status"` // active | inactive
-	ChannelID   *int64          `json:"channel_id,omitempty"`
-	Type        string          `json:"type"`   // lessor | lessee
-	Prices      json.RawMessage `json:"prices"` // [["<number_of_hours>hr", <price>], ...]
-	Categories  []string        `json:"categories,omitempty"`
-	Description string          `json:"description,omitempty"`
 }
 
 // @Security	JWT
@@ -60,7 +41,7 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
 	}
 
-	var req CreateListingRequest
+	var req model.CreateListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
@@ -80,7 +61,7 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 		ChannelID:   req.ChannelID,
 		Type:        entity.ListingType(req.Type),
 		Prices:      pricesNanoton,
-		Categories:  categoriesToRaw(req.Categories),
+		Categories:  model.CategoriesToRaw(req.Categories),
 		Description: req.Description,
 	}
 	if l.Status == "" {
@@ -89,7 +70,7 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 	if err := h.listingService.CreateListing(r.Context(), userID, l); err != nil {
 		return nil, toServiceError(err)
 	}
-	return listingWithPricesInTON(l), nil
+	return model.ListingWithPricesInTON(l), nil
 }
 
 // @Tags		Market
@@ -113,18 +94,7 @@ func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{
 	if l == nil {
 		return nil, apperrors.ServiceError{Err: nil, Message: "not found", Code: apperrors.ErrorCodeNotFound}
 	}
-	return listingWithPricesInTON(l), nil
-}
-
-// listingWithPricesInTON returns a copy of the listing with Prices JSON converted from nanoton to TON for API.
-func listingWithPricesInTON(l *entity.Listing) *entity.Listing {
-	if l == nil {
-		return nil
-	}
-	converted, _ := domain.ConvertListingPricesNanotonToTON(l.Prices)
-	out := *l
-	out.Prices = converted
-	return &out
+	return model.ListingWithPricesInTON(l), nil
 }
 
 // @Tags		Market
@@ -159,15 +129,7 @@ func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interfac
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return listingsWithPricesInTON(list), nil
-}
-
-func listingsWithPricesInTON(list []*entity.Listing) []*entity.Listing {
-	out := make([]*entity.Listing, len(list))
-	for i, l := range list {
-		out[i] = listingWithPricesInTON(l)
-	}
-	return out
+	return model.ListingsWithPricesInTON(list), nil
 }
 
 // @Security	JWT
@@ -192,17 +154,7 @@ func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interf
 	if err != nil {
 		return nil, toServiceError(err)
 	}
-	return listingsWithPricesInTON(list), nil
-}
-
-// UpdateListingRequest is the body for PATCH /api/v1/market/listings/:id.
-// Channel cannot be changed after creation. Prices if set must be [["<number_of_hours>hr", <price>], ...].
-type UpdateListingRequest struct {
-	Status      *string         `json:"status,omitempty"`
-	Type        *string         `json:"type,omitempty"`
-	Prices      json.RawMessage `json:"prices,omitempty"`
-	Categories  *[]string       `json:"categories,omitempty"`
-	Description *string         `json:"description,omitempty"`
+	return model.ListingsWithPricesInTON(list), nil
 }
 
 // @Security	JWT
@@ -234,7 +186,7 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, toServiceError(err)
 	}
 
-	var req UpdateListingRequest
+	var req model.UpdateListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
@@ -266,7 +218,7 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 		l.Prices = pricesNanoton
 	}
 	if req.Categories != nil {
-		l.Categories = categoriesToRaw(*req.Categories)
+		l.Categories = model.CategoriesToRaw(*req.Categories)
 	}
 	if req.Description != nil {
 		l.Description = *req.Description
@@ -276,7 +228,7 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, toServiceError(err)
 	}
 	updated, _ := h.listingService.GetListing(r.Context(), id)
-	return listingWithPricesInTON(updated), nil
+	return model.ListingWithPricesInTON(updated), nil
 }
 
 // @Security	JWT

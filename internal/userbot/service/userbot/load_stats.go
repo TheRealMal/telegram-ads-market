@@ -12,14 +12,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// asyncGraphJob is a field index + token for loading via StatsLoadAsyncGraph.
 type asyncGraphJob struct {
 	fieldIndex int
 	token      string
 }
 
-// collectAsyncGraphJobs uses reflection to find StatsGraphClass fields that are
-// *tg.StatsGraphAsync and returns jobs to load them.
 func collectAsyncGraphJobs(stats *tg.StatsBroadcastStats) []asyncGraphJob {
 	statsVal := reflect.ValueOf(stats).Elem()
 	graphIface := reflect.TypeOf((*tg.StatsGraphClass)(nil)).Elem()

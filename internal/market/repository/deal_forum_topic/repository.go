@@ -3,9 +3,9 @@ package deal_forum_topic
 import (
 	"context"
 	"errors"
-	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/deal_forum_topic/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -40,16 +40,6 @@ func (r *repository) InsertDealForumTopic(ctx context.Context, t *entity.DealFor
 	return err
 }
 
-type dealForumTopicRow struct {
-	DealID                int64     `db:"deal_id"`
-	LessorChatID          int64     `db:"lessor_chat_id"`
-	LesseeChatID          int64     `db:"lessee_chat_id"`
-	LessorMessageThreadID int64     `db:"lessor_message_thread_id"`
-	LesseeMessageThreadID int64     `db:"lessee_message_thread_id"`
-	CreatedAt             time.Time `db:"created_at"`
-	UpdatedAt             time.Time `db:"updated_at"`
-}
-
 func (r *repository) GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*entity.DealForumTopic, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT deal_id, lessor_chat_id, lessee_chat_id, lessor_message_thread_id, lessee_message_thread_id, created_at, updated_at
@@ -59,22 +49,14 @@ func (r *repository) GetDealForumTopicByDealID(ctx context.Context, dealID int64
 		return nil, err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealForumTopicRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealForumTopicRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &entity.DealForumTopic{
-		DealID:                row.DealID,
-		LessorChatID:          row.LessorChatID,
-		LesseeChatID:          row.LesseeChatID,
-		LessorMessageThreadID: row.LessorMessageThreadID,
-		LesseeMessageThreadID: row.LesseeMessageThreadID,
-		CreatedAt:             row.CreatedAt,
-		UpdatedAt:             row.UpdatedAt,
-	}, nil
+	return model.DealForumTopicRowToEntity(row), nil
 }
 
 func (r *repository) GetDealForumTopicByChatAndThread(ctx context.Context, chatID int64, messageThreadID int64) (*entity.DealForumTopic, string, error) {
@@ -88,22 +70,14 @@ func (r *repository) GetDealForumTopicByChatAndThread(ctx context.Context, chatI
 		return nil, "", err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealForumTopicRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealForumTopicRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", nil
 		}
 		return nil, "", err
 	}
-	t := &entity.DealForumTopic{
-		DealID:                row.DealID,
-		LessorChatID:          row.LessorChatID,
-		LesseeChatID:          row.LesseeChatID,
-		LessorMessageThreadID: row.LessorMessageThreadID,
-		LesseeMessageThreadID: row.LesseeMessageThreadID,
-		CreatedAt:             row.CreatedAt,
-		UpdatedAt:             row.UpdatedAt,
-	}
+	t := model.DealForumTopicRowToEntity(row)
 	side := "lessee"
 	if t.LessorChatID == chatID && t.LessorMessageThreadID == messageThreadID {
 		side = "lessor"

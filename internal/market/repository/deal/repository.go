@@ -2,13 +2,13 @@ package deal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
+	"ads-mrkt/internal/market/repository/deal/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -27,60 +27,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type dealRow struct {
-	ID                  int64           `db:"id"`
-	ListingID           int64           `db:"listing_id"`
-	LessorID            int64           `db:"lessor_id"`
-	LesseeID            int64           `db:"lessee_id"`
-	ChannelID           *int64          `db:"channel_id"`
-	Type                string          `db:"type"`
-	Duration            int64           `db:"duration"`
-	Price               int64           `db:"price"`
-	EscrowAmount        int64           `db:"escrow_amount"`
-	Details             json.RawMessage `db:"details"`
-	LessorSignature     *string         `db:"lessor_signature"`
-	LesseeSignature     *string         `db:"lessee_signature"`
-	Status              string          `db:"status"`
-	EscrowAddress       *string         `db:"escrow_address"`
-	EscrowPrivateKey    *string         `db:"escrow_private_key"`
-	EscrowReleaseTime   *time.Time      `db:"escrow_release_time"`
-	LessorPayoutAddress *string         `db:"lessor_payout_address"`
-	LesseePayoutAddress *string         `db:"lessee_payout_address"`
-	CreatedAt           time.Time       `db:"created_at"`
-	UpdatedAt           time.Time       `db:"updated_at"`
-}
-
-type dealReturnRow struct {
-	ID        int64     `db:"id"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-}
-
-func dealRowToEntity(row dealRow) *entity.Deal {
-	return &entity.Deal{
-		ID:                  row.ID,
-		ListingID:           row.ListingID,
-		LessorID:            row.LessorID,
-		LesseeID:            row.LesseeID,
-		ChannelID:           row.ChannelID,
-		Type:                row.Type,
-		Duration:            row.Duration,
-		Price:               row.Price,
-		EscrowAmount:        row.EscrowAmount,
-		Details:             row.Details,
-		LessorSignature:     row.LessorSignature,
-		LesseeSignature:     row.LesseeSignature,
-		Status:              entity.DealStatus(row.Status),
-		EscrowAddress:       row.EscrowAddress,
-		EscrowPrivateKey:    row.EscrowPrivateKey,
-		EscrowReleaseTime:   row.EscrowReleaseTime,
-		LessorPayoutAddress: row.LessorPayoutAddress,
-		LesseePayoutAddress: row.LesseePayoutAddress,
-		CreatedAt:           row.CreatedAt,
-		UpdatedAt:           row.UpdatedAt,
-	}
 }
 
 func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
@@ -105,7 +51,7 @@ func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealReturnRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealReturnRow])
 	if err != nil {
 		return err
 	}
@@ -126,17 +72,16 @@ func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, e
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return dealRowToEntity(row), nil
+	return model.DealRowToEntity(row), nil
 }
 
-// ListDealsApprovedWithoutEscrow returns deals with status approved and no escrow_address set (for escrow worker).
 func (r *repository) ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -150,13 +95,13 @@ func (r *repository) ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*ent
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
@@ -172,18 +117,17 @@ func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) (
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// GetDealsByListingIDForUser returns deals for the given listing where the user is lessor or lessee.
 func (r *repository) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -197,23 +141,21 @@ func (r *repository) GetDealsByListingIDForUser(ctx context.Context, listingID i
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// ListDealsWaitingEscrowRelease returns deals in status waiting_escrow_release (for release worker).
 func (r *repository) ListDealsWaitingEscrowRelease(ctx context.Context) ([]*entity.Deal, error) {
 	return r.listDealsByStatus(ctx, entity.DealStatusWaitingEscrowRelease)
 }
 
-// ListDealsWaitingEscrowRefund returns deals in status waiting_escrow_refund (for refund worker).
 func (r *repository) ListDealsWaitingEscrowRefund(ctx context.Context) ([]*entity.Deal, error) {
 	return r.listDealsByStatus(ctx, entity.DealStatusWaitingEscrowRefund)
 }
@@ -230,18 +172,17 @@ func (r *repository) listDealsByStatus(ctx context.Context, status entity.DealSt
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// ListDealsEscrowDepositConfirmedWithoutPostMessage returns deals with status escrow_deposit_confirmed that do not yet have a deal_post_message row.
 func (r *repository) ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT d.id, d.listing_id, d.lessor_id, d.lessee_id, d.channel_id, d.type, d.duration, d.price, d.escrow_amount, d.details,
@@ -255,18 +196,17 @@ func (r *repository) ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx conte
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// ListDealsByUserID returns all deals where the user is lessor or lessee, ordered by updated_at DESC.
 func (r *repository) ListDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -280,19 +220,17 @@ func (r *repository) ListDealsByUserID(ctx context.Context, userID int64) ([]*en
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// UpdateDealDraftFields updates type, duration, price, details and sets both signatures to NULL.
-// Call only when status is draft. Status filter is from domain (entity.DealStatusDraft).
 func (r *repository) UpdateDealDraftFieldsAndClearSignatures(ctx context.Context, d *entity.Deal) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal
@@ -334,7 +272,6 @@ func (r *repository) SetDealPayoutAddress(ctx context.Context, dealID int64, use
 	return err
 }
 
-// SetDealStatusApproved sets deal status to approved. Status value from domain (entity.DealStatusApproved).
 func (r *repository) SetDealStatusApproved(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW() WHERE id = @id`,
@@ -345,8 +282,6 @@ func (r *repository) SetDealStatusApproved(ctx context.Context, dealID int64) er
 	return err
 }
 
-// SignDealInTx runs sign-deal steps in a single transaction: set signer's signature,
-// re-fetch deal, set status to approved if both signatures match (same payout payload).
 func (r *repository) SignDealInTx(ctx context.Context, dealID int64, userID int64, sig string) (err error) {
 	txCtx, beginErr := r.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if beginErr != nil {
@@ -401,8 +336,6 @@ func (r *repository) SignDealInTx(ctx context.Context, dealID int64, userID int6
 	return nil
 }
 
-// SetDealEscrowAddress sets escrow address and private key when deal status is approved.
-// Escrow release time is not set on creation (handled by deal_post_message.until_ts).
 func (r *repository) SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal
@@ -418,7 +351,6 @@ func (r *repository) SetDealEscrowAddress(ctx context.Context, dealID int64, add
 	return err
 }
 
-// GetDealByEscrowAddress returns the deal with the given escrow address and status waiting_escrow_deposit, or nil.
 func (r *repository) GetDealByEscrowAddress(ctx context.Context, escrowAddress string) (*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -433,17 +365,16 @@ func (r *repository) GetDealByEscrowAddress(ctx context.Context, escrowAddress s
 		return nil, err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return dealRowToEntity(row), nil
+	return model.DealRowToEntity(row), nil
 }
 
-// SetDealStatusExpiredByEscrowAddress sets deal status to expired for the deal with the given escrow address (if in waiting_escrow_deposit).
 func (r *repository) SetDealStatusExpiredByEscrowAddress(ctx context.Context, escrowAddress string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -456,7 +387,6 @@ func (r *repository) SetDealStatusExpiredByEscrowAddress(ctx context.Context, es
 	return err
 }
 
-// ListDealsWaitingEscrowDepositOlderThan returns deals in status waiting_escrow_deposit with updated_at < before (for preload: expire timed-out deposits).
 func (r *repository) ListDealsWaitingEscrowDepositOlderThan(ctx context.Context, before time.Time) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -472,18 +402,17 @@ func (r *repository) ListDealsWaitingEscrowDepositOlderThan(ctx context.Context,
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// SetDealStatusExpiredByDealID sets deal status to expired when current status is waiting_escrow_deposit (for preload).
 func (r *repository) SetDealStatusExpiredByDealID(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -496,7 +425,6 @@ func (r *repository) SetDealStatusExpiredByDealID(ctx context.Context, dealID in
 	return err
 }
 
-// ListDealsEscrowConfirmedToComplete returns deals in escrow_release_confirmed or escrow_refund_confirmed (for final-status worker).
 func (r *repository) ListDealsEscrowConfirmedToComplete(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
@@ -512,18 +440,17 @@ func (r *repository) ListDealsEscrowConfirmedToComplete(ctx context.Context) ([]
 		return nil, err
 	}
 	defer rows.Close()
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealRow])
+	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealRow])
 	if err != nil {
 		return nil, err
 	}
 	list := make([]*entity.Deal, 0, len(slice))
 	for _, row := range slice {
-		list = append(list, dealRowToEntity(row))
+		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
 }
 
-// SetDealStatusCompleted sets deal status to completed when current status is escrow_release_confirmed or escrow_refund_confirmed.
 func (r *repository) SetDealStatusCompleted(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -537,7 +464,6 @@ func (r *repository) SetDealStatusCompleted(ctx context.Context, dealID int64) e
 	return err
 }
 
-// SetDealStatusEscrowDepositConfirmed sets deal status to escrow_deposit_confirmed by deal ID.
 func (r *repository) SetDealStatusEscrowDepositConfirmed(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -550,7 +476,6 @@ func (r *repository) SetDealStatusEscrowDepositConfirmed(ctx context.Context, de
 	return err
 }
 
-// SetDealStatusEscrowReleaseConfirmed sets deal status to escrow_release_confirmed. Call after successful release.
 func (r *repository) SetDealStatusEscrowReleaseConfirmed(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -563,7 +488,6 @@ func (r *repository) SetDealStatusEscrowReleaseConfirmed(ctx context.Context, de
 	return err
 }
 
-// SetDealStatusEscrowRefundConfirmed sets deal status to escrow_refund_confirmed. Call after successful refund.
 func (r *repository) SetDealStatusEscrowRefundConfirmed(ctx context.Context, dealID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()
@@ -576,7 +500,6 @@ func (r *repository) SetDealStatusEscrowRefundConfirmed(ctx context.Context, dea
 	return err
 }
 
-// SetDealStatusRejected sets deal status to rejected only when current status is draft. Returns true if a row was updated.
 func (r *repository) SetDealStatusRejected(ctx context.Context, dealID int64) (bool, error) {
 	cmd, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()

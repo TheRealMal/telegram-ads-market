@@ -26,9 +26,6 @@ func NewService(repository repository) *service {
 	}
 }
 
-// RunPassedWorker periodically lists deal_post_message with status=passed or status=deleted, then in one tx:
-// - passed -> sets rows to completed and deals to waiting_escrow_release
-// - deleted -> sets rows to failed and deals to waiting_escrow_refund
 func (s *service) RunPassedWorker(ctx context.Context) {
 	ticker := time.NewTicker(workerInterval)
 	defer ticker.Stop()
@@ -37,7 +34,6 @@ func (s *service) RunPassedWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Handle passed -> completed + deal waiting_escrow_release
 			passedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusPassed)
 			if err != nil {
 				slog.Error("deal_post_message worker: list passed", "error", err)
@@ -52,7 +48,6 @@ func (s *service) RunPassedWorker(ctx context.Context) {
 					slog.Info("deal_post_message worker: completed (passed)", "count", len(ids), "ids", ids)
 				}
 			}
-			// Handle deleted -> failed + deal waiting_escrow_refund
 			deletedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusDeleted)
 			if err != nil {
 				slog.Error("deal_post_message worker: list deleted", "error", err)

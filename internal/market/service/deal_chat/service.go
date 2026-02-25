@@ -35,7 +35,6 @@ type service struct {
 	botUsername    string
 }
 
-// NewService creates the deal chat service. Topics are created in each user's chat (lessor/lessee user id). botUsername is used for the "Jump into chat" link. Pass empty to disable.
 func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, botUsername string) *service {
 	return &service{
 		dealRepo:       dealRepo,
@@ -45,7 +44,6 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 	}
 }
 
-// GetOrCreateDealForumChat creates one topic in the lessor's chat and one in the lessee's chat (chat_id = user id), then returns the link for the requesting user.
 func (s *service) GetOrCreateDealForumChat(ctx context.Context, dealID int64, userID int64) (chatLink string, err error) {
 	if s.telegramForum == nil {
 		return "", ErrForumNotConfigured
@@ -101,7 +99,6 @@ func (s *service) threadIDForUser(t *entity.DealForumTopic, deal *entity.Deal, u
 	return t.LesseeMessageThreadID
 }
 
-// chatLinkForUser returns the deal chat link in format https://t.me/<bot_username>/<thread_id> for use with web_app_open_tg_link.
 func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, userID int64) string {
 	threadID := s.threadIDForUser(t, deal, userID)
 	if s.botUsername != "" {
@@ -110,7 +107,6 @@ func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, u
 	return ""
 }
 
-// DeleteDealForumTopic deletes both topics via Telegram deleteForumTopic (lessor and lessee chats), then removes the row.
 func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error {
 	if s.telegramForum == nil {
 		return nil
@@ -124,7 +120,6 @@ func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error 
 	return s.forumTopicRepo.DeleteDealForumTopic(ctx, dealID)
 }
 
-// CopyMessageToOtherTopic copies a message from one side's topic to the other. chatID and messageThreadID identify the sender's chat and topic.
 func (s *service) CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error {
 	if s.telegramForum == nil {
 		return nil

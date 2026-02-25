@@ -6,18 +6,11 @@ import (
 	"net/http"
 
 	apperrors "ads-mrkt/internal/errors"
+	"ads-mrkt/internal/market/application/market/http/model"
 	"ads-mrkt/pkg/auth"
 
 	_ "ads-mrkt/internal/server/templates/response"
 )
-
-type AuthUserRequest struct {
-	Referrer int64 `json:"referrer"` // optional, for future use
-}
-
-type SetWalletRequest struct {
-	WalletAddress string `json:"wallet_address"` // TON address in raw format
-}
 
 // @Security
 // @Tags		Market
@@ -39,9 +32,9 @@ func (h *handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 		}
 	}
 
-	var req AuthUserRequest
+	var req model.AuthUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		req = AuthUserRequest{Referrer: 0}
+		req = model.AuthUserRequest{Referrer: 0}
 	}
 
 	user, err := h.userService.AuthUser(r.Context(), initDataStr, req.Referrer)
@@ -81,7 +74,7 @@ func (h *handler) SetWallet(w http.ResponseWriter, r *http.Request) (interface{}
 		return nil, apperrors.ServiceError{Err: nil, Message: "unauthorized", Code: apperrors.ErrorCodeUnauthorized}
 	}
 
-	var req SetWalletRequest
+	var req model.SetWalletRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}

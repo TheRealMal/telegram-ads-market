@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"ads-mrkt/internal/userbot/repository/state/model"
+
 	"github.com/charmbracelet/log"
 	"github.com/gotd/td/telegram/updates"
 	"github.com/jackc/pgx/v5"
@@ -18,25 +20,6 @@ type database interface {
 	EndTx(ctx context.Context, err error, source string) error
 }
 
-// stateRow represents a row from telegram_state table
-type stateRow struct {
-	Pts  int `db:"pts"`
-	Qts  int `db:"qts"`
-	Date int `db:"date"`
-	Seq  int `db:"seq"`
-}
-
-// channelPtsRow represents a row from telegram_channel_state table
-type channelPtsRow struct {
-	ChannelID int64 `db:"channel_id"`
-	Pts       int   `db:"pts"`
-}
-
-// channelPtsOnlyRow is used for GetChannelPts (single column).
-type channelPtsOnlyRow struct {
-	Pts int `db:"pts"`
-}
-
 // stateStorage implements updates.stateStorage interface for PostgreSQL
 type stateStorage struct {
 	db database
@@ -46,7 +29,6 @@ func New(db database) *stateStorage {
 	return &stateStorage{db: db}
 }
 
-// GetState retrieves the current state from the database for a specific user
 func (s *stateStorage) GetState(ctx context.Context, userID int64) (updates.State, bool, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT pts, qts, date, seq
@@ -60,10 +42,9 @@ func (s *stateStorage) GetState(ctx context.Context, userID int64) (updates.Stat
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[stateRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.StateRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Return zero state if no row exists
 			return updates.State{
 				Pts:  0,
 				Qts:  0,
@@ -82,7 +63,6 @@ func (s *stateStorage) GetState(ctx context.Context, userID int64) (updates.Stat
 	}, true, nil
 }
 
-// SetState stores the state in the database for a specific user
 func (s *stateStorage) SetState(ctx context.Context, userID int64, state updates.State) error {
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO userbot.telegram_state (user_id, pts, qts, date, seq, updated_at)
@@ -109,7 +89,6 @@ func (s *stateStorage) SetState(ctx context.Context, userID int64, state updates
 	return nil
 }
 
-// SetPts updates only the pts value for a specific user
 func (s *stateStorage) SetPts(ctx context.Context, userID int64, pts int) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE userbot.telegram_state
@@ -130,7 +109,6 @@ func (s *stateStorage) SetPts(ctx context.Context, userID int64, pts int) error 
 	return nil
 }
 
-// SetQts updates only the qts value for a specific user
 func (s *stateStorage) SetQts(ctx context.Context, userID int64, qts int) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE userbot.telegram_state
@@ -151,7 +129,6 @@ func (s *stateStorage) SetQts(ctx context.Context, userID int64, qts int) error 
 	return nil
 }
 
-// SetSeq updates only the seq value for a specific user
 func (s *stateStorage) SetSeq(ctx context.Context, userID int64, seq int) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE userbot.telegram_state
@@ -172,7 +149,6 @@ func (s *stateStorage) SetSeq(ctx context.Context, userID int64, seq int) error 
 	return nil
 }
 
-// SetDate updates only the date value for a specific user
 func (s *stateStorage) SetDate(ctx context.Context, userID int64, date int) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE userbot.telegram_state
@@ -193,7 +169,6 @@ func (s *stateStorage) SetDate(ctx context.Context, userID int64, date int) erro
 	return nil
 }
 
-// SetDateSeq updates both date and seq values for a specific user
 func (s *stateStorage) SetDateSeq(ctx context.Context, userID int64, date, seq int) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE userbot.telegram_state
@@ -215,7 +190,6 @@ func (s *stateStorage) SetDateSeq(ctx context.Context, userID int64, date, seq i
 	return nil
 }
 
-// GetChannelPts retrieves channel-specific pts from the database
 func (s *stateStorage) GetChannelPts(ctx context.Context, userID, channelID int64) (int, bool, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT pts
@@ -230,7 +204,7 @@ func (s *stateStorage) GetChannelPts(ctx context.Context, userID, channelID int6
 	}
 	defer rows.Close()
 
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[channelPtsOnlyRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ChannelPtsOnlyRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, false, nil
@@ -241,7 +215,6 @@ func (s *stateStorage) GetChannelPts(ctx context.Context, userID, channelID int6
 	return row.Pts, true, nil
 }
 
-// SetChannelPts stores channel-specific pts in the database
 func (s *stateStorage) SetChannelPts(ctx context.Context, userID, channelID int64, pts int) error {
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO userbot.telegram_channel_state (user_id, channel_id, pts, updated_at)
@@ -262,7 +235,6 @@ func (s *stateStorage) SetChannelPts(ctx context.Context, userID, channelID int6
 	return nil
 }
 
-// ForEachChannels iterates over all channels for a user and calls f for each
 func (s *stateStorage) ForEachChannels(ctx context.Context, userID int64, f func(ctx context.Context, channelID int64, pts int) error) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT channel_id, pts
@@ -276,7 +248,7 @@ func (s *stateStorage) ForEachChannels(ctx context.Context, userID int64, f func
 	}
 	defer rows.Close()
 
-	channelRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[channelPtsRow])
+	channelRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ChannelPtsRow])
 	if err != nil {
 		return fmt.Errorf("failed to collect channel rows: %w", err)
 	}

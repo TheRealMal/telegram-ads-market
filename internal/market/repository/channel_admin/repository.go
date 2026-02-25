@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"ads-mrkt/internal/market/repository/channel_admin/model"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -21,10 +23,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type channelAdminExistsRow struct {
-	One int `db:"one"`
 }
 
 func (r *repository) DeleteChannelAdmins(ctx context.Context, channelID int64) error {
@@ -66,7 +64,7 @@ func (r *repository) IsChannelAdmin(ctx context.Context, userID, channelID int64
 	}
 	defer rows.Close()
 
-	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[channelAdminExistsRow])
+	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ChannelAdminExistsRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil

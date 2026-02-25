@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/market/repository/deal_action_lock/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -26,24 +27,6 @@ type repository struct {
 
 func New(db database) *repository {
 	return &repository{db: db}
-}
-
-type dealActionLockRow struct {
-	ID         string    `db:"id"`
-	DealID     int64     `db:"deal_id"`
-	ActionType string    `db:"action_type"`
-	Status     string    `db:"status"`
-	ExpireAt   time.Time `db:"expire_at"`
-	CreatedAt  time.Time `db:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at"`
-}
-
-type dealActionLockExistsRow struct {
-	One int `db:"one"`
-}
-
-type dealActionLockReturnRow struct {
-	ID string `db:"id"`
 }
 
 func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (string, error) {
@@ -67,7 +50,7 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 		return "", err
 	}
 	defer rows.Close()
-	active, err := pgx.CollectRows(rows, pgx.RowToStructByName[dealActionLockExistsRow])
+	active, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealActionLockExistsRow])
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +74,7 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 		return "", err
 	}
 	defer insertRows.Close()
-	row, err := pgx.CollectExactlyOneRow(insertRows, pgx.RowToStructByName[dealActionLockReturnRow])
+	row, err := pgx.CollectExactlyOneRow(insertRows, pgx.RowToStructByName[model.DealActionLockReturnRow])
 	if err != nil {
 		return "", err
 	}
@@ -114,22 +97,14 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 		return nil, err
 	}
 	defer rows.Close()
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[dealActionLockRow])
+	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealActionLockRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &entity.DealActionLock{
-		ID:         row.ID,
-		DealID:     row.DealID,
-		ActionType: entity.DealActionType(row.ActionType),
-		Status:     entity.DealActionLockStatus(row.Status),
-		ExpireAt:   row.ExpireAt,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
-	}, nil
+	return model.DealActionLockRowToEntity(row), nil
 }
 
 func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (lockID string, ok bool, err error) {

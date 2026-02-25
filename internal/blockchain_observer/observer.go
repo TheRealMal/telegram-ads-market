@@ -41,7 +41,6 @@ type depositEvent struct {
 	txHash     string
 }
 
-// Observer watches TON chain for transactions to escrow wallets and Redis key expiration for deal expiry.
 type Observer struct {
 	lt             lt
 	rdb            *redis.Client
@@ -57,7 +56,6 @@ type Observer struct {
 	log            *slog.Logger
 }
 
-// New builds an observer. rdb is the Redis client (for keys, keyspace subscription). dbIndex is Redis DB index for keyevent channels. escrowDepositAdder is used to push deposit events to the escrow_deposit stream.
 func New(lt lt, rdb *redis.Client, dealRepository dealRepository, eventService escrowDepositEventService, dbIndex int) *Observer {
 	return &Observer{
 		lt:             lt,
@@ -74,7 +72,6 @@ func New(lt lt, rdb *redis.Client, dealRepository dealRepository, eventService e
 	}
 }
 
-// Start runs the observer until ctx is cancelled. Requires Redis notify-keyspace-events Egx.
 func (o *Observer) Start(ctx context.Context) error {
 	o.log.Info("loading escrow wallets from Redis...")
 	if err := o.loadAddresses(ctx); err != nil {
@@ -151,7 +148,6 @@ func (o *Observer) removeAddress(key WalletAddress) {
 	delete(o.addresses, key)
 }
 
-// rawAddrFromAccount formats workchain 0 account ID as raw address string.
 func rawAddrFromAccount(account []byte) string {
 	return fmt.Sprintf("0:%x", account)
 }
