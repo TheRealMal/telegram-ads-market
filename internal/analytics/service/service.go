@@ -11,11 +11,14 @@ import (
 
 const collectInterval = 1 * time.Hour
 
+const snapshotHourUTC = 3 // snapshot is taken at 3:00 AM UTC
+
 type repository interface {
 	CollectSnapshot(ctx context.Context, transactionGasNanoton int64, commissionPercent float64) (*domain.Snapshot, error)
 	InsertSnapshot(ctx context.Context, snap *domain.Snapshot) error
 	GetLatestSnapshot(ctx context.Context) (*domain.Snapshot, error)
 	ListSnapshots(ctx context.Context, from, to time.Time) ([]*domain.Snapshot, error)
+	HasSnapshotForDate(ctx context.Context, date time.Time) (bool, error)
 }
 
 type service struct {
@@ -50,6 +53,24 @@ func (s *service) Run(ctx context.Context) {
 }
 
 func (s *service) collectAndSave(ctx context.Context) {
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	exists, err := s.repo.HasSnapshotForDate(ctx, today)
+	if err != nil {
+		slog.Error("analytics check snapshot for date", "error", err)
+		return
+	}
+	if exists {
+		return // already have today's snapshot
+	}
+
+	// Only take snapshot after 3:00 AM UTC today (fetch at 3:00 AM; catch-up if we're past that and none exists).
+	snapshotTimeToday := time.Date(now.Year(), now.Month(), now.Day(), snapshotHourUTC, 0, 0, 0, time.UTC)
+	if now.Before(snapshotTimeToday) {
+		return // wait until 3:00 AM UTC
+	}
+
 	snap, err := s.repo.CollectSnapshot(ctx, s.transactionGasNanoton, s.commissionPercent)
 	if err != nil {
 		slog.Error("analytics collect", "error", err)

@@ -47,6 +47,10 @@ type commissionRow struct {
 	Commission int64 `db:"commission"`
 }
 
+type existsRow struct {
+	Exists bool `db:"exists"`
+}
+
 type snapshotRow struct {
 	ID                      int64           `db:"id"`
 	RecordedAt              time.Time       `db:"recorded_at"`
@@ -151,6 +155,14 @@ func (r *Repository) CollectSnapshot(ctx context.Context, transactionGasNanoton 
 }
 
 func (r *Repository) InsertSnapshot(ctx context.Context, s *domain.Snapshot) error {
+	todayUTC := time.Now().UTC().Truncate(24 * time.Hour)
+	exists, err := r.HasSnapshotForDate(ctx, todayUTC)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil // already have a snapshot for today, do not insert
+	}
 	dealsByStatus, err := s.DealsByStatusJSON()
 	if err != nil {
 		return err
@@ -185,6 +197,27 @@ func (r *Repository) InsertSnapshot(ctx context.Context, s *domain.Snapshot) err
 		},
 	)
 	return err
+}
+
+// HasSnapshotForDate returns true if at least one snapshot exists for the given UTC date.
+func (r *Repository) HasSnapshotForDate(ctx context.Context, date time.Time) (bool, error) {
+	utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	rows, err := r.db.Query(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM analytic.snapshot
+			WHERE (recorded_at AT TIME ZONE 'UTC')::date = @date
+		) AS exists`,
+		pgx.NamedArgs{"date": utcDate},
+	)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[existsRow])
+	if err != nil {
+		return false, err
+	}
+	return row.Exists, nil
 }
 
 // GetLatestSnapshot returns the most recent snapshot, if any.
