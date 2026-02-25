@@ -166,22 +166,23 @@ function PieTooltipContent({
   valueLabel,
   valueFormat,
 }: {
-  payload?: Array<{ name: string; value: number; payload?: { fill?: string } }; color?: string }>;
+  payload?: Array<{ name?: unknown; value?: unknown; payload?: { fill?: string }; color?: string }>;
   valueLabel: string;
   valueFormat?: (v: number) => string;
 }) {
   if (!payload?.length) return null;
   const item = payload[0];
   const color = item.payload?.fill ?? item.color ?? 'var(--foreground)';
-  const value = item.value;
+  const value = Number(item.value ?? 0);
   const valueStr = valueFormat ? valueFormat(value) : String(value);
+  const name = item.name != null ? String(item.name) : '';
   return (
     <div
       className="rounded-md border border-border bg-card px-3 py-2 text-sm shadow-md"
       style={{ borderColor: 'var(--border)' }}
     >
       <div className="font-medium" style={{ color }}>
-        {item.name}
+        {name}
       </div>
       <div className="mt-0.5 text-muted-foreground">
         {valueLabel}: {valueStr}
