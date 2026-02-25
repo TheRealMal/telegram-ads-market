@@ -37,9 +37,8 @@ function formatTon(ton: number): string {
   return ton >= 1 ? `${ton.toFixed(1)} TON` : `${(ton * 1000).toFixed(2)} mTON`;
 }
 
-/** No white/very light colors so slices and text stay visible. */
+/** No white/black; distinct colors so slices and text stay visible. */
 const PIE_COLORS = [
-  '#0a0a0a',
   '#22c55e',
   '#3b82f6',
   '#f59e0b',
@@ -51,28 +50,39 @@ const PIE_COLORS = [
   '#f97316',
   '#6366f1',
   '#14b8a6',
+  '#a855f7',
 ];
 
 const HISTORY_COLORS = [
-  '#0a0a0a',
   '#22c55e',
   '#3b82f6',
   '#f59e0b',
   '#8b5cf6',
+  '#ec4899',
 ];
 
 const RADIAN = Math.PI / 180;
 function renderPieLabelInside(
-  props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; name: string; percent: number; fill?: string; payload?: { fill?: string } }
+  props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; name?: string; percent: number; fill?: string; payload?: { name?: string; fill?: string } }
 ) {
-  const { cx, cy, midAngle, innerRadius, outerRadius, name, percent, fill, payload } = props;
-  if (percent < 0.06) return null;
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent, payload } = props;
+  const name = props.name ?? payload?.name ?? '';
+  if (!name || percent < 0.04) return null;
   const r = (innerRadius + outerRadius) / 2;
   const x = cx + r * Math.cos(-midAngle * RADIAN);
   const y = cy + r * Math.sin(-midAngle * RADIAN);
-  const textColor = fill ?? payload?.fill ?? 'var(--foreground)';
   return (
-    <text x={x} y={y} fill={textColor} textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={500}>
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      stroke="rgba(0,0,0,0.4)"
+      strokeWidth={1.5}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={11}
+      fontWeight={500}
+    >
       {name}
     </text>
   );
