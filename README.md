@@ -17,6 +17,13 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 - Automatic escrow release if advertisment conditions are met otherwise escrow refund to a lessee
 - Chat with the other side of a deal via native telegram chat
 - Event & workers driven architecture with locks & recovery for message posting & escrow releases
+- Analytics shapshots being taken every day. Analytics dashboard available only to admins via another mini app direct link.
+    1. Current listings, deals, users amount
+    2. Total commission earned
+    3. Average listings amount by user
+    4. Pie chart with deals & deals amount by status
+    5. Graph of 1, 2, 3 values over time
+
 
 # User flow
 ## Lessor flow

@@ -14,15 +14,15 @@ import type {
 import { getDealStatusLabel } from '@/types';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
   PieChart,
   Pie,
   Cell,
@@ -37,8 +37,9 @@ function formatTon(ton: number): string {
   return ton >= 1 ? `${ton.toFixed(1)} TON` : `${(ton * 1000).toFixed(2)} mTON`;
 }
 
+/** No white/very light colors so slices and text stay visible. */
 const PIE_COLORS = [
-  'var(--primary)',
+  '#0a0a0a',
   '#22c55e',
   '#3b82f6',
   '#f59e0b',
@@ -52,20 +53,27 @@ const PIE_COLORS = [
   '#14b8a6',
 ];
 
+const HISTORY_COLORS = [
+  '#0a0a0a',
+  '#22c55e',
+  '#3b82f6',
+  '#f59e0b',
+  '#8b5cf6',
+];
+
 const RADIAN = Math.PI / 180;
 function renderPieLabelInside(
-  props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; name: string; value: number; percent: number },
-  valueFormat?: (v: number) => string
+  props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; name: string; percent: number; fill?: string; payload?: { fill?: string } }
 ) {
-  const { cx, cy, midAngle, innerRadius, outerRadius, name, value, percent } = props;
+  const { cx, cy, midAngle, innerRadius, outerRadius, name, percent, fill, payload } = props;
   if (percent < 0.06) return null;
   const r = (innerRadius + outerRadius) / 2;
   const x = cx + r * Math.cos(-midAngle * RADIAN);
   const y = cy + r * Math.sin(-midAngle * RADIAN);
-  const text = valueFormat ? `${name}: ${valueFormat(value)}` : `${name}: ${value}`;
+  const textColor = fill ?? payload?.fill ?? 'var(--foreground)';
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={500}>
-      {text}
+    <text x={x} y={y} fill={textColor} textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={500}>
+      {name}
     </text>
   );
 }
@@ -73,9 +81,13 @@ function renderPieLabelInside(
 function SnapshotCards({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   if (!snapshot) {
     return (
-      <p className="rounded-lg border border-border bg-card p-4 text-center text-muted-foreground">
-        No snapshot data yet. Snapshots are collected hourly.
-      </p>
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-center text-muted-foreground">
+            No snapshot data yet. Snapshots are collected hourly.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
   const recordedAt = snapshot.recorded_at
@@ -87,42 +99,52 @@ function SnapshotCards({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Listings
-          </p>
-          <p className="mt-1 text-2xl font-semibold">{snapshot.listings_count}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Deals
-          </p>
-          <p className="mt-1 text-2xl font-semibold">{snapshot.deals_count}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Users
-          </p>
-          <p className="mt-1 text-2xl font-semibold">{snapshot.users_count}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Commission earned
-          </p>
-          <p className="mt-1 text-2xl font-semibold">
-            {formatTon(snapshot.commission_earned_ton)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Avg listings / user
-          </p>
-          <p className="mt-1 text-2xl font-semibold">
-            {snapshot.avg_listings_per_user != null && !Number.isNaN(snapshot.avg_listings_per_user)
-              ? snapshot.avg_listings_per_user.toFixed(2)
-              : '—'}
-          </p>
-        </div>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Listings
+            </p>
+            <p className="mt-1 text-2xl font-semibold">{snapshot.listings_count}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Deals
+            </p>
+            <p className="mt-1 text-2xl font-semibold">{snapshot.deals_count}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Users
+            </p>
+            <p className="mt-1 text-2xl font-semibold">{snapshot.users_count}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Commission earned
+            </p>
+            <p className="mt-1 text-2xl font-semibold">
+              {formatTon(snapshot.commission_earned_ton)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Avg listings / user
+            </p>
+            <p className="mt-1 text-2xl font-semibold">
+              {snapshot.avg_listings_per_user != null && !Number.isNaN(snapshot.avg_listings_per_user)
+                ? snapshot.avg_listings_per_user.toFixed(2)
+                : '—'}
+            </p>
+          </CardContent>
+        </Card>
       </div>
       <p className="text-xs text-muted-foreground">Last snapshot: {recordedAt}</p>
     </div>
@@ -139,116 +161,171 @@ function mapToPieData(data: Record<string, number>): { name: string; value: numb
     .sort((a, b) => b.value - a.value);
 }
 
+function PieTooltipContent({
+  payload,
+  valueLabel,
+  valueFormat,
+}: {
+  payload?: Array<{ name: string; value: number; payload?: { fill?: string } }; color?: string }>;
+  valueLabel: string;
+  valueFormat?: (v: number) => string;
+}) {
+  if (!payload?.length) return null;
+  const item = payload[0];
+  const color = item.payload?.fill ?? item.color ?? 'var(--foreground)';
+  const value = item.value;
+  const valueStr = valueFormat ? valueFormat(value) : String(value);
+  return (
+    <div
+      className="rounded-md border border-border bg-card px-3 py-2 text-sm shadow-md"
+      style={{ borderColor: 'var(--border)' }}
+    >
+      <div className="font-medium" style={{ color }}>
+        {item.name}
+      </div>
+      <div className="mt-0.5 text-muted-foreground">
+        {valueLabel}: {valueStr}
+      </div>
+    </div>
+  );
+}
+
 function DealsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   if (!snapshot?.deals_by_status || Object.keys(snapshot.deals_by_status).length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="mb-4 text-lg font-semibold">Deals by status</h2>
-        <p className="text-center text-sm text-muted-foreground">No deal status data.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Deals by status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">No deal status data.</p>
+        </CardContent>
+      </Card>
     );
   }
-  const data = mapToPieData(snapshot.deals_by_status);
+  const rawData = mapToPieData(snapshot.deals_by_status);
+  const data = rawData.map((d, i) => ({ ...d, fill: PIE_COLORS[i % PIE_COLORS.length] }));
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <h2 className="mb-4 text-lg font-semibold">Deals by status</h2>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius="80%"
-              label={(p) => renderPieLabelInside(p)}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--card-foreground)',
-              }}
-              itemStyle={{ color: 'var(--card-foreground)' }}
-              labelStyle={{ color: 'var(--card-foreground)' }}
-              formatter={(value: number) => [value, 'Deals']}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Deals by status</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius="80%"
+                labelLine={false}
+                label={(p) => renderPieLabelInside(p)}
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={({ payload }) => (
+                  <PieTooltipContent payload={payload} valueLabel="Deals" />
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 function DealAmountsByStatusPie({ snapshot }: { snapshot: AnalyticsSnapshot | null }) {
   if (!snapshot?.deal_amounts_by_status_ton || Object.keys(snapshot.deal_amounts_by_status_ton).length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="mb-4 text-lg font-semibold">Deal amounts by status (TON)</h2>
-        <p className="text-center text-sm text-muted-foreground">No amount data.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Deal amounts by status (TON)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">No amount data.</p>
+        </CardContent>
+      </Card>
     );
   }
-  const data = mapToPieData(snapshot.deal_amounts_by_status_ton);
+  const rawData = mapToPieData(snapshot.deal_amounts_by_status_ton);
+  const data = rawData.map((d, i) => ({ ...d, fill: PIE_COLORS[i % PIE_COLORS.length] }));
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <h2 className="mb-4 text-lg font-semibold">Deal amounts by status (TON)</h2>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius="80%"
-              label={(p) => renderPieLabelInside(p, (v) => `${v.toFixed(2)} TON`)}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--card-foreground)',
-              }}
-              itemStyle={{ color: 'var(--card-foreground)' }}
-              labelStyle={{ color: 'var(--card-foreground)' }}
-              formatter={(value: number) => [`${value.toFixed(2)} TON`, 'Amount']}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Deal amounts by status (TON)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius="80%"
+                labelLine={false}
+                label={(p) => renderPieLabelInside(p)}
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={({ payload }) => (
+                  <PieTooltipContent
+                    payload={payload}
+                    valueLabel="Amount"
+                    valueFormat={(v) => `${v.toFixed(2)} TON`}
+                  />
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
+
+const HISTORY_SERIES: { dataKey: string; name: string }[] = [
+  { dataKey: 'listings', name: 'Listings' },
+  { dataKey: 'deals', name: 'Deals' },
+  { dataKey: 'users', name: 'Users' },
+  { dataKey: 'commission_ton', name: 'Commission (TON)' },
+  { dataKey: 'avg_listings', name: 'Avg listings/user' },
+];
 
 function HistoryCharts({
   history,
   period,
   onPeriodChange,
+  hiddenSeries,
+  onToggleSeries,
 }: {
   history: AnalyticsHistoryResponse | null;
   period: string;
   onPeriodChange: (p: string) => void;
+  hiddenSeries: Set<string>;
+  onToggleSeries: (dataKey: string) => void;
 }) {
   if (!history || !history.timestamps.length) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <p className="text-center text-muted-foreground">
-          No history data for the selected period.
-        </p>
-      </div>
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-center text-muted-foreground">
+            No history data for the selected period.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -264,51 +341,93 @@ function HistoryCharts({
     avg_listings: history.avg_listings_per_user[i] ?? 0,
   }));
 
+  const isVisible = (dataKey: string) => !hiddenSeries.has(dataKey);
+
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">History</h2>
-        <div className="flex gap-2">
-          {(['week', 'month', 'year'] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => onPeriodChange(p)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                period === p
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </button>
-          ))}
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">History</CardTitle>
+          <div className="flex gap-1">
+            {(['week', 'month', 'year'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onPeriodChange(p)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  period === p
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="time" className="text-xs" tick={{ fill: 'currentColor' }} />
-            <YAxis className="text-xs" tick={{ fill: 'currentColor' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-              }}
-              labelStyle={{ color: 'var(--card-foreground)' }}
-            />
-            <Legend />
-            <Line type="monotone" dataKey="listings" stroke="var(--primary)" name="Listings" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="deals" stroke="#22c55e" name="Deals" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="users" stroke="#3b82f6" name="Users" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="commission_ton" stroke="#f59e0b" name="Commission (TON)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="avg_listings" stroke="#8b5cf6" name="Avg listings/user" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      </CardHeader>
+      <CardContent className="px-3 pb-0 pt-0">
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="time" className="text-xs" tick={{ fill: 'currentColor' }} />
+              <YAxis className="text-xs" tick={{ fill: 'currentColor' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                }}
+                labelStyle={{ color: 'var(--card-foreground)' }}
+              />
+              {HISTORY_SERIES.filter((s) => isVisible(s.dataKey)).map((s, i) => (
+                <Area
+                  key={s.dataKey}
+                  type="monotone"
+                  dataKey={s.dataKey}
+                  name={s.name}
+                  stroke={HISTORY_COLORS[HISTORY_SERIES.findIndex((x) => x.dataKey === s.dataKey)]}
+                  fill={HISTORY_COLORS[HISTORY_SERIES.findIndex((x) => x.dataKey === s.dataKey)]}
+                  fillOpacity={0.35}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={true}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 pt-2 pb-1">
+          {HISTORY_SERIES.map((s, i) => {
+            const hidden = hiddenSeries.has(s.dataKey);
+            const color = HISTORY_COLORS[i];
+            return (
+              <button
+                key={s.dataKey}
+                type="button"
+                onClick={() => onToggleSeries(s.dataKey)}
+                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-90"
+                style={{
+                  backgroundColor: hidden ? 'transparent' : color,
+                  borderColor: color,
+                  color: hidden ? color : 'white',
+                  transition: 'background-color 0.2s ease-out, color 0.2s ease-out',
+                }}
+              >
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center text-[10px] font-bold"
+                  style={{ opacity: hidden ? 0 : 1 }}
+                >
+                  ✓
+                </span>
+                <span>{s.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -318,6 +437,16 @@ export default function AnalyticsPage() {
   const [history, setHistory] = useState<AnalyticsHistoryResponse | null>(null);
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('week');
   const [dataLoading, setDataLoading] = useState(false);
+  const [hiddenHistorySeries, setHiddenHistorySeries] = useState<Set<string>>(new Set());
+
+  const toggleHistorySeries = useCallback((dataKey: string) => {
+    setHiddenHistorySeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(dataKey)) next.delete(dataKey);
+      else next.add(dataKey);
+      return next;
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setDataLoading(true);
@@ -361,27 +490,31 @@ export default function AnalyticsPage() {
   return (
     <>
       <div
-        className={`min-h-screen pb-8 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+        className={`page-with-nav ${showContent ? 'opacity-100' : 'opacity-0'}`}
       >
         <PageTopSpacer />
-        <div className="mx-auto max-w-4xl px-4 py-6">
+        <div className="mx-auto max-w-4xl px-4 py-4">
           <h1 className="mb-6 text-2xl font-bold">Analytics Dashboard</h1>
 
           {authStatus === 'unauthenticated' && (
-            <div className="rounded-lg border border-border bg-card p-6 text-center">
-              <p className="text-muted-foreground">
-                Please open this app from Telegram and sign in to continue.
-              </p>
-            </div>
+            <Card>
+              <CardContent className="py-6 text-center">
+                <p className="text-muted-foreground">
+                  Please open this app from Telegram and sign in to continue.
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           {authStatus === 'unauthorized' && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-              <p className="font-medium text-destructive">Unauthorized</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Only administrators can view the analytics dashboard.
-              </p>
-            </div>
+            <Card className="border-destructive/50 bg-destructive/10">
+              <CardContent className="py-6 text-center">
+                <p className="font-medium text-destructive">Unauthorized</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Only administrators can view the analytics dashboard.
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           {showDashboard && (
@@ -395,6 +528,8 @@ export default function AnalyticsPage() {
                 history={history}
                 period={period}
                 onPeriodChange={(p) => setPeriod(p as 'week' | 'month' | 'year')}
+                hiddenSeries={hiddenHistorySeries}
+                onToggleSeries={toggleHistorySeries}
               />
               {dataLoading && (
                 <p className="text-center text-sm text-muted-foreground">
