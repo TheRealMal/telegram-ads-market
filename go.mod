@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gotd/td v0.138.0
 	github.com/gotd/td/examples v0.0.0-20260119103850-5a12ed251249
-	github.com/hashicorp/vault-client-go v0.4.3
+	github.com/hashicorp/vault-client-go v0.4.4-0.20250703155429-315a2bfeef6c
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/joho/godotenv v1.5.1

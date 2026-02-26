@@ -25,6 +25,9 @@ init_vault:
 unseal_vault:
 	docker exec -it ads-mrkt-contest-vault-1 vault operator unseal $(filter-out $@,$(MAKECMDGOALS))
 
+create_secret_vault:
+	docker exec -it ads-mrkt-contest-vault-1 env VAULT_TOKEN="$(filter-out $@,$(MAKECMDGOALS))" vault secrets enable -path=secret kv-v2
+
 init_userbot: ## Initialize the userbot session file
 	docker compose up -d postgres redis migrations
 	docker compose run --rm -it userbot

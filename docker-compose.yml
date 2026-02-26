@@ -61,17 +61,15 @@ services:
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
-    ports:
-      - "${VAULT_FORWARD_PORT:-8200}:8200"
     environment:
-      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_ADDR: "http://172.32.0.15:8200"
     volumes:
       - ./data/vault:/vault/data
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.15
     healthcheck:
-      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      test: ["CMD", "vault", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -169,8 +167,6 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CLIENT_DOMAIN: ${CLIENT_DOMAIN:-https://localhost}
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-root}
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.11

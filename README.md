@@ -7,6 +7,7 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 * May be inaccessible without VPN *
 - Bot: https://t.me/BaboonMarketBot
 - Mini APP: https://t.me/BaboonMarketBot?startapp=
+- Analytics dashboard: https://t.me/BaboonMarketBot/dashboard (admins only)
 
 # Features
 - Automatic channel fetching stats once bot added as an admin. Stats become available to all users when listing for channel is created
@@ -62,25 +63,23 @@ Telegram mini app providing smooth lessee & lessors interaction flow with automa
 
 Example environment variables file presented at [example.env](example.env)
 
-MVP can be deployed via make command or directly via docker compose
-
-```console
-# Initialize userbot session
-make init_vault
-make init_userbot
-# Start
-make start
-```
+MVP can be deployed via make commands
 
 ```console
 # Initialize vault
-docker compose up -d vault
-docker exec -it ads-mrkt-contest-vault-1 vault operator init
+make init_vault
+
+# Then you need to unseal it with 3 keys (use keys that were displayed)
+make unseal_vault <KEY>
+
+# And create secret storage (use token that was displayed)
+make create_secret_vault <TOKEN>
+
 # Initialize userbot session
-docker compose up -d postgres redis migrations
-docker compose run --rm -it userbot
+make init_userbot
+
 # Start
-docker compose up -d
+make start
 ```
 
 ## Frontend

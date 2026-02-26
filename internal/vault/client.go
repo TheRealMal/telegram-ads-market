@@ -19,6 +19,7 @@ const escrowSecretKey = "seed_phrase"
 type Client struct {
 	client    *vaultclient.Client
 	mountPath string
+	token     string
 }
 
 func NewClient(cfg config.Config) (*Client, error) {
@@ -29,29 +30,35 @@ func NewClient(cfg config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("vault new client: %w", err)
 	}
-	if err := client.SetToken(cfg.Token); err != nil {
-		return nil, fmt.Errorf("vault set token: %w", err)
-	}
+
+	slog.Info("vault client initialized", "address", cfg.Address, "token", cfg.Token[:4]+"..."+cfg.Token[len(cfg.Token)-4:], "mount_path", cfg.MountPath)
 
 	return &Client{
 		client:    client,
 		mountPath: cfg.MountPath,
+		token:     cfg.Token,
 	}, nil
 }
 
 func (c *Client) escrowPath(dealID int64) string {
-	return "escrow/deal/" + strconv.FormatInt(dealID, 10)
+	return "escrow/deal_" + strconv.FormatInt(dealID, 10)
 }
 
 func (c *Client) PutEscrowSeed(ctx context.Context, dealID int64, seedPhrase string) error {
 	path := c.escrowPath(dealID)
-	_, err := c.client.Secrets.KvV2Write(ctx, path, schema.KvV2WriteRequest{
-		Data: map[string]any{
-			escrowSecretKey: seedPhrase,
+	_, err := c.client.Secrets.KvV2Write(
+		ctx,
+		path,
+		schema.KvV2WriteRequest{
+			Data: map[string]any{
+				escrowSecretKey: seedPhrase,
+			},
 		},
-	}, vaultclient.WithMountPath(c.mountPath))
+		vaultclient.WithMountPath(c.mountPath),
+		vaultclient.WithToken(c.token),
+	)
 	if err != nil {
-		return fmt.Errorf("vault write escrow seed for deal %d: %w", dealID, err)
+		return fmt.Errorf("vault write escrow seed for deal %d path %s: %w", dealID, path, err)
 	}
 	slog.Debug("vault: stored escrow seed", "deal_id", dealID)
 	return nil
@@ -59,9 +66,13 @@ func (c *Client) PutEscrowSeed(ctx context.Context, dealID int64, seedPhrase str
 
 func (c *Client) GetEscrowSeed(ctx context.Context, dealID int64) (string, error) {
 	path := c.escrowPath(dealID)
-	resp, err := c.client.Secrets.KvV2Read(ctx, path, vaultclient.WithMountPath(c.mountPath))
+	resp, err := c.client.Secrets.KvV2Read(
+		ctx, path,
+		vaultclient.WithMountPath(c.mountPath),
+		vaultclient.WithToken(c.token),
+	)
 	if err != nil {
-		return "", fmt.Errorf("vault read escrow seed for deal %d: %w", dealID, err)
+		return "", fmt.Errorf("vault read escrow seed for deal %d path %s: %w", dealID, path, err)
 	}
 	if resp == nil || resp.Data.Data == nil {
 		return "", fmt.Errorf("vault: no secret at path for deal %d: %w", dealID, ErrSecretNotFound)
