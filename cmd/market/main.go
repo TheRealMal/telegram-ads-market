@@ -35,6 +35,7 @@ import (
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
+	"ads-mrkt/internal/vault"
 	marketrouter "ads-mrkt/internal/server/routers/market"
 	"ads-mrkt/pkg/auth"
 	"ads-mrkt/pkg/health"
@@ -103,7 +104,11 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
 			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo)
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
-			escrowSvc := escrowservice.NewService(dealRepo, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
+			vaultClient, err := vault.NewClient(cfg.Vault)
+			if err != nil {
+				return errors.Wrap(err, "create vault client")
+			}
+			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
 			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)

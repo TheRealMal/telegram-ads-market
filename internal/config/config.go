@@ -7,6 +7,7 @@ import (
 	redisconfig "ads-mrkt/internal/redis/config"
 	serverconfig "ads-mrkt/internal/server/config"
 	userbotconfig "ads-mrkt/internal/userbot/config"
+	vaultconfig "ads-mrkt/internal/vault/config"
 	authconfig "ads-mrkt/pkg/auth/config"
 	healthconfig "ads-mrkt/pkg/health/config"
 )
@@ -15,11 +16,12 @@ type Config struct {
 	LogLevel string `env:"LOG_LEVEL" env-default:"info"`
 
 	UserBot                 userbotconfig.Config `env-prefix:"USER_BOT_"`
-	Database                dbconfig.Config
+	Database                dbconfig.Config      `env-prefix:"DB_"`
 	Server                  serverconfig.Config
 	Health                  healthconfig.Config
 	Auth                    authconfig.Config
-	Redis                   redisconfig.Config
+	Redis                   redisconfig.Config      `env-prefix:"REDIS_"`
+	Vault                   vaultconfig.Config      `env-prefix:"VAULT_"`
 	Telegram                telegramconfig.Config   `env-prefix:"TELEGRAM_"`
 	Liteclient              liteclientconfig.Config `env-prefix:"LITECLIENT_"`
 	IsPublic                bool                    `env:"IS_PUBLIC" env-default:"false"`

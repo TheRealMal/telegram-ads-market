@@ -53,6 +53,30 @@ services:
         condition: service_healthy
 
 
+  vault:
+    image: internal.vault:latest
+    build:
+      context: .
+      dockerfile: dockerfiles/vault/Dockerfile
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "${VAULT_FORWARD_PORT:-8200}:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+    volumes:
+      - ./data/vault:/vault/data
+    networks:
+      ads-mrkt-network:
+        ipv4_address: 172.32.0.15
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   redis:
     image: redis:6.2-alpine
     restart: unless-stopped
@@ -145,6 +169,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CLIENT_DOMAIN: ${CLIENT_DOMAIN:-https://localhost}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-root}
     networks:
       ads-mrkt-network:
         ipv4_address: 172.32.0.11
@@ -152,6 +178,8 @@ services:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      vault:
         condition: service_healthy
 
   bot:
@@ -216,6 +244,7 @@ volumes:
   certbot_letsencrypt:
   certbot_webroot:
   userbot_sessions:
+  vault_data:
 
 networks:
   ads-mrkt-network:

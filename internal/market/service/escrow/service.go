@@ -25,10 +25,15 @@ type dealRepository interface {
 	ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error)
 	ListDealsWaitingEscrowRelease(ctx context.Context) ([]*entity.Deal, error)
 	ListDealsWaitingEscrowRefund(ctx context.Context) ([]*entity.Deal, error)
-	SetDealEscrowAddress(ctx context.Context, dealID int64, address string, privateKey string) error
+	SetDealEscrowAddress(ctx context.Context, dealID int64, address string) error
 	SetDealStatusEscrowDepositConfirmed(ctx context.Context, dealID int64) error
 	SetDealStatusEscrowReleaseConfirmed(ctx context.Context, dealID int64) error
 	SetDealStatusEscrowRefundConfirmed(ctx context.Context, dealID int64) error
+}
+
+type vaultRepository interface {
+	PutEscrowSeed(ctx context.Context, dealID int64, seedPhrase string) error
+	GetEscrowSeed(ctx context.Context, dealID int64) (string, error)
 }
 
 type dealActionLockRepository interface {
@@ -53,23 +58,25 @@ type dealChatService interface {
 
 type service struct {
 	dealRepo              dealRepository
-	dealActionLockRepo     dealActionLockRepository
-	liteclient             liteclient
-	redis                  redisCache
-	dealChatService        dealChatService
-	transactionGasNanoton  int64
-	comissionMultiplier    float64
+	vaultRepository       vaultRepository
+	dealActionLockRepo    dealActionLockRepository
+	liteclient            liteclient
+	redis                 redisCache
+	dealChatService       dealChatService
+	transactionGasNanoton int64
+	comissionMultiplier   float64
 }
 
-func NewService(dealRepo dealRepository, dealActionLockRepo dealActionLockRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
+func NewService(dealRepo dealRepository, vaultRepository vaultRepository, dealActionLockRepo dealActionLockRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
 	return &service{
-		dealRepo:             dealRepo,
-		dealActionLockRepo:   dealActionLockRepo,
-		liteclient:           liteclient,
-		redis:                redis,
-		dealChatService:     dealChatService,
+		dealRepo:              dealRepo,
+		vaultRepository:       vaultRepository,
+		dealActionLockRepo:    dealActionLockRepo,
+		liteclient:            liteclient,
+		redis:                 redis,
+		dealChatService:       dealChatService,
 		transactionGasNanoton: int64(transactionGasTON * nanotonPerTON),
-		comissionMultiplier:  1 + (commissionPercent / 100.0),
+		comissionMultiplier:   1 + (commissionPercent / 100.0),
 	}
 }
 
@@ -94,8 +101,12 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 		return err
 	}
 
+	seedPhrase := strings.Join(seed, " ")
+	if err = s.vaultRepository.PutEscrowSeed(ctx, dealID, seedPhrase); err != nil {
+		return err
+	}
 	rawAddr := wallet.Address().StringRaw()
-	if err = s.dealRepo.SetDealEscrowAddress(ctx, dealID, rawAddr, strings.Join(seed, " ")); err != nil {
+	if err = s.dealRepo.SetDealEscrowAddress(ctx, dealID, rawAddr); err != nil {
 		return err
 	}
 	if err = s.redis.Set(ctx, rawAddr, "1", escrowRedisTTL); err != nil {
@@ -123,12 +134,11 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 		return fmt.Errorf("failed to parse payout address: %w", err)
 	}
 
-	key, err := wallet.SeedToPrivateKeyWithOptions(
-		strings.Split(
-			strings.TrimSpace(*deal.EscrowPrivateKey),
-			" ",
-		),
-	)
+	seedPhrase, err := s.vaultRepository.GetEscrowSeed(ctx, dealID)
+	if err != nil {
+		return fmt.Errorf("get escrow seed from vault: %w", err)
+	}
+	key, err := wallet.SeedToPrivateKeyWithOptions(strings.Split(strings.TrimSpace(seedPhrase), " "))
 	if err != nil {
 		return fmt.Errorf("failed to parse escrow private key: %w", err)
 	}
@@ -229,8 +239,8 @@ func prepareAction(deal *entity.Deal, release bool) (actionType entity.DealActio
 	if deal.Status != wantStatus {
 		return "", "", errors.New("deal status is not " + string(wantStatus))
 	}
-	if deal.EscrowPrivateKey == nil || *deal.EscrowPrivateKey == "" {
-		return "", "", errors.New("deal has no escrow private key")
+	if deal.EscrowAddress == nil || *deal.EscrowAddress == "" {
+		return "", "", errors.New("deal has no escrow address")
 	}
 	return
 }

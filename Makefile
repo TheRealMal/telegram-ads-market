@@ -1,4 +1,4 @@
-.PHONY: install_lint lint install_openapi swagger install_buf gen_proto build_linux_bin docker_build_bin
+.PHONY: install_lint lint install_openapi swagger install_buf gen_proto build_linux_bin docker_build_bin init_vault unseal_vault init_userbot init_certs start rollout_web rollout_back stop
 
 install_lint: ## Install linting tool
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.6
@@ -15,6 +15,15 @@ swagger: ## Generate swagger documentation
 	--outputTypes yaml,json \
 	-q
 	swag fmt
+
+init_vault:
+	docker compose up -d vault
+	@echo "Waiting for Vault to become healthy..."
+	@sleep 5
+	docker exec -it ads-mrkt-contest-vault-1 vault operator init
+
+unseal_vault:
+	docker exec -it ads-mrkt-contest-vault-1 vault operator unseal $(filter-out $@,$(MAKECMDGOALS))
 
 init_userbot: ## Initialize the userbot session file
 	docker compose up -d postgres redis migrations

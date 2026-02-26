@@ -66,12 +66,16 @@ MVP can be deployed via make command or directly via docker compose
 
 ```console
 # Initialize userbot session
+make init_vault
 make init_userbot
 # Start
 make start
 ```
 
 ```console
+# Initialize vault
+docker compose up -d vault
+docker exec -it ads-mrkt-contest-vault-1 vault operator init
 # Initialize userbot session
 docker compose up -d postgres redis migrations
 docker compose run --rm -it userbot
@@ -134,7 +138,7 @@ Frontend sources are placed into `web` directory, fully written with AI on React
 
 - [x] Fix deals being available to everyone (must be available only to deal sides)
 - [x] Fetch channel picture
-- [ ] Secure escrow keys in database
+- [x] Secure escrow keys in database
 - [ ] Somehow monitor removing & adding new admins which will have ability to create listings
 - [x] Refresh channels stats & display last update date on stats page
 - [x] Add telegram notifications about deals

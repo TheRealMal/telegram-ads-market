@@ -22,7 +22,6 @@ type DealRow struct {
 	LesseeSignature     *string         `db:"lessee_signature"`
 	Status              string          `db:"status"`
 	EscrowAddress       *string         `db:"escrow_address"`
-	EscrowPrivateKey    *string         `db:"escrow_private_key"`
 	EscrowReleaseTime   *time.Time      `db:"escrow_release_time"`
 	LessorPayoutAddress *string         `db:"lessor_payout_address"`
 	LesseePayoutAddress *string         `db:"lessee_payout_address"`
@@ -52,7 +51,6 @@ func DealRowToEntity(row DealRow) *entity.Deal {
 		LesseeSignature:     row.LesseeSignature,
 		Status:              entity.DealStatus(row.Status),
 		EscrowAddress:       row.EscrowAddress,
-		EscrowPrivateKey:    row.EscrowPrivateKey,
 		EscrowReleaseTime:   row.EscrowReleaseTime,
 		LessorPayoutAddress: row.LessorPayoutAddress,
 		LesseePayoutAddress: row.LesseePayoutAddress,
