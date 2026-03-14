@@ -105,6 +105,7 @@ services:
         # Same-origin: frontend calls /api/v1/* on same host
         NEXT_PUBLIC_API_URL: ""
         NEXT_PUBLIC_ADD_CHANNEL_USERNAME: ${NEXT_PUBLIC_ADD_CHANNEL_USERNAME:-}
+        NEXT_PUBLIC_BOT_USERNAME: ${NEXT_PUBLIC_BOT_USERNAME:-}
     env_file:
       - .env
     restart: unless-stopped
