@@ -16,9 +16,6 @@ const navItems = [
 export function BottomNav() {
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Analytics dashboard and waitlist are direct-URL pages, not in main nav
-  if (pathname.startsWith('/analytics') || pathname.startsWith('/waitlist')) return null;
   const listRef = useRef<HTMLUListElement>(null);
 
   const isActive = useCallback(
@@ -47,6 +44,9 @@ export function BottomNav() {
     container.style.setProperty('--pill-w', `${liRect.width}px`);
     container.style.setProperty('--pill-h', `${liRect.height}px`);
   }, [pathname, safeIndex]);
+
+  // Analytics dashboard and waitlist are direct-URL pages, not in main nav
+  if (pathname.startsWith('/analytics') || pathname.startsWith('/waitlist')) return null;
 
   return (
     <nav
