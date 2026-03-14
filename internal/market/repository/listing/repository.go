@@ -165,6 +165,37 @@ func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID in
 	return true, nil
 }
 
+func (r *repository) DeactivateListingsByUserAndChannel(ctx context.Context, userID, channelID int64) (int64, error) {
+	cmd, err := r.db.Exec(ctx, `
+		UPDATE market.listing SET status = @status_inactive, updated_at = NOW()
+		WHERE user_id = @user_id AND channel_id = @channel_id AND status = @status_active`,
+		pgx.NamedArgs{
+			"user_id":         userID,
+			"channel_id":      channelID,
+			"status_inactive": string(entity.ListingStatusInactive),
+			"status_active":   string(entity.ListingStatusActive),
+		})
+	if err != nil {
+		return 0, err
+	}
+	return cmd.RowsAffected(), nil
+}
+
+func (r *repository) DeactivateListingsByChannel(ctx context.Context, channelID int64) (int64, error) {
+	cmd, err := r.db.Exec(ctx, `
+		UPDATE market.listing SET status = @status_inactive, updated_at = NOW()
+		WHERE channel_id = @channel_id AND status = @status_active`,
+		pgx.NamedArgs{
+			"channel_id":      channelID,
+			"status_inactive": string(entity.ListingStatusInactive),
+			"status_active":   string(entity.ListingStatusActive),
+		})
+	if err != nil {
+		return 0, err
+	}
+	return cmd.RowsAffected(), nil
+}
+
 func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error) {
 	q := `
 		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,

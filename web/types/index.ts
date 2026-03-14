@@ -3,6 +3,7 @@ export interface ApiResponse<T> {
   ok: boolean;
   data?: T;
   error_code?: string;
+  status?: number;
 }
 
 // Listing

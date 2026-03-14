@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -97,6 +98,16 @@ func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *s
 			continue
 		}
 		if ch == nil {
+			ids = append(ids, ev.ID)
+			continue
+		}
+		ch, err = s.ensureChannelAccess(ctx, ch)
+		if err != nil {
+			if errors.Is(err, ErrSkipThatIteration) {
+				logger.Info("channel access ensured, skipping that iteration to restart process on next iteration")
+				continue
+			}
+			logger.Error("ensure channel access for stats", "channel_id", ev.ChannelID, "error", err)
 			ids = append(ids, ev.ID)
 			continue
 		}

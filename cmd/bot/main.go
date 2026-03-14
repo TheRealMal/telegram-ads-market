@@ -5,14 +5,18 @@ import (
 
 	"ads-mrkt/cmd/builder"
 	webhookhttp "ads-mrkt/internal/bot/application/webhook/http"
+	userbotstate "ads-mrkt/internal/bot/repository/userbot_state"
 	botupdates "ads-mrkt/internal/bot/service/updates"
 	"ads-mrkt/internal/config"
 	eventtelegramnotify "ads-mrkt/internal/event/application/telegram_notification/event"
 	eventtelegram "ads-mrkt/internal/event/application/telegram_update/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
 	"ads-mrkt/internal/helpers/telegram"
+	"ads-mrkt/internal/market/repository/channel"
+	"ads-mrkt/internal/market/repository/channel_admin"
 	"ads-mrkt/internal/market/repository/deal"
 	"ads-mrkt/internal/market/repository/deal_forum_topic"
+	"ads-mrkt/internal/market/repository/listing"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
@@ -70,14 +74,23 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return errors.Wrap(err, "postgres")
 			}
 
+			channelRepo := channel.New(pg)
+			channelAdminRepo := channel_admin.New(pg)
+			listingRepo := listing.New(pg)
+			userbotStateRepo := userbotstate.New(pg)
+
 			dealRepo := deal.New(pg)
 			dealForumTopicRepo := deal_forum_topic.New(pg)
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
 
 			// Bot updates service
-			updatesSvc := botupdates.NewService(telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc)
+			updatesSvc := botupdates.NewService(
+				telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc,
+				channelRepo, channelAdminRepo, listingRepo, dealRepo, telegramNotifyEventSvc, userbotStateRepo,
+			)
 			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
 			go updatesSvc.StartBackgroundProcessingNotifications(ctxRun)
+			go updatesSvc.StartAdminMonitorWorker(ctxRun)
 
 			// Webhook HTTP handler and router
 			webhookHandler := webhookhttp.NewHandler(updatesSvc)

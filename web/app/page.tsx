@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsListWithPill, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
@@ -14,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function MarketplacePage() {
+  const router = useRouter();
   const [lessorListings, setLessorListings] = useState<Listing[]>([]);
   const [lesseeListings, setLesseeListings] = useState<Listing[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,6 +72,10 @@ export default function MarketplacePage() {
           api<Listing[]>(`/api/v1/market/listings?${paramsLessor.toString()}`),
           api<Listing[]>(`/api/v1/market/listings?${paramsLessee.toString()}`),
         ]);
+        if (lessors.status === 401 || lessees.status === 401) {
+          router.push('/waitlist');
+          return;
+        }
         setLessorListings(lessors.ok && lessors.data ? lessors.data : []);
         setLesseeListings(lessees.ok && lessees.data ? lessees.data : []);
       } catch (e) {

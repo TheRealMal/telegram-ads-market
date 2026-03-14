@@ -35,6 +35,12 @@ type DealReturnRow struct {
 	UpdatedAt time.Time `db:"updated_at"`
 }
 
+type RejectedDealRow struct {
+	ID       int64 `db:"id"`
+	LessorID int64 `db:"lessor_id"`
+	LesseeID int64 `db:"lessee_id"`
+}
+
 func DealRowToEntity(row DealRow) *entity.Deal {
 	return &entity.Deal{
 		ID:                  row.ID,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, ensureValidToken } from '@/lib/api';
 import type { Deal } from '@/types';
 import { DealCard } from '@/components/DealCard';
@@ -8,6 +9,7 @@ import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function DealsPage() {
+  const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -29,6 +31,10 @@ export default function DealsPage() {
     }
     api<Deal[]>('/api/v1/market/my-deals')
       .then((res) => {
+        if (res.status === 401) {
+          router.push('/waitlist');
+          return;
+        }
         if (res.ok && res.data) setDeals(res.data);
       })
       .finally(() => setLoading(false));

@@ -31,6 +31,8 @@ const (
 	telegramPathCreateForumTopic       TelegramPath = "/createForumTopic"
 	telegramPathDeleteForumTopic       TelegramPath = "/deleteForumTopic"
 	telegramPathCopyMessage            TelegramPath = "/copyMessage"
+	telegramPathGetChatAdministrators  TelegramPath = "/getChatAdministrators"
+	telegramPathPromoteChatMember      TelegramPath = "/promoteChatMember"
 
 	messageWelcome = "Start message"
 	openAppURL     = "https://t.me/%s?startapp="
@@ -398,6 +400,51 @@ func (c *APIClient) CopyMessage(ctx context.Context, fromChatID int64, messageID
 		return 0, fmt.Errorf("copyMessage returned ok=false")
 	}
 	return result.Result.MessageID, nil
+}
+
+// GetChatAdministrators returns a list of administrators in a chat.
+// See https://core.telegram.org/bots/api#getchatadministrators
+func (c *APIClient) GetChatAdministrators(ctx context.Context, chatID int64) ([]*ChatMember, error) {
+	uri := c.buildTelegramURL(telegramPathGetChatAdministrators)
+	payload := map[string]interface{}{"chat_id": chatID}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal getChatAdministrators: %w", err)
+	}
+	body, err := c.sendRequest(ctx, uri, jsonData)
+	if err != nil {
+		return nil, err
+	}
+	var result ChatMemberResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal getChatAdministrators: %w", err)
+	}
+	if !result.OK {
+		return nil, fmt.Errorf("getChatAdministrators returned ok=false")
+	}
+	return result.Result, nil
+}
+
+// PromoteChatMember promotes a user in a channel/group.
+// See https://core.telegram.org/bots/api#promotechatmember
+func (c *APIClient) PromoteChatMember(ctx context.Context, chatID int64, userID int64, rights AdminPromoteRights) error {
+	uri := c.buildTelegramURL(telegramPathPromoteChatMember)
+	payload := map[string]interface{}{
+		"chat_id":             chatID,
+		"user_id":             userID,
+		"can_post_messages":   rights.CanPostMessages,
+		"can_edit_messages":   rights.CanEditMessages,
+		"can_delete_messages": rights.CanDeleteMessages,
+		"can_post_stories":    rights.CanPostStories,
+		"can_delete_stories":  rights.CanDeleteStories,
+		"can_manage_chat":     true,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal promoteChatMember: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
 }
 
 // SendMessageWithForceReply sends a text message with reply_markup force_reply so the user is asked to reply.

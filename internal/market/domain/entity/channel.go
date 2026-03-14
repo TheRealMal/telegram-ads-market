@@ -10,10 +10,11 @@ type AdminRights struct {
 }
 
 type Channel struct {
-	AdminRights AdminRights `json:"-"`
-	ID          int64       `json:"id"`
-	AccessHash  int64       `json:"-"`
-	Title       string      `json:"title"`
-	Username    string      `json:"username"`
-	Photo       string      `json:"photo"`
+	AdminRights     AdminRights `json:"-"`
+	ID              int64       `json:"id"`
+	AccessHash      int64       `json:"-"`
+	BotMemberStatus string      `json:"-"`
+	Title           string      `json:"title"`
+	Username        string      `json:"username"`
+	Photo           string      `json:"photo"`
 }

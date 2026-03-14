@@ -8,6 +8,7 @@ import (
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
+	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/userbot/config"
 
@@ -52,6 +53,10 @@ type dealActionLockRepository interface {
 	GetLastDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (*marketentity.DealActionLock, error)
 }
 
+type botAPIClient interface {
+	PromoteChatMember(ctx context.Context, chatID int64, userID int64, rights helpertelegram.AdminPromoteRights) error
+}
+
 type channelUpdateStatsEventService interface {
 	ReadChannelUpdateStatsEvents(ctx context.Context, group, consumer string, limit int64) ([]*evententity.EventChannelUpdateStats, error)
 	PendingChannelUpdateStatsEvents(ctx context.Context, group, consumer string, limit int64, minIdle time.Duration) ([]*evententity.EventChannelUpdateStats, error)
@@ -68,13 +73,14 @@ type service struct {
 	dealPostMessageRepo        dealPostMessageRepository
 	dealActionLockRepo         dealActionLockRepository
 	channelUpdateStatsEventSvc channelUpdateStatsEventService
+	botAPIClient               botAPIClient
 	telegramClient             *telegram.Client
 	authFlow                   auth.Flow
 	updatesManager             *updates.Manager
 	userID                     int64
 }
 
-func New(cfg config.Config, stateStorage updates.StateStorage, channelRepo channelRepository, channelAdminRepo channelAdminRepository, listingRepo listingRepository, dealRepo dealRepository, dealPostMessageRepo dealPostMessageRepository, dealActionLockRepo dealActionLockRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService) *service {
+func New(cfg config.Config, stateStorage updates.StateStorage, channelRepo channelRepository, channelAdminRepo channelAdminRepository, listingRepo listingRepository, dealRepo dealRepository, dealPostMessageRepo dealPostMessageRepository, dealActionLockRepo dealActionLockRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService, botAPIClient botAPIClient) *service {
 	s := &service{
 		stateStorage:               stateStorage,
 		channelRepo:                channelRepo,
@@ -84,6 +90,7 @@ func New(cfg config.Config, stateStorage updates.StateStorage, channelRepo chann
 		dealPostMessageRepo:        dealPostMessageRepo,
 		dealActionLockRepo:         dealActionLockRepo,
 		channelUpdateStatsEventSvc: channelUpdateStatsEventSvc,
+		botAPIClient:               botAPIClient,
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()

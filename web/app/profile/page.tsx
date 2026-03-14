@@ -1,19 +1,24 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, ensureValidToken } from '@/lib/api';
 import { getTelegramUser } from '@/lib/initData';
+import { openTelegramLink } from '@/lib/telegram';
 import type { Channel } from '@/types';
 import { ChannelCard } from '@/components/ChannelCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { toggleTheme, getCurrentTheme } from '@/lib/theme';
-import { User, HelpCircle, X, Sun, Moon } from 'lucide-react';
+import { User, HelpCircle, Plus, X, Sun, Moon } from 'lucide-react';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
+const BOT_USERNAME =
+  typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_BOT_USERNAME || 'YourBotUsername' : 'YourBotUsername';
 const ADD_CHANNEL_USERNAME =
   typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADD_CHANNEL_USERNAME || 'therealmal' : 'therealmal';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -57,6 +62,10 @@ export default function ProfilePage() {
     const fetchChannels = () =>
       api<Channel[]>('/api/v1/market/my-channels')
         .then((res) => {
+          if (res.status === 401) {
+            router.push('/waitlist');
+            return;
+          }
           if (isMounted && res.ok && res.data) setChannels(res.data);
         })
         .catch(() => {})
@@ -210,14 +219,26 @@ export default function ProfilePage() {
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             My channels
           </h2>
-          <button
-            type="button"
-            onClick={() => setShowAddChannelModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          >
-            <HelpCircle size={16} />
-            How to add a channel
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const link = `https://t.me/${BOT_USERNAME}?startchannel&admin=post_messages+edit_messages+delete_messages+post_stories+delete_stories+manage_chat`;
+                openTelegramLink(link);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              Add Channel
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddChannelModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <HelpCircle size={16} />
+            </button>
+          </div>
         </div>
 
         {hasToken === false && (

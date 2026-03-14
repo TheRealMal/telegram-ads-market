@@ -7,10 +7,31 @@ const (
 // Update represents an incoming update from Telegram.
 // At most one of the optional parameters can be present in any given update.
 type Update struct {
-	UpdateID         int64             `json:"update_id"`
-	Message          *UpdateMessage    `json:"message,omitempty"`
-	CallbackQuery    *CallbackQuery    `json:"callback_query,omitempty"`
-	PreCheckoutQuery *PreCheckoutQuery `json:"pre_checkout_query,omitempty"`
+	UpdateID         int64              `json:"update_id"`
+	Message          *UpdateMessage     `json:"message,omitempty"`
+	CallbackQuery    *CallbackQuery     `json:"callback_query,omitempty"`
+	PreCheckoutQuery *PreCheckoutQuery  `json:"pre_checkout_query,omitempty"`
+	MyChatMember     *ChatMemberUpdated `json:"my_chat_member,omitempty"`
+	ChatMember       *ChatMemberUpdated `json:"chat_member,omitempty"`
+}
+
+// ChatMemberUpdated represents a change in chat member status.
+// See https://core.telegram.org/bots/api#chatmemberupdated
+type ChatMemberUpdated struct {
+	Chat          *Chat       `json:"chat"`
+	From          *User       `json:"from"`
+	Date          int64       `json:"date"`
+	OldChatMember *ChatMember `json:"old_chat_member"`
+	NewChatMember *ChatMember `json:"new_chat_member"`
+}
+
+// ChatMember contains information about one member of a chat.
+// See https://core.telegram.org/bots/api#chatmember
+type ChatMember struct {
+	Status      string `json:"status"`
+	User        *User  `json:"user"`
+	IsAnonymous bool   `json:"is_anonymous,omitempty"`
+	CustomTitle string `json:"custom_title,omitempty"`
 }
 
 // Message represents a message from Telegram.
@@ -205,6 +226,21 @@ type InvoiceLinkResponse struct {
 type RefundStarPaymentPayload struct {
 	UserID                  int64  `json:"user_id"`                    // Identifier of the user whose payment will be refunded
 	TelegramPaymentChargeID string `json:"telegram_payment_charge_id"` // Telegram payment identifier
+}
+
+// ChatMemberResponse is the Bot API response for getChatAdministrators.
+type ChatMemberResponse struct {
+	OK     bool          `json:"ok"`
+	Result []*ChatMember `json:"result"`
+}
+
+// AdminPromoteRights contains the rights to grant when promoting a user.
+type AdminPromoteRights struct {
+	CanPostMessages   bool
+	CanEditMessages   bool
+	CanDeleteMessages bool
+	CanPostStories    bool
+	CanDeleteStories  bool
 }
 
 // SentMessage is the result of sendMessage API (message_id and chat for persistence).

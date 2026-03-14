@@ -6,6 +6,7 @@ import (
 	"ads-mrkt/internal/config"
 	channelupdateevent "ads-mrkt/internal/event/application/channel_update_stats/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
+	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/repository/channel"
 	"ads-mrkt/internal/market/repository/channel_admin"
 	"ads-mrkt/internal/market/repository/deal"
@@ -60,7 +61,8 @@ func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealActionLockRepo := deal_action_lock.New(pg)
 			eventRepo := eventredis.New(redisClient)
 			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
-			b := userbotservice.New(cfg.UserBot, stateStorage, channelRepo, channelAdminRepo, listingRepo, dealRepo, dealPostMessageRepo, dealActionLockRepo, channelUpdateStatsEventSvc)
+			telegramBotClient := telegram.NewAPIClient(ctx, cfg.Telegram, redisClient)
+			b := userbotservice.New(cfg.UserBot, stateStorage, channelRepo, channelAdminRepo, listingRepo, dealRepo, dealPostMessageRepo, dealActionLockRepo, channelUpdateStatsEventSvc, telegramBotClient)
 
 			if err := b.Start(ctx); err != nil {
 				return errors.Wrap(err, "userbot start")

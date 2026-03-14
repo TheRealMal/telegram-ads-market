@@ -9,14 +9,19 @@ import (
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
+	marketentity "ads-mrkt/internal/market/domain/entity"
+	dealmodel "ads-mrkt/internal/market/repository/deal/model"
 )
 
 type UpdateType string
 
 const (
-	UpdateCommandStart UpdateType = "start"
-	UpdateCallback     UpdateType = "callback"
-	UpdateUnknown      UpdateType = "unknown"
+	UpdateCommandStart  UpdateType = "start"
+	UpdateCallback      UpdateType = "callback"
+	UpdateMyChatMember  UpdateType = "my_chat_member"
+	UpdateChatMember    UpdateType = "chat_member"
+	UpdateForumMessage  UpdateType = "forum_message"
+	UpdateUnknown       UpdateType = "unknown"
 
 	groupName                     = "master"
 	consumerName                  = "updates"
@@ -45,10 +50,41 @@ type telegramService interface {
 	SendWelcomeMessage(ctx context.Context, chatID int64) error
 	SendMessageSimple(ctx context.Context, chatID int64, text string) error
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
+	GetChatAdministrators(ctx context.Context, chatID int64) ([]*telegram.ChatMember, error)
 }
 
 type marketDealChatService interface {
 	CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error
+}
+
+type channelRepository interface {
+	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
+	UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status string) error
+	ListChannelsWithBotAccess(ctx context.Context) ([]*marketentity.Channel, error)
+	ResetChannelAccessHash(ctx context.Context, channelID int64) error
+}
+
+type channelAdminRepository interface {
+	DeleteChannelAdmins(ctx context.Context, channelID int64) error
+	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error
+}
+
+type listingRepository interface {
+	DeactivateListingsByUserAndChannel(ctx context.Context, userID, channelID int64) (int64, error)
+	DeactivateListingsByChannel(ctx context.Context, channelID int64) (int64, error)
+}
+
+type dealRepository interface {
+	RejectDealsByUserAndChannel(ctx context.Context, userID, channelID int64) ([]dealmodel.RejectedDealRow, error)
+	RejectDealsByChannel(ctx context.Context, channelID int64) ([]dealmodel.RejectedDealRow, error)
+}
+
+type notificationAdder interface {
+	AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error
+}
+
+type userbotStateRepository interface {
+	GetUserbotUserID(ctx context.Context) (int64, error)
 }
 
 type service struct {
@@ -56,6 +92,12 @@ type service struct {
 	eventService          eventService
 	notificationEventSvc  telegramNotificationEventService
 	marketDealChatService marketDealChatService
+	channelRepo           channelRepository
+	channelAdminRepo      channelAdminRepository
+	listingRepo           listingRepository
+	dealRepo              dealRepository
+	notificationAdder     notificationAdder
+	userbotStateRepo      userbotStateRepository
 }
 
 func NewService(
@@ -63,12 +105,24 @@ func NewService(
 	eventService eventService,
 	notificationEventSvc telegramNotificationEventService,
 	marketDealChatService marketDealChatService,
+	channelRepo channelRepository,
+	channelAdminRepo channelAdminRepository,
+	listingRepo listingRepository,
+	dealRepo dealRepository,
+	notificationAdder notificationAdder,
+	userbotStateRepo userbotStateRepository,
 ) *service {
 	return &service{
 		telegramClient:        telegramClient,
 		eventService:          eventService,
 		notificationEventSvc:  notificationEventSvc,
 		marketDealChatService: marketDealChatService,
+		channelRepo:           channelRepo,
+		channelAdminRepo:      channelAdminRepo,
+		listingRepo:           listingRepo,
+		dealRepo:              dealRepo,
+		notificationAdder:     notificationAdder,
+		userbotStateRepo:      userbotStateRepo,
 	}
 }
 
@@ -128,8 +182,13 @@ func (s *service) processUpdates(ctx context.Context) error {
 
 func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.EventTelegramUpdate) error {
 	update := updateEvent.Update
+
 	updateType := s.getUpdateType(update)
 	switch updateType {
+	case UpdateMyChatMember:
+		return s.handleMyChatMember(ctx, update.MyChatMember)
+	case UpdateChatMember:
+		return s.handleChatMember(ctx, update.ChatMember)
 	case UpdateCommandStart:
 		err := s.telegramClient.SendWelcomeMessage(ctx, update.Message.Chat.ID)
 		if err != nil {
@@ -138,21 +197,30 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 			}
 			return fmt.Errorf("failed to send welcome message: %w", err)
 		}
-	}
-
-	// If message is in a forum topic (deal chat), mirror it to the other side's topic.
-	if update.Message != nil && update.Message.Chat != nil && update.Message.MessageThreadID != 0 {
+	case UpdateForumMessage:
 		if err := s.marketDealChatService.CopyMessageToOtherTopic(ctx, update.Message.Chat.ID, update.Message.MessageThreadID, update.Message.MessageID); err != nil {
 			slog.Debug("deal chat copy message", "error", err, "chat_id", update.Message.Chat.ID, "thread_id", update.Message.MessageThreadID, "message_id", update.Message.MessageID)
 		}
+	case UpdateUnknown:
+		// No action needed
 	}
+
 	return nil
 }
 
 func (s *service) getUpdateType(update *telegram.Update) UpdateType {
+	if update.MyChatMember != nil {
+		return UpdateMyChatMember
+	}
+	if update.ChatMember != nil {
+		return UpdateChatMember
+	}
 	if update.Message != nil {
 		if update.Message.Text == "/start" {
 			return UpdateCommandStart
+		}
+		if update.Message.Chat != nil && update.Message.MessageThreadID != 0 {
+			return UpdateForumMessage
 		}
 	}
 	return UpdateUnknown

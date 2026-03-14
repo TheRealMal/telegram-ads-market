@@ -50,6 +50,11 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
 			continue
 		}
+		channel, err = s.ensureChannelAccess(ctx, channel)
+		if err != nil {
+			logger.Error("ensure channel access", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "error", err)
+			continue
+		}
 		text := domain.GetMessageFromDetails(deal.Details)
 		if text == "" {
 			logger.Error("skip deal, no message in details", "deal_id", deal.ID)
@@ -178,6 +183,11 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 	for _, m := range list {
 		channel, err := s.channelRepo.GetChannelByID(ctx, m.ChannelID)
 		if err != nil || channel == nil {
+			continue
+		}
+		channel, err = s.ensureChannelAccess(ctx, channel)
+		if err != nil {
+			logger.Error("ensure channel access", "channel_id", m.ChannelID, "error", err)
 			continue
 		}
 		exists, err := s.getChannelMessageExists(ctx, m.ChannelID, channel.AccessHash, m.MessageID)

@@ -30,6 +30,7 @@ type handler interface {
 	SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	GetWaitlist(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
 
 type authMiddleware interface {
@@ -80,6 +81,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.SetWallet),
 				http.MethodPut,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -89,6 +91,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.DisconnectWallet),
 				http.MethodDelete,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -99,6 +102,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.ListListings),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -108,6 +112,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.ListMyListings),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -117,6 +122,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.CreateListing),
 				http.MethodPost,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -126,6 +132,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.GetListing),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -135,6 +142,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.UpdateListing),
 				http.MethodPatch,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -144,6 +152,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.DeleteListing),
 				http.MethodDelete,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -154,6 +163,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.ListMyChannels),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -163,6 +173,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.RefreshChannel),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -172,6 +183,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.GetChannelStats),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -182,6 +194,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.CreateDeal),
 				http.MethodPost,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -191,6 +204,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.GetDeal),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -200,6 +214,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.ListDealsByListingID),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -209,6 +224,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.ListMyDeals),
 				http.MethodGet,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -218,6 +234,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.UpdateDealDraft),
 				http.MethodPatch,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -227,6 +244,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.SignDeal),
 				http.MethodPost,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -236,6 +254,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.SetDealPayoutAddress),
 				http.MethodPut,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -245,6 +264,7 @@ func (r *Router) GetRoutes() http.Handler {
 				server.WithJSONResponse(r.handler.RejectDeal),
 				http.MethodPost,
 			),
+			role.AdminRole,
 		),
 		"/api/v1",
 	))
@@ -253,6 +273,17 @@ func (r *Router) GetRoutes() http.Handler {
 			server.WithMethod(
 				server.WithJSONResponse(r.handler.GetOrCreateDealChatLink),
 				http.MethodPost,
+			),
+			role.AdminRole,
+		),
+		"/api/v1",
+	))
+
+	mux.HandleFunc("GET /api/v1/market/waitlist", server.WithMetrics(
+		r.authMiddleware.WithAuth(
+			server.WithMethod(
+				server.WithJSONResponse(r.handler.GetWaitlist),
+				http.MethodGet,
 			),
 		),
 		"/api/v1",

@@ -488,6 +488,45 @@ func (r *repository) SetDealStatusEscrowRefundConfirmed(ctx context.Context, dea
 	return err
 }
 
+func (r *repository) RejectDealsByUserAndChannel(ctx context.Context, userID, channelID int64) ([]model.RejectedDealRow, error) {
+	rows, err := r.db.Query(ctx, `
+		UPDATE market.deal SET status = @status_rejected, updated_at = NOW()
+		WHERE channel_id = @channel_id AND lessor_id = @user_id
+		  AND (status = @status_draft OR status = @status_approved)
+		RETURNING id, lessor_id, lessee_id`,
+		pgx.NamedArgs{
+			"channel_id":      channelID,
+			"user_id":         userID,
+			"status_rejected": string(entity.DealStatusRejected),
+			"status_draft":    string(entity.DealStatusDraft),
+			"status_approved": string(entity.DealStatusApproved),
+		})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.RejectedDealRow])
+}
+
+func (r *repository) RejectDealsByChannel(ctx context.Context, channelID int64) ([]model.RejectedDealRow, error) {
+	rows, err := r.db.Query(ctx, `
+		UPDATE market.deal SET status = @status_rejected, updated_at = NOW()
+		WHERE channel_id = @channel_id
+		  AND (status = @status_draft OR status = @status_approved)
+		RETURNING id, lessor_id, lessee_id`,
+		pgx.NamedArgs{
+			"channel_id":      channelID,
+			"status_rejected": string(entity.DealStatusRejected),
+			"status_draft":    string(entity.DealStatusDraft),
+			"status_approved": string(entity.DealStatusApproved),
+		})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.RejectedDealRow])
+}
+
 func (r *repository) SetDealStatusRejected(ctx context.Context, dealID int64) (bool, error) {
 	cmd, err := r.db.Exec(ctx, `
 		UPDATE market.deal SET status = @status, updated_at = NOW()

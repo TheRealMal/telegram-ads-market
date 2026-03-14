@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { api, ensureValidToken } from '@/lib/api';
 import type { Listing } from '@/types';
@@ -11,6 +12,7 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { Tabs, TabsContent, TabsListWithPill, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MyListingsPage() {
+  const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -32,6 +34,10 @@ export default function MyListingsPage() {
     }
     api<Listing[]>('/api/v1/market/my-listings')
       .then((res) => {
+        if (res.status === 401) {
+          router.push('/waitlist');
+          return;
+        }
         if (res.ok && res.data) setListings(res.data);
       })
       .finally(() => setLoading(false));

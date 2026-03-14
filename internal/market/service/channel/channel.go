@@ -13,6 +13,10 @@ func (s *channelService) ListMyChannels(ctx context.Context, userID int64) ([]*e
 	return s.channelRepo.ListChannelsByAdminUserID(ctx, userID)
 }
 
+func (s *channelService) CountMyChannels(ctx context.Context, userID int64) (int64, error) {
+	return s.channelAdminRepo.CountChannelsByUserID(ctx, userID)
+}
+
 func (s *channelService) RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error) {
 	ok, err := s.channelAdminRepo.IsChannelAdmin(ctx, userID, channelID)
 	if err != nil {

@@ -7,12 +7,13 @@ import (
 )
 
 type ChannelRow struct {
-	ID         int64           `db:"id"`
-	AccessHash int64           `db:"access_hash"`
-	AdminRights json.RawMessage `db:"admin_rights"`
-	Title      string          `db:"title"`
-	Username   string          `db:"username"`
-	Photo      string          `db:"photo"`
+	ID              int64           `db:"id"`
+	AccessHash      int64           `db:"access_hash"`
+	BotMemberStatus string          `db:"bot_member_status"`
+	AdminRights     json.RawMessage `db:"admin_rights"`
+	Title           string          `db:"title"`
+	Username        string          `db:"username"`
+	Photo           string          `db:"photo"`
 }
 
 type ChannelStatsRow struct {
@@ -27,11 +28,12 @@ func ChannelRowToEntity(row ChannelRow) (*entity.Channel, error) {
 		}
 	}
 	return &entity.Channel{
-		ID:          row.ID,
-		AccessHash:  row.AccessHash,
-		AdminRights: rights,
-		Title:       row.Title,
-		Username:    row.Username,
-		Photo:       row.Photo,
+		ID:              row.ID,
+		AccessHash:      row.AccessHash,
+		BotMemberStatus: row.BotMemberStatus,
+		AdminRights:     rights,
+		Title:           row.Title,
+		Username:        row.Username,
+		Photo:           row.Photo,
 	}, nil
 }

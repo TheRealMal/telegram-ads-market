@@ -43,6 +43,7 @@ type channelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
 	GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error)
+	CountMyChannels(ctx context.Context, userID int64) (int64, error)
 }
 
 type handler struct {
