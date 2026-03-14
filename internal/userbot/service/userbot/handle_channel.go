@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 
 	"github.com/gotd/td/tg"
@@ -17,6 +18,8 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		return nil
 	}
 	slog.Info("channel update received", "channel_id", update.ChannelID, "title", channelEnt.Title)
+
+	botAPIID := helpertelegram.ToBotAPIChannelID(update.ChannelID)
 
 	fullChannel, err := s.telegramClient.API().ChannelsGetFullChannel(ctx, &tg.InputChannel{
 		ChannelID:  update.ChannelID,
@@ -34,22 +37,22 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 	channel.AccessHash = channelEnt.AccessHash
 
 	if err = s.channelRepo.UpsertChannel(ctx, channel); err != nil {
-		return fmt.Errorf("failed to upsert channel id=%d: %w", update.ChannelID, err)
+		return fmt.Errorf("failed to upsert channel id=%d: %w", botAPIID, err)
 	}
 
 	if channel.AdminRights.CanViewStats {
-		slog.Info("updating channel stats", "channel_id", update.ChannelID)
-		if err = s.UpdateChannelStats(ctx, update.ChannelID, channelEnt.AccessHash, statsDC); err != nil {
-			slog.Error("failed to update channel stats", "channel_id", update.ChannelID, "error", err)
+		slog.Info("updating channel stats", "channel_id", botAPIID)
+		if err = s.UpdateChannelStats(ctx, botAPIID, channelEnt.AccessHash, statsDC); err != nil {
+			slog.Error("failed to update channel stats", "channel_id", botAPIID, "error", err)
 			return fmt.Errorf("failed to update channel stats: %w", err)
 		}
 	}
 
-	if err := s.syncChannelAdmins(ctx, update.ChannelID, channelEnt.AccessHash); err != nil {
+	if err := s.syncChannelAdmins(ctx, botAPIID, channelEnt.AccessHash); err != nil {
 		return err
 	}
 
-	s.updateChannelPhotoFromTelegram(ctx, update.ChannelID, channelEnt.AccessHash)
+	s.updateChannelPhotoFromTelegram(ctx, botAPIID, channelEnt.AccessHash)
 	return nil
 }
 
@@ -57,7 +60,7 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash int64) error {
 	participantsResp, err := s.telegramClient.API().ChannelsGetParticipants(ctx, &tg.ChannelsGetParticipantsRequest{
 		Channel: &tg.InputChannel{
-			ChannelID:  channelID,
+			ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
 			AccessHash: accessHash,
 		},
 		Filter: &tg.ChannelParticipantsAdmins{},
@@ -120,7 +123,7 @@ func mapChannel(rawChannel *tg.MessagesChatFull) (*marketentity.Channel, int) {
 	}
 
 	return &marketentity.Channel{
-		ID:          channel.GetID(),
+		ID:          helpertelegram.ToBotAPIChannelID(channel.GetID()),
 		Title:       channel.GetTitle(),
 		Username:    username,
 		Photo:       "",

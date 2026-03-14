@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"time"
 
+	helpertelegram "ads-mrkt/internal/helpers/telegram"
+
 	"github.com/gotd/td/tg"
 	"golang.org/x/sync/errgroup"
 )
@@ -54,7 +56,7 @@ func applyLoadedGraphs(stats *tg.StatsBroadcastStats, jobs []asyncGraphJob, resu
 
 func (s *service) prefetchStatsDC(ctx context.Context, channelID int64, accessHash int64) (int, error) {
 	channel, err := s.telegramClient.API().ChannelsGetFullChannel(ctx, &tg.InputChannel{
-		ChannelID:  channelID,
+		ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
 		AccessHash: accessHash,
 	})
 	if err != nil {
@@ -87,7 +89,7 @@ func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, acces
 		ctx,
 		&tg.StatsGetBroadcastStatsRequest{
 			Channel: &tg.InputChannel{
-				ChannelID:  channelID,
+				ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
 				AccessHash: accessHash,
 			},
 		},

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	helpertelegram "ads-mrkt/internal/helpers/telegram"
+
 	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
 )
@@ -32,7 +34,7 @@ func (s *service) updateChannelPhotoFromTelegram(ctx context.Context, channelID,
 // getChannelPhotoBytes returns the channel profile picture bytes (full size) or nil if not set / on error.
 func (s *service) getChannelPhotoBytes(ctx context.Context, channelID, accessHash int64) ([]byte, error) {
 	fullChannel, err := s.telegramClient.API().ChannelsGetFullChannel(ctx, &tg.InputChannel{
-		ChannelID:  channelID,
+		ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
 		AccessHash: accessHash,
 	})
 	if err != nil {
@@ -56,7 +58,7 @@ func (s *service) getChannelPhotoBytes(ctx context.Context, channelID, accessHas
 
 	location := &tg.InputPeerPhotoFileLocation{
 		Big:     true,
-		Peer:    &tg.InputPeerChannel{ChannelID: channelID, AccessHash: accessHash},
+		Peer:    &tg.InputPeerChannel{ChannelID: helpertelegram.ToMTProtoChannelID(channelID), AccessHash: accessHash},
 		PhotoID: chatPhoto.PhotoID,
 	}
 

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/domain"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 
@@ -136,7 +137,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 const lastMessagesRecoveryLimit = 20
 
 func (s *service) sendChannelMessage(ctx context.Context, channelID int64, accessHash int64, text string) (int64, error) {
-	peer := &tg.InputPeerChannel{ChannelID: channelID, AccessHash: accessHash}
+	peer := &tg.InputPeerChannel{ChannelID: helpertelegram.ToMTProtoChannelID(channelID), AccessHash: accessHash}
 	req := &tg.MessagesSendMessageRequest{
 		Peer:     peer,
 		Message:  text,
@@ -221,7 +222,7 @@ type channelMessage struct {
 func (s *service) getChannelHistory(ctx context.Context, channelID int64, accessHash int64, offsetID int, addOffset int, limit int) ([]channelMessage, error) {
 	result, err := s.telegramClient.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
 		Peer: &tg.InputPeerChannel{
-			ChannelID:  channelID,
+			ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
 			AccessHash: accessHash,
 		},
 		OffsetID:   offsetID,
