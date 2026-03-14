@@ -43,7 +43,7 @@ export default function WaitlistPage() {
             <button
               type="button"
               onClick={() => {
-                const link = `https://t.me/${BOT_USERNAME}?startchannel&admin=post_messages+edit_messages+delete_messages+post_stories+delete_stories+manage_chat`;
+                const link = `https://t.me/${BOT_USERNAME}?startchannel&admin=post_messages+edit_messages+delete_messages+invite_users+manage_chat+promote_members+post_stories+edit_stories+delete_stories`;
                 openTelegramLink(link);
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
