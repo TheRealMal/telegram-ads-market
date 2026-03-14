@@ -31,6 +31,12 @@ func (r *repository) DeleteChannelAdmins(ctx context.Context, channelID int64) e
 	return err
 }
 
+func (r *repository) DeleteChannelAdmin(ctx context.Context, userID, channelID int64) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM market.channel_admin WHERE user_id = @user_id AND channel_id = @channel_id`,
+		pgx.NamedArgs{"user_id": userID, "channel_id": channelID})
+	return err
+}
+
 func (r *repository) UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error {
 	_, err := r.db.Exec(ctx, `
 		WITH ensure_user AS (

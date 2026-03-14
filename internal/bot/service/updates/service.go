@@ -65,6 +65,7 @@ type channelRepository interface {
 }
 
 type channelAdminRepository interface {
+	DeleteChannelAdmin(ctx context.Context, userID, channelID int64) error
 	DeleteChannelAdmins(ctx context.Context, channelID int64) error
 	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error
 }

@@ -111,6 +111,10 @@ func (s *service) handleChatMember(ctx context.Context, update *telegram.ChatMem
 }
 
 func (s *service) handleAdminRemoved(ctx context.Context, channelID, userID int64) {
+	if err := s.channelAdminRepo.DeleteChannelAdmin(ctx, userID, channelID); err != nil {
+		slog.Error("delete channel admin on removal", "error", err, "channel_id", channelID, "user_id", userID)
+	}
+
 	count, err := s.listingRepo.DeactivateListingsByUserAndChannel(ctx, userID, channelID)
 	if err != nil {
 		slog.Error("deactivate listings on admin removal", "error", err, "channel_id", channelID, "user_id", userID)
