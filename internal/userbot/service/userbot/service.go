@@ -20,18 +20,6 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-type channelRepository interface {
-	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
-	UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error
-	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
-	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
-}
-
-type channelAdminRepository interface {
-	DeleteChannelAdmins(ctx context.Context, channelID int64) error
-	UpsertChannelAdmin(ctx context.Context, userID, channelID int64, role string) error
-}
-
 type listingRepository interface {
 	GetListingByID(ctx context.Context, id int64) (*marketentity.Listing, error)
 }
@@ -53,6 +41,12 @@ type dealActionLockRepository interface {
 	GetLastDealActionLock(ctx context.Context, dealID int64, actionType marketentity.DealActionType) (*marketentity.DealActionLock, error)
 }
 
+type channelRepository interface {
+	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
+	UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error
+	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
+}
+
 type botAPIClient interface {
 	PromoteChatMember(ctx context.Context, chatID int64, userID int64, rights helpertelegram.AdminPromoteRights) error
 }
@@ -67,7 +61,6 @@ type channelUpdateStatsEventService interface {
 type service struct {
 	stateStorage               updates.StateStorage
 	channelRepo                channelRepository
-	channelAdminRepo           channelAdminRepository
 	listingRepo                listingRepository
 	dealRepo                   dealRepository
 	dealPostMessageRepo        dealPostMessageRepository
@@ -80,11 +73,20 @@ type service struct {
 	userID                     int64
 }
 
-func New(cfg config.Config, stateStorage updates.StateStorage, channelRepo channelRepository, channelAdminRepo channelAdminRepository, listingRepo listingRepository, dealRepo dealRepository, dealPostMessageRepo dealPostMessageRepository, dealActionLockRepo dealActionLockRepository, channelUpdateStatsEventSvc channelUpdateStatsEventService, botAPIClient botAPIClient) *service {
+func New(
+	cfg config.Config,
+	stateStorage updates.StateStorage,
+	channelRepo channelRepository,
+	listingRepo listingRepository,
+	dealRepo dealRepository,
+	dealPostMessageRepo dealPostMessageRepository,
+	dealActionLockRepo dealActionLockRepository,
+	channelUpdateStatsEventSvc channelUpdateStatsEventService,
+	botAPIClient botAPIClient,
+) *service {
 	s := &service{
 		stateStorage:               stateStorage,
 		channelRepo:                channelRepo,
-		channelAdminRepo:           channelAdminRepo,
 		listingRepo:                listingRepo,
 		dealRepo:                   dealRepo,
 		dealPostMessageRepo:        dealPostMessageRepo,
@@ -176,9 +178,9 @@ func (s *service) run(ctx context.Context) error {
 
 	s.userID = user.ID
 
+	go s.RunChannelUpdateStatsWorker(ctx)
 	go s.RunDealPostSenderWorker(ctx)
 	go s.RunDealPostCheckerWorker(ctx)
-	go s.RunChannelUpdateStatsWorker(ctx)
 
 	slog.Debug("getting current state")
 	if err := s.getCurrentState(ctx); err != nil {

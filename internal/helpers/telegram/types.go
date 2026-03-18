@@ -34,14 +34,31 @@ type ChatMember struct {
 	CustomTitle string `json:"custom_title,omitempty"`
 }
 
+// MessageEntity represents a special entity in a text message (Bot API format).
+// See https://core.telegram.org/bots/api#messageentity
+type MessageEntity struct {
+	Type          string `json:"type"`
+	Offset        int    `json:"offset"`
+	Length        int    `json:"length"`
+	URL           string `json:"url,omitempty"`
+	User          *User  `json:"user,omitempty"`
+	Language      string `json:"language,omitempty"`
+	CustomEmojiID string `json:"custom_emoji_id,omitempty"`
+}
+
 // Message represents a message from Telegram.
 type UpdateMessage struct {
-	MessageID         int64              `json:"message_id"`
-	MessageThreadID   int64              `json:"message_thread_id,omitempty"` // Forum topic thread ID when present
-	From              *User              `json:"from,omitempty"`
-	Chat              *Chat              `json:"chat"`
-	Text              string             `json:"text,omitempty"`
-	ReplyToMessage    *ReplyToMessage    `json:"reply_to_message,omitempty"`
+	MessageID         int64           `json:"message_id"`
+	MessageThreadID   int64           `json:"message_thread_id,omitempty"` // Forum topic thread ID when present
+	From              *User           `json:"from,omitempty"`
+	Chat              *Chat           `json:"chat"`
+	Text              string          `json:"text,omitempty"`
+	Caption           string          `json:"caption,omitempty"`
+	Entities          []MessageEntity `json:"entities,omitempty"`
+	CaptionEntities   []MessageEntity `json:"caption_entities,omitempty"`
+	Photo             []PhotoSize     `json:"photo,omitempty"`
+	Video             *Video          `json:"video,omitempty"`
+	ReplyToMessage    *ReplyToMessage `json:"reply_to_message,omitempty"`
 	SuccessfulPayment *SuccessfulPayment `json:"successful_payment,omitempty"` // Optional. Message is a service message about a successful payment, information about the payment.
 	RefundedPayment   *RefundedPayment   `json:"refunded_payment,omitempty"`
 }
@@ -114,6 +131,15 @@ type PhotoSize struct {
 	FileUniqueID string `json:"file_unique_id,omitempty"`
 	Height       int    `json:"height,omitempty"`
 	Width        int    `json:"width,omitempty"`
+}
+
+type Video struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id,omitempty"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	Duration     int    `json:"duration,omitempty"`
+	FileSize     int64  `json:"file_size,omitempty"`
 }
 
 type File struct {
@@ -253,4 +279,30 @@ type SentMessage struct {
 type SendMessageResponse struct {
 	OK     bool         `json:"ok"`
 	Result *SentMessage `json:"result"`
+}
+
+// ChatPhoto represents a chat photo returned by getChat.
+// See https://core.telegram.org/bots/api#chatphoto
+type ChatPhoto struct {
+	SmallFileID       string `json:"small_file_id"`
+	SmallFileUniqueID string `json:"small_file_unique_id"`
+	BigFileID         string `json:"big_file_id"`
+	BigFileUniqueID   string `json:"big_file_unique_id"`
+}
+
+// ChatFullInfo is the response from the getChat Bot API method.
+// Only fields we need are included.
+// See https://core.telegram.org/bots/api#chatfullinfo
+type ChatFullInfo struct {
+	ID       int64      `json:"id"`
+	Type     string     `json:"type"`
+	Title    string     `json:"title,omitempty"`
+	Username string     `json:"username,omitempty"`
+	Photo    *ChatPhoto `json:"photo,omitempty"`
+}
+
+// GetChatResponse is the Telegram API response for getChat.
+type GetChatResponse struct {
+	OK     bool          `json:"ok"`
+	Result *ChatFullInfo `json:"result"`
 }

@@ -33,17 +33,18 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 		categories = json.RawMessage("[]")
 	}
 	rows, err := r.db.Query(ctx, `
-		INSERT INTO market.listing (status, user_id, channel_id, type, prices, categories, description)
-		VALUES (@status, @user_id, @channel_id, @type, @prices, @categories, @description)
+		INSERT INTO market.listing (status, user_id, channel_id, type, prices, categories, description, prepared_post)
+		VALUES (@status, @user_id, @channel_id, @type, @prices, @categories, @description, @prepared_post)
 		RETURNING id, created_at, updated_at`,
 		pgx.NamedArgs{
-			"status":      l.Status,
-			"user_id":     l.UserID,
-			"channel_id":  l.ChannelID,
-			"type":        l.Type,
-			"prices":      l.Prices,
-			"categories":  categories,
-			"description": l.Description,
+			"status":        l.Status,
+			"user_id":       l.UserID,
+			"channel_id":    l.ChannelID,
+			"type":          l.Type,
+			"prices":        l.Prices,
+			"categories":    categories,
+			"description":   l.Description,
+			"prepared_post": l.PreparedPost,
 		})
 	if err != nil {
 		return err
@@ -62,7 +63,7 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 
 func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.Listing, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
+		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
 		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l
@@ -92,17 +93,18 @@ func (r *repository) UpdateListing(ctx context.Context, l *entity.Listing) error
 	}
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.listing
-		SET status = @status, user_id = @user_id, channel_id = @channel_id, type = @type, prices = @prices, categories = @categories, description = @description, updated_at = NOW()
+		SET status = @status, user_id = @user_id, channel_id = @channel_id, type = @type, prices = @prices, categories = @categories, description = @description, prepared_post = @prepared_post, updated_at = NOW()
 		WHERE id = @id`,
 		pgx.NamedArgs{
-			"id":          l.ID,
-			"status":      l.Status,
-			"user_id":     l.UserID,
-			"channel_id":  l.ChannelID,
-			"type":        l.Type,
-			"prices":      l.Prices,
-			"categories":  categories,
-			"description": l.Description,
+			"id":            l.ID,
+			"status":        l.Status,
+			"user_id":       l.UserID,
+			"channel_id":    l.ChannelID,
+			"type":          l.Type,
+			"prices":        l.Prices,
+			"categories":    categories,
+			"description":   l.Description,
+			"prepared_post": l.PreparedPost,
 		})
 	return err
 }
@@ -114,7 +116,7 @@ func (r *repository) DeleteListing(ctx context.Context, id int64) error {
 
 func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error) {
 	q := `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
+		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
 		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l
@@ -198,7 +200,7 @@ func (r *repository) DeactivateListingsByChannel(ctx context.Context, channelID 
 
 func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error) {
 	q := `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.created_at, l.updated_at,
+		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
 		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
 		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
 		FROM market.listing l

@@ -3,12 +3,21 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"net/url"
 	"time"
 )
 
-var ErrDealDetailsInvalid = errors.New("deal details must contain only \"message\" (string) and optional \"posted_at\" (RFC3339 datetime)")
+var ErrDealDetailsInvalid = errors.New("deal details contains invalid or disallowed fields")
 
-// ValidateDealDetails parses raw as JSON and ensures it has only "message" (string) and optional "posted_at" (RFC3339).
+// DealDetailsButton represents an inline button on the ad post.
+type DealDetailsButton struct {
+	Text  string `json:"text"`
+	URL   string `json:"url"`
+	Style string `json:"style"` // "red", "green", "blue", "default"
+	Emoji string `json:"emoji"` // emoji string, or "" for none
+}
+
+// ValidateDealDetails parses raw as JSON and ensures it contains only allowed keys.
 // Returns canonical JSON for storage. Empty or null input becomes {}.
 func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 	if len(raw) == 0 || string(raw) == "null" {
@@ -18,8 +27,17 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, ErrDealDetailsInvalid
 	}
+	allowedKeys := map[string]bool{
+		"message":          true,
+		"posted_at":        true,
+		"media_type":       true,
+		"media_file_id":    true,
+		"button":           true,
+		"entities":         true,
+		"caption_entities": true,
+	}
 	for k := range m {
-		if k != "message" && k != "posted_at" {
+		if !allowedKeys[k] {
 			return nil, ErrDealDetailsInvalid
 		}
 	}
@@ -44,12 +62,92 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 			postedAt = paStr
 		}
 	}
-	canon := make(map[string]string)
+	var mediaType, mediaFileID string
+	if mt, ok := m["media_type"]; ok && mt != nil {
+		mtStr, ok := mt.(string)
+		if !ok {
+			return nil, ErrDealDetailsInvalid
+		}
+		if mtStr != "photo" && mtStr != "video" {
+			return nil, ErrDealDetailsInvalid
+		}
+		mediaType = mtStr
+	}
+	if mf, ok := m["media_file_id"]; ok && mf != nil {
+		mfStr, ok := mf.(string)
+		if !ok {
+			return nil, ErrDealDetailsInvalid
+		}
+		mediaFileID = mfStr
+	}
+	if mediaType != "" && mediaFileID == "" {
+		return nil, ErrDealDetailsInvalid
+	}
+	var button *DealDetailsButton
+	if btnRaw, ok := m["button"]; ok && btnRaw != nil {
+		btnBytes, err := json.Marshal(btnRaw)
+		if err != nil {
+			return nil, ErrDealDetailsInvalid
+		}
+		var btn DealDetailsButton
+		if err := json.Unmarshal(btnBytes, &btn); err != nil {
+			return nil, ErrDealDetailsInvalid
+		}
+		validStyles := map[string]bool{"red": true, "green": true, "blue": true, "default": true}
+		if !validStyles[btn.Style] {
+			return nil, ErrDealDetailsInvalid
+		}
+		if btn.URL != "" {
+			parsed, parseErr := url.ParseRequestURI(btn.URL)
+			if parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				return nil, ErrDealDetailsInvalid
+			}
+		}
+		button = &btn
+	}
+
+	var entities []interface{}
+	if ent, ok := m["entities"]; ok && ent != nil {
+		entArr, ok := ent.([]interface{})
+		if !ok {
+			return nil, ErrDealDetailsInvalid
+		}
+		if err := validateEntityURLs(entArr); err != nil {
+			return nil, err
+		}
+		entities = entArr
+	}
+	var captionEntities []interface{}
+	if ce, ok := m["caption_entities"]; ok && ce != nil {
+		ceArr, ok := ce.([]interface{})
+		if !ok {
+			return nil, ErrDealDetailsInvalid
+		}
+		if err := validateEntityURLs(ceArr); err != nil {
+			return nil, err
+		}
+		captionEntities = ceArr
+	}
+
+	canon := make(map[string]interface{})
 	if message != "" {
 		canon["message"] = message
 	}
 	if postedAt != "" {
 		canon["posted_at"] = postedAt
+	}
+	if mediaType != "" {
+		canon["media_type"] = mediaType
+		canon["media_file_id"] = mediaFileID
+	}
+	if button != nil {
+		canon["button"] = button
+	}
+	if len(entities) > 0 {
+		canon["entities"] = entities
+	}
+	if len(captionEntities) > 0 {
+		canon["caption_entities"] = captionEntities
 	}
 	return json.Marshal(canon)
 }
@@ -93,4 +191,161 @@ func GetPostedAtFromDetails(details json.RawMessage) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return t, true
+}
+
+// GetMediaFromDetails returns (mediaType, mediaFileID) from details. mediaType is "photo" or "video", or "" if none.
+func GetMediaFromDetails(details json.RawMessage) (mediaType string, mediaFileID string) {
+	if len(details) == 0 || string(details) == "null" {
+		return "", ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return "", ""
+	}
+	if mt, ok := m["media_type"].(string); ok {
+		mediaType = mt
+	}
+	if mf, ok := m["media_file_id"].(string); ok {
+		mediaFileID = mf
+	}
+	return mediaType, mediaFileID
+}
+
+// GetButtonFromDetails returns the button config from details, or nil if not set.
+func GetButtonFromDetails(details json.RawMessage) *DealDetailsButton {
+	if len(details) == 0 || string(details) == "null" {
+		return nil
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return nil
+	}
+	btnRaw, ok := m["button"]
+	if !ok || btnRaw == nil {
+		return nil
+	}
+	btnBytes, err := json.Marshal(btnRaw)
+	if err != nil {
+		return nil
+	}
+	var btn DealDetailsButton
+	if err := json.Unmarshal(btnBytes, &btn); err != nil {
+		return nil
+	}
+	return &btn
+}
+
+// SetMessageInDetails updates the "message" key in details JSON. Preserves other keys.
+func SetMessageInDetails(details json.RawMessage, message string) (json.RawMessage, error) {
+	m := parseDetailsMap(details)
+	m["message"] = message
+	return json.Marshal(m)
+}
+
+// SetMediaInDetails updates/removes the "media_type" and "media_file_id" keys.
+// Pass empty strings to remove media.
+func SetMediaInDetails(details json.RawMessage, mediaType string, mediaFileID string) (json.RawMessage, error) {
+	m := parseDetailsMap(details)
+	if mediaType == "" || mediaFileID == "" {
+		delete(m, "media_type")
+		delete(m, "media_file_id")
+	} else {
+		m["media_type"] = mediaType
+		m["media_file_id"] = mediaFileID
+	}
+	return json.Marshal(m)
+}
+
+// SetButtonInDetails updates/removes the "button" key. Pass nil to remove.
+func SetButtonInDetails(details json.RawMessage, button *DealDetailsButton) (json.RawMessage, error) {
+	m := parseDetailsMap(details)
+	if button == nil {
+		delete(m, "button")
+	} else {
+		m["button"] = button
+	}
+	return json.Marshal(m)
+}
+
+// validateEntityURLs checks that any text_link entity in the array has an http/https URL.
+func validateEntityURLs(entities []interface{}) error {
+	for _, e := range entities {
+		em, ok := e.(map[string]interface{})
+		if !ok {
+			return ErrDealDetailsInvalid
+		}
+		eType, _ := em["type"].(string)
+		if eType == "text_link" {
+			eURL, _ := em["url"].(string)
+			if eURL == "" {
+				return ErrDealDetailsInvalid
+			}
+			parsed, err := url.ParseRequestURI(eURL)
+			if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				return ErrDealDetailsInvalid
+			}
+		}
+	}
+	return nil
+}
+
+// parseDetailsMap unmarshals details into a map, returning empty map on error.
+func parseDetailsMap(details json.RawMessage) map[string]interface{} {
+	if len(details) == 0 || string(details) == "null" {
+		return make(map[string]interface{})
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return make(map[string]interface{})
+	}
+	return m
+}
+
+// GetRawEntitiesFromDetails returns the raw JSON "entities" array from details, or nil.
+func GetRawEntitiesFromDetails(details json.RawMessage) json.RawMessage {
+	return getRawField(details, "entities")
+}
+
+// GetRawCaptionEntitiesFromDetails returns the raw JSON "caption_entities" array from details, or nil.
+func GetRawCaptionEntitiesFromDetails(details json.RawMessage) json.RawMessage {
+	return getRawField(details, "caption_entities")
+}
+
+func getRawField(details json.RawMessage, key string) json.RawMessage {
+	if len(details) == 0 || string(details) == "null" {
+		return nil
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(details, &m); err != nil {
+		return nil
+	}
+	raw, ok := m[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	return raw
+}
+
+// SetRawEntitiesInDetails sets/removes the "entities" key using raw JSON. Pass nil to remove.
+func SetRawEntitiesInDetails(details json.RawMessage, entitiesJSON json.RawMessage) (json.RawMessage, error) {
+	return setRawField(details, "entities", entitiesJSON)
+}
+
+// SetRawCaptionEntitiesInDetails sets/removes the "caption_entities" key using raw JSON. Pass nil to remove.
+func SetRawCaptionEntitiesInDetails(details json.RawMessage, entitiesJSON json.RawMessage) (json.RawMessage, error) {
+	return setRawField(details, "caption_entities", entitiesJSON)
+}
+
+func setRawField(details json.RawMessage, key string, raw json.RawMessage) (json.RawMessage, error) {
+	m := parseDetailsMap(details)
+	if len(raw) == 0 || string(raw) == "null" {
+		delete(m, key)
+	} else {
+		var val interface{}
+		if err := json.Unmarshal(raw, &val); err != nil {
+			return nil, err
+		}
+		m[key] = val
+	}
+	return json.Marshal(m)
 }

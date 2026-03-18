@@ -9,6 +9,8 @@ import (
 
 type userService interface {
 	AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error)
+	GetUserByID(ctx context.Context, userID int64) (*entity.User, error)
+	GetReferrals(ctx context.Context, userID int64) ([]*entity.User, error)
 	SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error
 	ClearWallet(ctx context.Context, userID int64) error
 }
@@ -36,14 +38,14 @@ type dealService interface {
 }
 
 type dealChatService interface {
-	GetOrCreateDealForumChat(ctx context.Context, dealID, userID int64) (chatLink string, err error)
+	GetDealChatLink(ctx context.Context, dealID, userID int64) (chatLink string, err error)
+	CreateDealForumTopics(ctx context.Context, dealID int64) error
 }
 
 type channelService interface {
 	ListMyChannels(ctx context.Context, userID int64) ([]*entity.Channel, error)
 	RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*entity.Channel, error)
 	GetChannelStats(ctx context.Context, channelID int64, userID int64) (interface{}, error)
-	CountMyChannels(ctx context.Context, userID int64) (int64, error)
 }
 
 type handler struct {

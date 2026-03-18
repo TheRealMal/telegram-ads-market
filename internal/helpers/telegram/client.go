@@ -3,6 +3,7 @@ package telegram
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,8 +32,13 @@ const (
 	telegramPathCreateForumTopic       TelegramPath = "/createForumTopic"
 	telegramPathDeleteForumTopic       TelegramPath = "/deleteForumTopic"
 	telegramPathCopyMessage            TelegramPath = "/copyMessage"
+	telegramPathDeleteMessage          TelegramPath = "/deleteMessage"
 	telegramPathGetChatAdministrators  TelegramPath = "/getChatAdministrators"
 	telegramPathPromoteChatMember      TelegramPath = "/promoteChatMember"
+	telegramPathGetChat                TelegramPath = "/getChat"
+	telegramPathSendPhoto              TelegramPath = "/sendPhoto"
+	telegramPathAnswerCallbackQuery    TelegramPath = "/answerCallbackQuery"
+	telegramPathEditMessageReplyMarkup TelegramPath = "/editMessageReplyMarkup"
 
 	messageWelcome = "Start message"
 	openAppURL     = "https://t.me/%s?startapp="
@@ -274,7 +280,7 @@ func (c *APIClient) SetMessageReaction(ctx context.Context, chatID, messageID in
 }
 
 // SendMessage sends a text message to the chat and returns the sent message (chat_id, message_id) on success.
-func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string) (*SentMessage, error) {
+func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string, entities []MessageEntity) (*SentMessage, error) {
 	allow, err := c.rateLimiter.CheckLimits(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("check rate limiting failed: %w", err)
@@ -284,9 +290,12 @@ func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string) 
 	}
 
 	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := MessagePayload{
-		Payload: Payload{ChatID: chatID},
-		Text:    text,
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+	}
+	if len(entities) > 0 {
+		payload["entities"] = entities
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
@@ -310,7 +319,7 @@ func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string) 
 
 // SendMessageSimple sends a text message to the chat and returns only an error (for use by notification workers).
 func (c *APIClient) SendMessageSimple(ctx context.Context, chatID int64, text string) error {
-	_, err := c.SendMessage(ctx, chatID, text)
+	_, err := c.SendMessage(ctx, chatID, text, nil)
 	return err
 }
 
@@ -442,6 +451,275 @@ func (c *APIClient) PromoteChatMember(ctx context.Context, chatID int64, userID 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal promoteChatMember: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
+}
+
+// GetChat returns full information about a chat.
+// See https://core.telegram.org/bots/api#getchat
+func (c *APIClient) GetChat(ctx context.Context, chatID int64) (*ChatFullInfo, error) {
+	uri := c.buildTelegramURL(telegramPathGetChat)
+	payload := map[string]interface{}{"chat_id": chatID}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal getChat payload: %w", err)
+	}
+	body, err := c.sendRequest(ctx, uri, jsonData)
+	if err != nil {
+		return nil, err
+	}
+	var result GetChatResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal getChat response: %w", err)
+	}
+	if !result.OK || result.Result == nil {
+		return nil, fmt.Errorf("getChat returned ok=false or empty result")
+	}
+	return result.Result, nil
+}
+
+// GetChannelPhotoBase64 fetches a channel's photo via getChat, downloads it,
+// and returns the base64-encoded image. Returns empty string if no photo.
+func (c *APIClient) GetChannelPhotoBase64(ctx context.Context, chatID int64) (string, error) {
+	chat, err := c.GetChat(ctx, chatID)
+	if err != nil {
+		return "", fmt.Errorf("getChat for photo: %w", err)
+	}
+	if chat.Photo == nil || chat.Photo.BigFileID == "" {
+		return "", nil
+	}
+
+	fileURL, err := c.GetFileURL(chat.Photo.SmallFileID)
+	if err != nil {
+		return "", fmt.Errorf("get file URL for photo: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create photo download request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download photo: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("photo download failed with status %d", resp.StatusCode)
+	}
+
+	photoBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read photo body: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(photoBytes), nil
+}
+
+// SendChannelMessage sends a text message to a channel and returns the message ID.
+// chatID must be in Bot API format (negative -100 prefix).
+func (c *APIClient) SendChannelMessage(ctx context.Context, chatID int64, text string, entities []MessageEntity) (int64, error) {
+	sent, err := c.SendMessage(ctx, chatID, text, entities)
+	if err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
+// DeleteMessage deletes a message in a chat.
+func (c *APIClient) DeleteMessage(ctx context.Context, chatID int64, messageID int64) error {
+	uri := c.buildTelegramURL(telegramPathDeleteMessage)
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal deleteMessage payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
+}
+
+// CheckMessageExists checks if a message exists in a chat by copying it to probeChatID
+// (a service account chat). If the copy succeeds, the message exists. The copied message
+// stays in the service chat (no deletion needed — it serves as an audit trail).
+// Returns false if the message does not exist.
+func (c *APIClient) CheckMessageExists(ctx context.Context, chatID int64, messageID int64, probeChatID int64) (bool, error) {
+	_, err := c.CopyMessage(ctx, chatID, messageID, probeChatID, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "message to copy not found") ||
+			strings.Contains(err.Error(), "message not found") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// SendMessageToThread sends a text message to a specific forum topic (message_thread_id).
+func (c *APIClient) SendMessageToThread(ctx context.Context, chatID int64, messageThreadID int64, text string, entities []MessageEntity) error {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return fmt.Errorf("too many requests to send message in telegram")
+	}
+	url := c.buildTelegramURL(telegramPathSendMessage)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+		"text":              text,
+	}
+	if len(entities) > 0 {
+		payload["entities"] = entities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendMessage payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+// SendMessageToThreadWithMarkup sends a text message to a forum topic with optional inline keyboard.
+func (c *APIClient) SendMessageToThreadWithMarkup(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *InlineKeyboardMarkup, entities []MessageEntity) (*SentMessage, error) {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return nil, fmt.Errorf("too many requests to send message in telegram")
+	}
+	url := c.buildTelegramURL(telegramPathSendMessage)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+		"text":              text,
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(entities) > 0 {
+		payload["entities"] = entities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal sendMessage payload: %w", err)
+	}
+	body, err := c.sendRequest(ctx, url, jsonData)
+	if err != nil {
+		return nil, err
+	}
+	var result SendMessageResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal sendMessage response: %w", err)
+	}
+	if !result.OK || result.Result == nil {
+		return nil, fmt.Errorf("sendMessage returned ok=false or empty result")
+	}
+	return result.Result, nil
+}
+
+// SendPhotoToThread sends a photo (by file_id) to a forum topic with optional caption and inline keyboard.
+func (c *APIClient) SendPhotoToThread(ctx context.Context, chatID int64, messageThreadID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return fmt.Errorf("too many requests to send message in telegram")
+	}
+	url := c.buildTelegramURL(telegramPathSendPhoto)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+		"photo":             photoFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendPhoto payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+// SendVideoToThread sends a video (by file_id) to a forum topic with optional caption and inline keyboard.
+func (c *APIClient) SendVideoToThread(ctx context.Context, chatID int64, messageThreadID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return fmt.Errorf("too many requests to send message in telegram")
+	}
+	url := c.buildTelegramURL(telegramPathSendVideo)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+		"video":             videoFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendVideo payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+// AnswerCallbackQuery sends a response to a callback query from an inline keyboard button.
+func (c *APIClient) AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error {
+	uri := c.buildTelegramURL(telegramPathAnswerCallbackQuery)
+	payload := map[string]interface{}{
+		"callback_query_id": callbackQueryID,
+	}
+	if text != "" {
+		payload["text"] = text
+	}
+	if showAlert {
+		payload["show_alert"] = true
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal answerCallbackQuery payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, uri, jsonData)
+	return err
+}
+
+// EditMessageReplyMarkup edits the reply markup of a message. Pass nil to remove markup.
+func (c *APIClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int64, markup *InlineKeyboardMarkup) error {
+	uri := c.buildTelegramURL(telegramPathEditMessageReplyMarkup)
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal editMessageReplyMarkup payload: %w", err)
 	}
 	_, err = c.sendRequest(ctx, uri, jsonData)
 	return err

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	apperrors "ads-mrkt/internal/errors"
@@ -47,6 +48,7 @@ func buildDealFromCreateRequest(req *model.CreateDealRequest, lessorID, lesseeID
 		Duration:  req.Duration,
 		Price:     domain.TONToNanoton(req.Price),
 		Details:   canonDetails,
+		Message:   req.Message,
 	}
 }
 
@@ -135,20 +137,69 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, err
 	}
 
-	details := req.Details
-	if details == nil {
-		details = json.RawMessage("{}")
-	}
-	canonDetails, err := domain.ValidateDealDetails(details)
-	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
+	isInstantPost := req.Type == string(entity.AdTypeInstantPost)
+
+	var canonDetails json.RawMessage
+	if isInstantPost {
+		// For instant_post, use the listing's prepared post as the deal message.
+		canonDetails, err = domain.ValidateDealDetails(listing.PreparedPost)
+		if err != nil {
+			return nil, apperrors.ServiceError{Err: err, Message: "listing prepared_post is invalid: " + err.Error(), Code: apperrors.ErrorCodeBadRequest}
+		}
+	} else {
+		// For standard post deals, details starts empty. Ad content is formed via /edit in forum topics.
+		canonDetails = json.RawMessage("{}")
 	}
 
 	d := buildDealFromCreateRequest(&req, lessorID, lesseeID, dealChannelID, canonDetails)
+
+	if isInstantPost {
+		if err := h.prepareInstantPostDeal(r.Context(), d, lessorID, lesseeID); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := h.dealService.CreateDeal(r.Context(), d, listing.UserID); err != nil {
 		return nil, toServiceError(err)
 	}
+
+	// Create forum topics eagerly (best-effort, don't fail the deal creation)
+	if err := h.dealChatService.CreateDealForumTopics(r.Context(), d.ID); err != nil {
+		slog.Error("create deal forum topics", "deal_id", d.ID, "error", err)
+	}
+
 	return model.DealToResponse(d), nil
+}
+
+// prepareInstantPostDeal sets up an instant_post deal: validates wallets, sets payout addresses,
+// computes signatures, and sets status to approved (skipping draft).
+func (h *handler) prepareInstantPostDeal(ctx context.Context, d *entity.Deal, lessorID, lesseeID int64) error {
+	lessor, err := h.userService.GetUserByID(ctx, lessorID)
+	if err != nil {
+		return toServiceError(err)
+	}
+	if lessor == nil || lessor.WalletAddress == nil || *lessor.WalletAddress == "" {
+		return apperrors.ServiceError{Err: nil, Message: "lessor must have a wallet connected for instant_post deals", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	lessee, err := h.userService.GetUserByID(ctx, lesseeID)
+	if err != nil {
+		return toServiceError(err)
+	}
+	if lessee == nil || lessee.WalletAddress == nil || *lessee.WalletAddress == "" {
+		return apperrors.ServiceError{Err: nil, Message: "lessee must have a wallet connected for instant_post deals", Code: apperrors.ErrorCodeBadRequest}
+	}
+
+	d.LessorPayoutAddress = lessor.WalletAddress
+	d.LesseePayoutAddress = lessee.WalletAddress
+	d.Status = entity.DealStatusApproved
+
+	lessorSig := domain.ComputeDealSignature(d.Type, d.Duration, d.Price, d.Details, lessorID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
+	lesseeSig := domain.ComputeDealSignature(d.Type, d.Duration, d.Price, d.Details, lesseeID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
+	d.LessorSignature = &lessorSig
+	d.LesseeSignature = &lesseeSig
+
+	return nil
 }
 
 // @Security	JWT
@@ -375,7 +426,7 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 
 // @Security	JWT
 // @Tags		Market
-// @Summary	Get or create deal forum chat and return link to open the topic. Caller must be lessor or lessee.
+// @Summary	Get deal forum chat link. Caller must be lessor or lessee.
 // @Produce	json
 // @Param		id	path		int	true	"Deal ID"
 // @Success	200	{object}	response.Template{data=DealChatLinkResponse}	"Chat link to open in Telegram"
@@ -384,7 +435,7 @@ func (h *handler) RejectDeal(w http.ResponseWriter, r *http.Request) (interface{
 // @Failure	403	{object}	response.Template{data=string}	"Forbidden"
 // @Failure	404	{object}	response.Template{data=string}	"Not found"
 // @Router		/market/deals/{id}/chat-link [post]
-func (h *handler) GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (h *handler) GetDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, err := requireUserID(r)
 	if err != nil {
 		return nil, err
@@ -394,7 +445,7 @@ func (h *handler) GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request
 		return nil, err
 	}
 
-	chatLink, err := h.dealChatService.GetOrCreateDealForumChat(r.Context(), id, userID)
+	chatLink, err := h.dealChatService.GetDealChatLink(r.Context(), id, userID)
 	if err != nil {
 		return nil, toServiceError(err)
 	}

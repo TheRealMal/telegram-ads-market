@@ -5,7 +5,6 @@ go 1.24.0
 require (
 	github.com/charmbracelet/log v0.4.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/uuid v1.6.0
 	github.com/gotd/td v0.138.0
 	github.com/gotd/td/examples v0.0.0-20260119103850-5a12ed251249
 	github.com/hashicorp/vault-client-go v0.4.4-0.20250703155429-315a2bfeef6c
@@ -49,6 +48,7 @@ require (
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gotd/ige v0.2.2 // indirect
 	github.com/gotd/neo v0.1.5 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

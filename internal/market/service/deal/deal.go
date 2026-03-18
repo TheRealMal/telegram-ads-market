@@ -4,10 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"strconv"
-	"strings"
 	"time"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -15,15 +13,21 @@ import (
 const completedWorkerInterval = 30 * time.Second
 
 func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal, otherSideID int64) error {
-	d.Status = entity.DealStatusDraft
+	if d.Status != entity.DealStatusApproved {
+		d.Status = entity.DealStatusDraft
+	}
 	d.EscrowAmount = s.escrowSvc.ComputeEscrowAmount(d.Price)
 	if err := s.dealRepo.CreateDeal(ctx, d); err != nil {
 		return err
 	}
+	notifMsg := "New deal #" + strconv.FormatInt(d.ID, 10) + " on your listing."
+	if d.Status == entity.DealStatusApproved {
+		notifMsg = "New instant deal #" + strconv.FormatInt(d.ID, 10) + " approved on your listing."
+	}
 	_ = s.notificationAdder.AddTelegramNotificationEvent(
 		ctx,
 		otherSideID,
-		"New deal #"+strconv.FormatInt(d.ID, 10)+" on your listing.",
+		notifMsg,
 	)
 	return nil
 }
@@ -78,51 +82,9 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, d *enti
 	return s.dealRepo.UpdateDealDraftFieldsAndClearSignatures(ctx, d)
 }
 
-// SignDeal sets the current user's signature (hash of type, duration, price, details, user_id, payout addresses) in a transaction.
-// Both payout addresses must already be set on the deal; user's wallet must match their deal payout. Then both signatures use the same payload.
+// SignDeal sets the current user's signature on the deal. Delegates to signerSvc.
 func (s *dealService) SignDeal(ctx context.Context, userID int64, dealID int64) error {
-	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
-	if err != nil || existing == nil {
-		return marketerrors.ErrNotFound
-	}
-	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil || user == nil {
-		return marketerrors.ErrNotFound
-	}
-	if user.WalletAddress == nil || *user.WalletAddress == "" {
-		return marketerrors.ErrWalletNotSet
-	}
-	if existing.LessorPayoutAddress == nil || *existing.LessorPayoutAddress == "" ||
-		existing.LesseePayoutAddress == nil || *existing.LesseePayoutAddress == "" {
-		return marketerrors.ErrPayoutNotSet
-	}
-	if strings.TrimSpace(domain.GetMessageFromDetails(existing.Details)) == "" {
-		return marketerrors.ErrDealDetailsMessageRequired
-	}
-	myPayout := *existing.LesseePayoutAddress
-	if userID == existing.LessorID {
-		myPayout = *existing.LessorPayoutAddress
-	}
-	if *user.WalletAddress != myPayout {
-		return marketerrors.ErrWalletNotSet // wallet does not match deal payout
-	}
-	lessorPayout := *existing.LessorPayoutAddress
-	lesseePayout := *existing.LesseePayoutAddress
-	sig := domain.ComputeDealSignature(existing.Type, existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
-	if err := s.dealRepo.SignDealInTx(ctx, dealID, userID, sig); err != nil {
-		return err
-	}
-	otherID := existing.LesseeID
-	if userID == existing.LesseeID {
-		otherID = existing.LessorID
-	}
-	_ = s.notificationAdder.AddTelegramNotificationEvent(
-		ctx,
-		otherID,
-		"Deal #"+strconv.FormatInt(dealID, 10)+" was signed by the other party.",
-	)
-
-	return nil
+	return s.signerSvc.SignDeal(ctx, userID, dealID)
 }
 
 // SetDealPayoutAddress sets the current user's payout address on the deal (lessor or lessee). Only in draft.

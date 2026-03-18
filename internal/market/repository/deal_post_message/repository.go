@@ -134,10 +134,11 @@ func (r *repository) ListDealPostMessageExistsWithNextCheckBefore(ctx context.Co
 	rows, err := r.db.Query(ctx, `
 		SELECT id, deal_id, channel_id, message_id, post_message, status, next_check, until_ts, created_at, updated_at
 		FROM market.deal_post_message
-		WHERE status = 'exists' AND next_check <= @before
+		WHERE status = @status_exists AND next_check <= @before
 		ORDER BY id`,
 		pgx.NamedArgs{
-			"before": before,
+			"before":        before,
+			"status_exists": string(entity.DealPostMessageStatusExists),
 		},
 	)
 	if err != nil {
@@ -191,19 +192,21 @@ func (r *repository) CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx
 	var err error
 	defer func() { _ = r.db.EndTx(txCtx, err, "CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease") }()
 	_, err = r.db.Exec(txCtx, `
-		UPDATE market.deal_post_message SET status = 'completed', updated_at = NOW() WHERE id = ANY(@ids)`,
+		UPDATE market.deal_post_message SET status = @status_completed, updated_at = NOW() WHERE id = ANY(@ids)`,
 		pgx.NamedArgs{
-			"ids": ids,
+			"ids":              ids,
+			"status_completed": string(entity.DealPostMessageStatusCompleted),
 		},
 	)
 	if err != nil {
 		return err
 	}
 	_, err = r.db.Exec(txCtx, `
-		UPDATE market.deal SET status = 'waiting_escrow_release', updated_at = NOW()
+		UPDATE market.deal SET status = @status_waiting_escrow_release, updated_at = NOW()
 		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`,
 		pgx.NamedArgs{
-			"ids": ids,
+			"ids":                            ids,
+			"status_waiting_escrow_release": string(entity.DealStatusWaitingEscrowRelease),
 		},
 	)
 	if err != nil {
@@ -223,19 +226,21 @@ func (r *repository) FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx cont
 	var err error
 	defer func() { _ = r.db.EndTx(txCtx, err, "FailDealPostMessagesAndSetDealsWaitingEscrowRefund") }()
 	_, err = r.db.Exec(txCtx, `
-		UPDATE market.deal_post_message SET status = 'failed', updated_at = NOW() WHERE id = ANY(@ids)`,
+		UPDATE market.deal_post_message SET status = @status_failed, updated_at = NOW() WHERE id = ANY(@ids)`,
 		pgx.NamedArgs{
-			"ids": ids,
+			"ids":           ids,
+			"status_failed": string(entity.DealPostMessageStatusFailed),
 		},
 	)
 	if err != nil {
 		return err
 	}
 	_, err = r.db.Exec(txCtx, `
-		UPDATE market.deal SET status = 'waiting_escrow_refund', updated_at = NOW()
+		UPDATE market.deal SET status = @status_waiting_escrow_refund, updated_at = NOW()
 		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`,
 		pgx.NamedArgs{
-			"ids": ids,
+			"ids":                           ids,
+			"status_waiting_escrow_refund": string(entity.DealStatusWaitingEscrowRefund),
 		},
 	)
 	if err != nil {

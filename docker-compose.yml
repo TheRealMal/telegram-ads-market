@@ -200,7 +200,7 @@ services:
   blockchain_observer:
     image: internal.server:latest
     restart: unless-stopped
-    command: ["blockchain_observer"]
+    command: ["blockchain_observer", "run"]
     env_file:
       - .env
     environment:

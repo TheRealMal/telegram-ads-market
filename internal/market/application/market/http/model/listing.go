@@ -8,20 +8,22 @@ import (
 )
 
 type CreateListingRequest struct {
-	Status      string          `json:"status"`
-	ChannelID   *int64          `json:"channel_id,omitempty"`
-	Type        string          `json:"type"`
-	Prices      json.RawMessage `json:"prices"`
-	Categories  []string        `json:"categories,omitempty"`
-	Description string          `json:"description,omitempty"`
+	Status       string          `json:"status"`
+	ChannelID    *int64          `json:"channel_id,omitempty"`
+	Type         string          `json:"type"`
+	Prices       json.RawMessage `json:"prices"`
+	Categories   []string        `json:"categories,omitempty"`
+	Description  string          `json:"description,omitempty"`
+	PreparedPost json.RawMessage `json:"prepared_post,omitempty"`
 }
 
 type UpdateListingRequest struct {
-	Status      *string         `json:"status,omitempty"`
-	Type        *string         `json:"type,omitempty"`
-	Prices      json.RawMessage `json:"prices,omitempty"`
-	Categories  *[]string       `json:"categories,omitempty"`
-	Description *string         `json:"description,omitempty"`
+	Status       *string         `json:"status,omitempty"`
+	Type         *string         `json:"type,omitempty"`
+	Prices       json.RawMessage `json:"prices,omitempty"`
+	Categories   *[]string       `json:"categories,omitempty"`
+	Description  *string         `json:"description,omitempty"`
+	PreparedPost json.RawMessage `json:"prepared_post,omitempty"`
 }
 
 func ListingWithPricesInTON(l *entity.Listing) *entity.Listing {

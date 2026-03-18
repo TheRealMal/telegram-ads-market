@@ -18,6 +18,7 @@ type DealRow struct {
 	Price               int64           `db:"price"`
 	EscrowAmount        int64           `db:"escrow_amount"`
 	Details             json.RawMessage `db:"details"`
+	Message             string          `db:"message"`
 	LessorSignature     *string         `db:"lessor_signature"`
 	LesseeSignature     *string         `db:"lessee_signature"`
 	Status              string          `db:"status"`
@@ -53,6 +54,7 @@ func DealRowToEntity(row DealRow) *entity.Deal {
 		Price:               row.Price,
 		EscrowAmount:        row.EscrowAmount,
 		Details:             row.Details,
+		Message:             row.Message,
 		LessorSignature:     row.LessorSignature,
 		LesseeSignature:     row.LesseeSignature,
 		Status:              entity.DealStatus(row.Status),

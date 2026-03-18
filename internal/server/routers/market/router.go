@@ -29,7 +29,7 @@ type handler interface {
 	SignDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
-	GetOrCreateDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error)
+	GetDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetWaitlist(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
 
@@ -60,11 +60,11 @@ func NewRouter(config serverconfig.Config, handler handler, authMiddleware authM
 }
 
 func (r *Router) GetRoutes() http.Handler {
-	corsConfig := server.CORSConfig{
-		AllowOrigin:  []string{r.Config.ClientDomain},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete},
-		AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
-	}
+	// corsConfig := server.CORSConfig{
+	// 	AllowOrigin:  []string{r.Config.ClientDomain},
+	// 	AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete},
+	// 	AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
+	// }
 
 	mux := http.NewServeMux()
 
@@ -271,7 +271,7 @@ func (r *Router) GetRoutes() http.Handler {
 	mux.HandleFunc("POST /api/v1/market/deals/{id}/chat-link", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
-				server.WithJSONResponse(r.handler.GetOrCreateDealChatLink),
+				server.WithJSONResponse(r.handler.GetDealChatLink),
 				http.MethodPost,
 			),
 			role.AdminRole,
@@ -310,5 +310,6 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	return server.MuxWithCORS(mux, &corsConfig)
+	return mux
+	// return server.MuxWithCORS(mux, &corsConfig)
 }

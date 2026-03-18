@@ -17,7 +17,9 @@ import (
 	"ads-mrkt/internal/market/repository/deal"
 	"ads-mrkt/internal/market/repository/deal_forum_topic"
 	"ads-mrkt/internal/market/repository/listing"
+	userrepo "ads-mrkt/internal/market/repository/user"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
+	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
@@ -81,7 +83,12 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 
 			dealRepo := deal.New(pg)
 			dealForumTopicRepo := deal_forum_topic.New(pg)
-			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
+			userRepo := userrepo.New(pg)
+			// TODO: (@TheRealMal) Remove at all if userbot flow is choosen
+			// dealPostMessageRepo := deal_post_message.New(pg)
+			// dealActionLockRepo := deal_action_lock.New(pg)
+			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, cfg.Telegram.BotUsername)
 
 			// Bot updates service
 			updatesSvc := botupdates.NewService(
@@ -91,6 +98,19 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
 			go updatesSvc.StartBackgroundProcessingNotifications(ctxRun)
 			go updatesSvc.StartAdminMonitorWorker(ctxRun)
+
+			// TODO: (@TheRealMal) Remove at all if userbot flow is choosen
+			// dealPostSvc := botdealpost.NewService(
+			// 	telegramClient,
+			// 	channelRepo,
+			// 	listingRepo,
+			// 	dealRepo,
+			// 	dealPostMessageRepo,
+			// 	dealActionLockRepo,
+			// 	cfg.Telegram.ServiceChatID,
+			// )
+			// go dealPostSvc.RunDealPostSenderWorker(ctxRun)
+			// go dealPostSvc.RunDealPostCheckerWorker(ctxRun)
 
 			// Webhook HTTP handler and router
 			webhookHandler := webhookhttp.NewHandler(updatesSvc)

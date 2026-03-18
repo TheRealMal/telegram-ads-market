@@ -9,6 +9,14 @@ type AdminRights struct {
 	CanViewStats   bool `json:"can_view_stats"`
 }
 
+const (
+	BotMemberStatusAdministrator string = "administrator"
+	BotMemberStatusCreator       string = "creator"
+	BotMemberStatusMember        string = "member"
+	BotMemberStatusLeft          string = "left"
+	BotMemberStatusKicked        string = "kicked"
+)
+
 type Channel struct {
 	AdminRights     AdminRights `json:"-"`
 	ID              int64       `json:"id"`

@@ -26,10 +26,11 @@ func New(db database) *repository {
 	return &repository{db: db}
 }
 
-func (r *repository) InsertDealForumTopic(ctx context.Context, t *entity.DealForumTopic) error {
-	_, err := r.db.Exec(ctx, `
+func (r *repository) InsertDealForumTopic(ctx context.Context, t *entity.DealForumTopic) (inserted bool, err error) {
+	cmd, err := r.db.Exec(ctx, `
 		INSERT INTO market.deal_forum_topic (deal_id, lessor_chat_id, lessee_chat_id, lessor_message_thread_id, lessee_message_thread_id)
-		VALUES (@deal_id, @lessor_chat_id, @lessee_chat_id, @lessor_message_thread_id, @lessee_message_thread_id)`,
+		VALUES (@deal_id, @lessor_chat_id, @lessee_chat_id, @lessor_message_thread_id, @lessee_message_thread_id)
+		ON CONFLICT (deal_id) DO NOTHING`,
 		pgx.NamedArgs{
 			"deal_id":                  t.DealID,
 			"lessor_chat_id":           t.LessorChatID,
@@ -37,7 +38,10 @@ func (r *repository) InsertDealForumTopic(ctx context.Context, t *entity.DealFor
 			"lessor_message_thread_id": t.LessorMessageThreadID,
 			"lessee_message_thread_id": t.LesseeMessageThreadID,
 		})
-	return err
+	if err != nil {
+		return false, err
+	}
+	return cmd.RowsAffected() > 0, nil
 }
 
 func (r *repository) GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*entity.DealForumTopic, error) {

@@ -84,6 +84,27 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 	return model.UserRowToEntity(row), nil
 }
 
+func (r *repository) GetReferrals(ctx context.Context, userID int64) ([]*entity.User, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, username, photo, first_name, last_name, locale, referrer_id, allows_pm, wallet_address, role
+		FROM market.user WHERE referrer_id = @referrer_id`,
+		pgx.NamedArgs{"referrer_id": userID})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.UserRow])
+	if err != nil {
+		return nil, err
+	}
+	users := make([]*entity.User, 0, len(userRows))
+	for _, row := range userRows {
+		users = append(users, model.UserRowToEntity(row))
+	}
+	return users, nil
+}
+
 func (r *repository) SetUserWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.user SET wallet_address = @wallet_address, updated_at = NOW() WHERE id = @id`,

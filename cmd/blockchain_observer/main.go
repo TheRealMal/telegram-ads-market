@@ -3,6 +3,7 @@ package blockchain_observer
 import (
 	"context"
 
+	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/blockchain_observer"
 	"ads-mrkt/internal/config"
 	escrowdepositevent "ads-mrkt/internal/event/application/escrow_deposit/event"
@@ -17,12 +18,30 @@ import (
 )
 
 func Cmd(ctx context.Context, conf *config.Config) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "blockchain_observer",
+		Short: "blockchain observer commands",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Usage()
+		},
+	}
+
+	cmd.AddCommand(runCmd(ctx, conf))
+
+	return cmd
+}
+
+func runCmd(ctx context.Context, conf *config.Config) *cobra.Command {
+	return &cobra.Command{
+		Use:   "run",
 		Short: "run blockchain observer (escrow wallet TTL + deposit stream)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctxRun, cancel := context.WithCancel(ctx)
-			defer cancel()
+			shutdownSrv := builder.NewShutdown()
+			go func() {
+				shutdownSrv.WaitShutdown(ctxRun)
+				cancel()
+			}()
 
 			pg, err := postgres.New(ctxRun, conf.Database)
 			if err != nil {
@@ -45,7 +64,11 @@ func Cmd(ctx context.Context, conf *config.Config) *cobra.Command {
 			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
 			obs := blockchain_observer.New(lc, redisClient.Client(), dealRepo, escrowDepositEventSvc, conf.Redis.DB)
 
-			go obs.Start(ctxRun)
+			go func() {
+				if err := obs.Start(ctxRun); err != nil {
+					shutdownSrv.MustShutdown(ctxRun, "blockchain_observer", err)
+				}
+			}()
 
 			<-ctxRun.Done()
 			return nil

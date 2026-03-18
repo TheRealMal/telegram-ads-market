@@ -34,6 +34,14 @@ func (s *userService) AuthUser(ctx context.Context, initDataStr string, referrer
 	return u, nil
 }
 
+func (s *userService) GetUserByID(ctx context.Context, userID int64) (*entity.User, error) {
+	return s.userRepo.GetUserByID(ctx, userID)
+}
+
+func (s *userService) GetReferrals(ctx context.Context, userID int64) ([]*entity.User, error) {
+	return s.userRepo.GetReferrals(ctx, userID)
+}
+
 func (s *userService) SetWallet(ctx context.Context, userID int64, walletAddressRaw string) error {
 	if walletAddressRaw == "" {
 		return fmt.Errorf("wallet address is required")

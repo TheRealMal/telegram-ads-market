@@ -2,8 +2,6 @@ package entity
 
 import (
 	"strconv"
-
-	"github.com/google/uuid"
 )
 
 type Event interface {
@@ -19,13 +17,4 @@ func mustParseInt64(v interface{}) int64 {
 		return -1
 	}
 	return vInt
-}
-
-func mustParseUUID(v interface{}) uuid.UUID {
-	vStr := v.(string)
-	vUUID, err := uuid.Parse(vStr)
-	if err != nil {
-		return uuid.Nil
-	}
-	return vUUID
 }

@@ -48,57 +48,6 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		}
 	}
 
-	if err := s.syncChannelAdmins(ctx, botAPIID, channelEnt.AccessHash); err != nil {
-		return err
-	}
-
-	s.updateChannelPhotoFromTelegram(ctx, botAPIID, channelEnt.AccessHash)
-	return nil
-}
-
-// syncChannelAdmins fetches current admins from Telegram and replaces channel_admin rows for the channel.
-func (s *service) syncChannelAdmins(ctx context.Context, channelID, accessHash int64) error {
-	participantsResp, err := s.telegramClient.API().ChannelsGetParticipants(ctx, &tg.ChannelsGetParticipantsRequest{
-		Channel: &tg.InputChannel{
-			ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
-			AccessHash: accessHash,
-		},
-		Filter: &tg.ChannelParticipantsAdmins{},
-		Offset: 0,
-		Limit:  100,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get participants: %w", err)
-	}
-
-	modified, ok := participantsResp.(*tg.ChannelsChannelParticipants)
-	if !ok {
-		slog.Info("channel participants not modified or empty", "channel_id", channelID)
-		return nil
-	}
-
-	if err = s.channelAdminRepo.DeleteChannelAdmins(ctx, channelID); err != nil {
-		return fmt.Errorf("delete channel admins: %w", err)
-	}
-
-	for _, p := range modified.Participants {
-		var userID int64
-		var role string
-		switch v := p.(type) {
-		case *tg.ChannelParticipantCreator:
-			userID = v.UserID
-			role = "owner"
-		case *tg.ChannelParticipantAdmin:
-			userID = v.UserID
-			role = "admin"
-		default:
-			continue
-		}
-		if err = s.channelAdminRepo.UpsertChannelAdmin(ctx, userID, channelID, role); err != nil {
-			return fmt.Errorf("upsert channel admin user_id=%d: %w", userID, err)
-		}
-		slog.Info("synced channel admin", "channel_id", channelID, "user_id", userID, "role", role)
-	}
 	return nil
 }
 

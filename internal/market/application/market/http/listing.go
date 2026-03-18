@@ -13,6 +13,20 @@ import (
 	_ "ads-mrkt/internal/server/templates/response"
 )
 
+func validateInstantPostListing(typ entity.ListingType, prices json.RawMessage, preparedPost json.RawMessage) error {
+	if !domain.ListingHasAdType(prices, string(entity.AdTypeInstantPost)) {
+		return nil
+	}
+	if typ != entity.ListingTypeLessee {
+		return apperrors.ServiceError{Err: nil, Message: "instant_post ad type is only allowed for lessee listings", Code: apperrors.ErrorCodeBadRequest}
+	}
+	msg := domain.GetMessageFromDetails(preparedPost)
+	if strings.TrimSpace(msg) == "" {
+		return apperrors.ServiceError{Err: nil, Message: "prepared_post with non-empty message is required for instant_post listings", Code: apperrors.ErrorCodeBadRequest}
+	}
+	return nil
+}
+
 func splitComma(s string) []string {
 	var out []string
 	for _, p := range strings.Split(s, ",") {
@@ -76,6 +90,22 @@ func mergeListingWithUpdate(existing *entity.Listing, id int64, req *model.Updat
 	if req.Description != nil {
 		l.Description = *req.Description
 	}
+	if req.PreparedPost != nil {
+		l.PreparedPost = req.PreparedPost
+	}
+
+	listingType := l.Type
+	if req.Type != nil {
+		listingType = entity.ListingType(*req.Type)
+	}
+	pricesToCheck := l.Prices
+	if req.Prices != nil {
+		pricesToCheck = req.Prices
+	}
+	if err := validateInstantPostListing(listingType, pricesToCheck, l.PreparedPost); err != nil {
+		return nil, err
+	}
+
 	return &l, nil
 }
 
@@ -111,13 +141,18 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
 	}
 
+	if err := validateInstantPostListing(entity.ListingType(req.Type), req.Prices, req.PreparedPost); err != nil {
+		return nil, err
+	}
+
 	l := &entity.Listing{
-		Status:      entity.ListingStatus(req.Status),
-		ChannelID:   req.ChannelID,
-		Type:        entity.ListingType(req.Type),
-		Prices:      pricesNanoton,
-		Categories:  model.CategoriesToRaw(req.Categories),
-		Description: req.Description,
+		Status:       entity.ListingStatus(req.Status),
+		ChannelID:    req.ChannelID,
+		Type:         entity.ListingType(req.Type),
+		Prices:       pricesNanoton,
+		Categories:   model.CategoriesToRaw(req.Categories),
+		Description:  req.Description,
+		PreparedPost: req.PreparedPost,
 	}
 	if l.Status == "" {
 		l.Status = entity.ListingStatusInactive

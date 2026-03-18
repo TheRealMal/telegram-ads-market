@@ -19,7 +19,6 @@ type channelRepository interface {
 
 type channelAdminRepository interface {
 	IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error)
-	CountChannelsByUserID(ctx context.Context, userID int64) (int64, error)
 }
 
 type listingRepository interface {
@@ -31,9 +30,9 @@ type channelUpdateStatsEventAdder interface {
 }
 
 type channelService struct {
-	channelRepo           channelRepository
-	channelAdminRepo      channelAdminRepository
-	listingRepo           listingRepository
+	channelRepo             channelRepository
+	channelAdminRepo        channelAdminRepository
+	listingRepo             listingRepository
 	channelUpdateStatsAdder channelUpdateStatsEventAdder
 }
 

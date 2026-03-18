@@ -8,16 +8,17 @@ import (
 )
 
 type ListingRow struct {
-	ID          int64           `db:"id"`
-	Status      string          `db:"status"`
-	UserID      int64           `db:"user_id"`
-	ChannelID   *int64          `db:"channel_id"`
-	Type        string          `db:"type"`
-	Prices      json.RawMessage `db:"prices"`
-	Categories  json.RawMessage `db:"categories"`
-	Description *string         `db:"description"`
-	CreatedAt   time.Time       `db:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at"`
+	ID           int64           `db:"id"`
+	Status       string          `db:"status"`
+	UserID       int64           `db:"user_id"`
+	ChannelID    *int64          `db:"channel_id"`
+	Type         string          `db:"type"`
+	Prices       json.RawMessage `db:"prices"`
+	Categories   json.RawMessage `db:"categories"`
+	Description  *string         `db:"description"`
+	PreparedPost json.RawMessage `db:"prepared_post"`
+	CreatedAt    time.Time       `db:"created_at"`
+	UpdatedAt    time.Time       `db:"updated_at"`
 }
 
 type ListingWithChannelRow struct {
@@ -47,15 +48,16 @@ func stringFromPtr(p *string) string {
 
 func ListingRowToEntity(row ListingRow) *entity.Listing {
 	l := &entity.Listing{
-		ID:          row.ID,
-		Status:      entity.ListingStatus(row.Status),
-		UserID:      row.UserID,
-		ChannelID:   row.ChannelID,
-		Type:        entity.ListingType(row.Type),
-		Prices:      row.Prices,
-		Description: stringFromPtr(row.Description),
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:           row.ID,
+		Status:       entity.ListingStatus(row.Status),
+		UserID:       row.UserID,
+		ChannelID:    row.ChannelID,
+		Type:         entity.ListingType(row.Type),
+		Prices:       row.Prices,
+		Description:  stringFromPtr(row.Description),
+		PreparedPost: row.PreparedPost,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
 	}
 	if len(row.Categories) > 0 {
 		l.Categories = row.Categories

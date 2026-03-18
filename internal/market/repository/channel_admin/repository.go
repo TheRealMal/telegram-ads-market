@@ -56,25 +56,6 @@ func (r *repository) UpsertChannelAdmin(ctx context.Context, userID, channelID i
 	return err
 }
 
-func (r *repository) CountChannelsByUserID(ctx context.Context, userID int64) (int64, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT COUNT(*) AS count FROM market.channel_admin
-		WHERE user_id = @user_id`,
-		pgx.NamedArgs{
-			"user_id": userID,
-		})
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.CountRow])
-	if err != nil {
-		return 0, err
-	}
-	return row.Count, nil
-}
-
 func (r *repository) IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT 1 AS one FROM market.channel_admin

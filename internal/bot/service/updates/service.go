@@ -16,12 +16,12 @@ import (
 type UpdateType string
 
 const (
-	UpdateCommandStart  UpdateType = "start"
-	UpdateCallback      UpdateType = "callback"
-	UpdateMyChatMember  UpdateType = "my_chat_member"
-	UpdateChatMember    UpdateType = "chat_member"
-	UpdateForumMessage  UpdateType = "forum_message"
-	UpdateUnknown       UpdateType = "unknown"
+	UpdateCommandStart UpdateType = "start"
+	UpdateCallback     UpdateType = "callback"
+	UpdateMyChatMember UpdateType = "my_chat_member"
+	UpdateChatMember   UpdateType = "chat_member"
+	UpdateForumMessage UpdateType = "forum_message"
+	UpdateUnknown      UpdateType = "unknown"
 
 	groupName                     = "master"
 	consumerName                  = "updates"
@@ -51,10 +51,15 @@ type telegramService interface {
 	SendMessageSimple(ctx context.Context, chatID int64, text string) error
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 	GetChatAdministrators(ctx context.Context, chatID int64) ([]*telegram.ChatMember, error)
+	GetChannelPhotoBase64(ctx context.Context, chatID int64) (string, error)
+	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 }
 
 type marketDealChatService interface {
 	CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error
+	HandleForumCommand(ctx context.Context, message *telegram.UpdateMessage) error
+	HandleApproveCallback(ctx context.Context, callbackQuery *telegram.CallbackQuery) error
+	HandleConfirmSignCallback(ctx context.Context, callbackQuery *telegram.CallbackQuery) error
 }
 
 type channelRepository interface {
@@ -62,6 +67,7 @@ type channelRepository interface {
 	UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status string) error
 	ListChannelsWithBotAccess(ctx context.Context) ([]*marketentity.Channel, error)
 	ResetChannelAccessHash(ctx context.Context, channelID int64) error
+	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
 }
 
 type channelAdminRepository interface {
@@ -186,10 +192,6 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 
 	updateType := s.getUpdateType(update)
 	switch updateType {
-	case UpdateMyChatMember:
-		return s.handleMyChatMember(ctx, update.MyChatMember)
-	case UpdateChatMember:
-		return s.handleChatMember(ctx, update.ChatMember)
 	case UpdateCommandStart:
 		err := s.telegramClient.SendWelcomeMessage(ctx, update.Message.Chat.ID)
 		if err != nil {
@@ -198,10 +200,14 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 			}
 			return fmt.Errorf("failed to send welcome message: %w", err)
 		}
+	case UpdateMyChatMember:
+		return s.handleMyChatMember(ctx, update.MyChatMember)
+	case UpdateChatMember:
+		return s.handleChatMember(ctx, update.ChatMember)
 	case UpdateForumMessage:
-		if err := s.marketDealChatService.CopyMessageToOtherTopic(ctx, update.Message.Chat.ID, update.Message.MessageThreadID, update.Message.MessageID); err != nil {
-			slog.Debug("deal chat copy message", "error", err, "chat_id", update.Message.Chat.ID, "thread_id", update.Message.MessageThreadID, "message_id", update.Message.MessageID)
-		}
+		return s.handleForumMessage(ctx, update.Message)
+	case UpdateCallback:
+		return s.handleCallback(ctx, update.CallbackQuery)
 	case UpdateUnknown:
 		// No action needed
 	}
@@ -215,6 +221,9 @@ func (s *service) getUpdateType(update *telegram.Update) UpdateType {
 	}
 	if update.ChatMember != nil {
 		return UpdateChatMember
+	}
+	if update.CallbackQuery != nil {
+		return UpdateCallback
 	}
 	if update.Message != nil {
 		if update.Message.Text == "/start" {

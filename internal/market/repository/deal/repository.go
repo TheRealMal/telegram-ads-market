@@ -2,6 +2,7 @@ package deal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -31,20 +32,27 @@ func New(db database) *repository {
 
 func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
 	rows, err := r.db.Query(ctx, `
-		INSERT INTO market.deal (listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, status)
-		VALUES (@listing_id, @lessor_id, @lessee_id, @channel_id, @type, @duration, @price, @escrow_amount, @details, @status)
+		INSERT INTO market.deal (listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message, status,
+		                         lessor_payout_address, lessee_payout_address, lessor_signature, lessee_signature)
+		VALUES (@listing_id, @lessor_id, @lessee_id, @channel_id, @type, @duration, @price, @escrow_amount, @details, @message, @status,
+		        @lessor_payout_address, @lessee_payout_address, @lessor_signature, @lessee_signature)
 		RETURNING id, created_at, updated_at`,
 		pgx.NamedArgs{
-			"listing_id":    d.ListingID,
-			"lessor_id":     d.LessorID,
-			"lessee_id":     d.LesseeID,
-			"channel_id":    d.ChannelID,
-			"type":          d.Type,
-			"duration":      d.Duration,
-			"price":         d.Price,
-			"escrow_amount": d.EscrowAmount,
-			"details":       d.Details,
-			"status":        d.Status,
+			"listing_id":            d.ListingID,
+			"lessor_id":             d.LessorID,
+			"lessee_id":             d.LesseeID,
+			"channel_id":            d.ChannelID,
+			"type":                  d.Type,
+			"duration":              d.Duration,
+			"price":                 d.Price,
+			"escrow_amount":         d.EscrowAmount,
+			"details":               d.Details,
+			"message":               d.Message,
+			"status":                d.Status,
+			"lessor_payout_address": d.LessorPayoutAddress,
+			"lessee_payout_address": d.LesseePayoutAddress,
+			"lessor_signature":      d.LessorSignature,
+			"lessee_signature":      d.LesseeSignature,
 		})
 	if err != nil {
 		return err
@@ -63,7 +71,7 @@ func (r *repository) CreateDeal(ctx context.Context, d *entity.Deal) error {
 
 func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal WHERE id = @id`,
 		pgx.NamedArgs{"id": id})
@@ -84,7 +92,7 @@ func (r *repository) GetDealByID(ctx context.Context, id int64) (*entity.Deal, e
 
 func (r *repository) ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE status = @status AND escrow_address IS NULL
@@ -108,7 +116,7 @@ func (r *repository) ListDealsApprovedWithoutEscrow(ctx context.Context) ([]*ent
 
 func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal WHERE listing_id = @listing_id ORDER BY updated_at DESC`,
 		pgx.NamedArgs{"listing_id": listingID})
@@ -130,7 +138,7 @@ func (r *repository) GetDealsByListingID(ctx context.Context, listingID int64) (
 
 func (r *repository) GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE listing_id = @listing_id AND (lessor_id = @user_id OR lessee_id = @user_id)
@@ -162,7 +170,7 @@ func (r *repository) ListDealsWaitingEscrowRefund(ctx context.Context) ([]*entit
 
 func (r *repository) listDealsByStatus(ctx context.Context, status entity.DealStatus) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE status = @status
@@ -185,12 +193,13 @@ func (r *repository) listDealsByStatus(ctx context.Context, status entity.DealSt
 
 func (r *repository) ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT d.id, d.listing_id, d.lessor_id, d.lessee_id, d.channel_id, d.type, d.duration, d.price, d.escrow_amount, d.details,
+		SELECT d.id, d.listing_id, d.lessor_id, d.lessee_id, d.channel_id, d.type, d.duration, d.price, d.escrow_amount, d.details, d.message,
 		       d.lessor_signature, d.lessee_signature, d.status, d.escrow_address, d.escrow_release_time, d.lessor_payout_address, d.lessee_payout_address, d.created_at, d.updated_at
 		FROM market.deal d
 		LEFT JOIN market.deal_post_message dpm ON dpm.deal_id = d.id
 		WHERE d.status = @status AND dpm.id IS NULL
-		ORDER BY d.id`,
+		ORDER BY d.id
+		LIMIT 50`,
 		pgx.NamedArgs{"status": string(entity.DealStatusEscrowDepositConfirmed)})
 	if err != nil {
 		return nil, err
@@ -209,7 +218,7 @@ func (r *repository) ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx conte
 
 func (r *repository) ListDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE lessor_id = @user_id OR lessee_id = @user_id
@@ -229,6 +238,21 @@ func (r *repository) ListDealsByUserID(ctx context.Context, userID int64) ([]*en
 		list = append(list, model.DealRowToEntity(row))
 	}
 	return list, nil
+}
+
+// UpdateDealDetailsAndClearSignatures updates only the details JSONB and clears both signatures.
+// Only works in draft status.
+func (r *repository) UpdateDealDetailsAndClearSignatures(ctx context.Context, dealID int64, details json.RawMessage) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE market.deal
+		SET details = @details, lessor_signature = NULL, lessee_signature = NULL, updated_at = NOW()
+		WHERE id = @id AND status = @status_draft`,
+		pgx.NamedArgs{
+			"id":           dealID,
+			"details":      details,
+			"status_draft": string(entity.DealStatusDraft),
+		})
+	return err
 }
 
 func (r *repository) UpdateDealDraftFieldsAndClearSignatures(ctx context.Context, d *entity.Deal) error {
@@ -341,7 +365,7 @@ func (r *repository) SetDealEscrowAddress(ctx context.Context, dealID int64, add
 
 func (r *repository) GetDealByEscrowAddress(ctx context.Context, escrowAddress string) (*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE escrow_address = @escrow_address AND status = @status`,
@@ -377,7 +401,7 @@ func (r *repository) SetDealStatusExpiredByEscrowAddress(ctx context.Context, es
 
 func (r *repository) ListDealsWaitingEscrowDepositOlderThan(ctx context.Context, before time.Time) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE status = @status AND updated_at < @before
@@ -415,7 +439,7 @@ func (r *repository) SetDealStatusExpiredByDealID(ctx context.Context, dealID in
 
 func (r *repository) ListDealsEscrowConfirmedToComplete(ctx context.Context) ([]*entity.Deal, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details,
+		SELECT id, listing_id, lessor_id, lessee_id, channel_id, type, duration, price, escrow_amount, details, message,
 		       lessor_signature, lessee_signature, status, escrow_address, escrow_release_time, lessor_payout_address, lessee_payout_address, created_at, updated_at
 		FROM market.deal
 		WHERE status = @s1 OR status = @s2

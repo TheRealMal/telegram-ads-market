@@ -20,7 +20,7 @@ func (s *service) ensureChannelAccess(ctx context.Context, channel *marketentity
 		return channel, nil
 	}
 
-	if channel.BotMemberStatus != "administrator" {
+	if channel.BotMemberStatus != marketentity.BotMemberStatusAdministrator {
 		return nil, fmt.Errorf("channel %d: bot is not administrator (status=%s), cannot add userbot", channel.ID, channel.BotMemberStatus)
 	}
 

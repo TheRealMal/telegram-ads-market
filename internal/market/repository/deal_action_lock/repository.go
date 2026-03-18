@@ -39,11 +39,12 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 
 	rows, err := r.db.Query(txCtx, `
 		SELECT 1 AS one FROM market.deal_action_lock
-		WHERE deal_id = @deal_id AND action_type = @action_type AND status = 'locked' AND expire_at > NOW()
+		WHERE deal_id = @deal_id AND action_type = @action_type AND status = @status_locked AND expire_at > NOW()
 		LIMIT 1`,
 		pgx.NamedArgs{
-			"deal_id":     dealID,
-			"action_type": string(actionType),
+			"deal_id":       dealID,
+			"action_type":   string(actionType),
+			"status_locked": string(entity.DealActionLockStatusLocked),
 		},
 	)
 	if err != nil {
@@ -62,12 +63,13 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 	expireAt := time.Now().Add(dealActionLockTTL)
 	insertRows, err := r.db.Query(txCtx, `
 		INSERT INTO market.deal_action_lock (deal_id, action_type, status, expire_at, updated_at)
-		VALUES (@deal_id, @action_type, 'locked', @expire_at, NOW())
+		VALUES (@deal_id, @action_type, @status_locked, @expire_at, NOW())
 		RETURNING id`,
 		pgx.NamedArgs{
-			"deal_id":     dealID,
-			"action_type": string(actionType),
-			"expire_at":   expireAt,
+			"deal_id":       dealID,
+			"action_type":   string(actionType),
+			"status_locked": string(entity.DealActionLockStatusLocked),
+			"expire_at":     expireAt,
 		},
 	)
 	if err != nil {

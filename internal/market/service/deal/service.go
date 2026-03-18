@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 )
 
 type dealRepository interface {
@@ -41,6 +42,7 @@ type dealService struct {
 	userRepo          userRepository
 	escrowSvc         escrowService
 	notificationAdder telegramNotificationAdder
+	signerSvc         *dealsigner.Service
 }
 
 func NewDealService(dealRepo dealRepository, userRepo userRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder) *dealService {
@@ -49,5 +51,6 @@ func NewDealService(dealRepo dealRepository, userRepo userRepository, escrowSvc 
 		userRepo:          userRepo,
 		escrowSvc:         escrowSvc,
 		notificationAdder: notificationAdder,
+		signerSvc:         dealsigner.NewService(dealRepo, userRepo, notificationAdder),
 	}
 }

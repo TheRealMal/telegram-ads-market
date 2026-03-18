@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+type AdType string
+
+const (
+	AdTypePost        AdType = "post"
+	AdTypeInstantPost AdType = "instant_post"
+)
+
 type DealStatus string
 
 const (
@@ -36,6 +43,7 @@ type Deal struct {
 	Price               int64           `json:"price"`         // in nanoton; API layer converts to/from TON
 	EscrowAmount        int64           `json:"escrow_amount"` // price + transaction gas + commission
 	Details             json.RawMessage `json:"details"`
+	Message             string          `json:"message"`              // context message from deal creator (NOT ad content)
 	LessorSignature     *string         `json:"lessor_signature,omitempty"`
 	LesseeSignature     *string         `json:"lessee_signature,omitempty"`
 	Status              DealStatus      `json:"status"`

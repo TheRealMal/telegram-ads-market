@@ -19,6 +19,7 @@ type DealResponse struct {
 	Price               float64           `json:"price"`
 	EscrowAmount        int64             `json:"escrow_amount"`
 	Details             json.RawMessage   `json:"details"`
+	Message             string            `json:"message"`
 	LessorSignature     *string           `json:"lessor_signature,omitempty"`
 	LesseeSignature     *string           `json:"lessee_signature,omitempty"`
 	Status              entity.DealStatus `json:"status"`
@@ -45,6 +46,7 @@ func DealToResponse(d *entity.Deal) *DealResponse {
 		Price:               domain.NanotonToTON(d.Price),
 		EscrowAmount:        d.EscrowAmount,
 		Details:             d.Details,
+		Message:             d.Message,
 		LessorSignature:     d.LessorSignature,
 		LesseeSignature:     d.LesseeSignature,
 		Status:              d.Status,
@@ -71,6 +73,7 @@ type CreateDealRequest struct {
 	Type      string          `json:"type"`
 	Duration  int64           `json:"duration"`
 	Price     float64         `json:"price"`
+	Message   string          `json:"message"`
 	Details   json.RawMessage `json:"details"`
 }
 

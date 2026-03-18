@@ -32,6 +32,7 @@ type Listing struct {
 	Prices           json.RawMessage `json:"prices"`
 	Categories       json.RawMessage `json:"categories,omitempty"` // JSON array of strings from predefined set
 	Description      string          `json:"description,omitempty"`
+	PreparedPost     json.RawMessage `json:"prepared_post,omitempty"` // JSON object, e.g. {"message": "ad text"}; extensible
 	CreatedAt        time.Time       `json:"created_at,omitempty"`
 	UpdatedAt        time.Time       `json:"updated_at,omitempty"`
 }

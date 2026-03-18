@@ -28,6 +28,7 @@ import (
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
+	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 	dealpostmessage "ads-mrkt/internal/market/service/deal_post_message"
 	escrowservice "ads-mrkt/internal/market/service/escrow"
 	listingservice "ads-mrkt/internal/market/service/listing"
@@ -101,18 +102,22 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			analyticsRepo := analyticsrepo.New(pg)
 			analyticsSvc := analyticsservice.New(analyticsRepo, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
+			eventRepo := eventredis.New(redisClient)
+			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
+			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
+			telegramNotifyEventSvc := telegramnotifyevent.NewService(eventRepo)
+
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
 			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo)
-			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, cfg.Telegram.BotUsername)
+
+			// Standalone deal signer for deal chat (breaks circular dep: dealChatSvc -> dealSigner -> escrowSvc -> dealChatSvc).
+			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, cfg.Telegram.BotUsername)
 			vaultClient, err := vault.NewClient(cfg.Vault)
 			if err != nil {
 				return errors.Wrap(err, "create vault client")
 			}
 			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
-			eventRepo := eventredis.New(redisClient)
-			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
-			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
-			telegramNotifyEventSvc := telegramnotifyevent.NewService(eventRepo)
 
 			channelSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
 			dealSvc := dealservice.NewDealService(dealRepo, userRepo, escrowSvc, telegramNotifyEventSvc)

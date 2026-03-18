@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"math/rand"
+	"strconv"
 	"time"
 
 	helpertelegram "ads-mrkt/internal/helpers/telegram"
@@ -66,6 +68,17 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			continue
 		}
 
+		var botEntities []helpertelegram.MessageEntity
+		if raw := domain.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
+			_ = json.Unmarshal(raw, &botEntities)
+		}
+		if len(botEntities) == 0 {
+			if raw := domain.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
+				_ = json.Unmarshal(raw, &botEntities)
+			}
+		}
+		mtprotoEntities := toMTProtoEntities(botEntities)
+
 		// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
 		lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
 		if err != nil {
@@ -106,7 +119,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, status)
 		}
 
-		msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text)
+		msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text, mtprotoEntities)
 		if err != nil {
 			logger.Error("send message", "deal_id", deal.ID, "error", err)
 			releaseLock(marketentity.DealActionLockStatusFailed)
@@ -136,12 +149,78 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 
 const lastMessagesRecoveryLimit = 20
 
-func (s *service) sendChannelMessage(ctx context.Context, channelID int64, accessHash int64, text string) (int64, error) {
+// toMTProtoEntities converts Bot API MessageEntity slice to MTProto entity slice.
+func toMTProtoEntities(entities []helpertelegram.MessageEntity) []tg.MessageEntityClass {
+	if len(entities) == 0 {
+		return nil
+	}
+	result := make([]tg.MessageEntityClass, 0, len(entities))
+	for _, e := range entities {
+		var me tg.MessageEntityClass
+		switch e.Type {
+		case "bold":
+			me = &tg.MessageEntityBold{Offset: e.Offset, Length: e.Length}
+		case "italic":
+			me = &tg.MessageEntityItalic{Offset: e.Offset, Length: e.Length}
+		case "underline":
+			me = &tg.MessageEntityUnderline{Offset: e.Offset, Length: e.Length}
+		case "strikethrough":
+			me = &tg.MessageEntityStrike{Offset: e.Offset, Length: e.Length}
+		case "code":
+			me = &tg.MessageEntityCode{Offset: e.Offset, Length: e.Length}
+		case "pre":
+			me = &tg.MessageEntityPre{Offset: e.Offset, Length: e.Length, Language: e.Language}
+		case "text_link":
+			me = &tg.MessageEntityTextURL{Offset: e.Offset, Length: e.Length, URL: e.URL}
+		case "text_mention":
+			if e.User != nil {
+				me = &tg.MessageEntityMentionName{Offset: e.Offset, Length: e.Length, UserID: e.User.ID}
+			}
+		case "spoiler":
+			me = &tg.MessageEntitySpoiler{Offset: e.Offset, Length: e.Length}
+		case "blockquote":
+			me = &tg.MessageEntityBlockquote{Offset: e.Offset, Length: e.Length}
+		case "expandable_blockquote":
+			me = &tg.MessageEntityBlockquote{Offset: e.Offset, Length: e.Length, Collapsed: true}
+		case "url":
+			me = &tg.MessageEntityURL{Offset: e.Offset, Length: e.Length}
+		case "mention":
+			me = &tg.MessageEntityMention{Offset: e.Offset, Length: e.Length}
+		case "hashtag":
+			me = &tg.MessageEntityHashtag{Offset: e.Offset, Length: e.Length}
+		case "bot_command":
+			me = &tg.MessageEntityBotCommand{Offset: e.Offset, Length: e.Length}
+		case "email":
+			me = &tg.MessageEntityEmail{Offset: e.Offset, Length: e.Length}
+		case "phone_number":
+			me = &tg.MessageEntityPhone{Offset: e.Offset, Length: e.Length}
+		case "custom_emoji":
+			if e.CustomEmojiID != "" {
+				docID, _ := strconv.ParseInt(e.CustomEmojiID, 10, 64)
+				me = &tg.MessageEntityCustomEmoji{Offset: e.Offset, Length: e.Length, DocumentID: docID}
+			}
+		default:
+			continue // unknown entity type, skip
+		}
+		if me != nil {
+			result = append(result, me)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func (s *service) sendChannelMessage(ctx context.Context, channelID int64, accessHash int64, text string, entities []tg.MessageEntityClass) (int64, error) {
 	peer := &tg.InputPeerChannel{ChannelID: helpertelegram.ToMTProtoChannelID(channelID), AccessHash: accessHash}
 	req := &tg.MessagesSendMessageRequest{
 		Peer:     peer,
 		Message:  text,
 		RandomID: rand.Int63(),
+	}
+	if len(entities) > 0 {
+		req.Entities = entities
 	}
 	result, err := s.telegramClient.API().MessagesSendMessage(ctx, req)
 	if err != nil {
