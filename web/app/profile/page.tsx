@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-react';
 import { api, ensureValidToken } from '@/lib/api';
 import { getTelegramUser } from '@/lib/initData';
 import { openTelegramLink } from '@/lib/telegram';
+import { truncateAddressDisplay } from '@/lib/tonAddress';
 import type { Channel } from '@/types';
 import { ChannelCard } from '@/components/ChannelCard';
 import { PageTopSpacer } from '@/components/PageTopSpacer';
 import { toggleTheme, getCurrentTheme } from '@/lib/theme';
-import { User, HelpCircle, Plus, X, Sun, Moon } from 'lucide-react';
+import { User, HelpCircle, Plus, X, Sun, Moon, Wallet } from 'lucide-react';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
 const BOT_USERNAME =
@@ -35,6 +37,11 @@ export default function ProfilePage() {
   const [notificationEntered, setNotificationEntered] = useState(false);
   const [refreshDisabledChannels, setRefreshDisabledChannels] = useState<Set<number>>(new Set());
   const [refreshLoading, setRefreshLoading] = useState(false);
+
+  const wallet = useTonWallet();
+  const rawAddress = useTonAddress(false);
+  const [tonConnectUI] = useTonConnectUI();
+  const walletSyncedRef = useRef(false);
 
   useEffect(() => {
     setTgUser(getTelegramUser());
@@ -139,6 +146,19 @@ export default function ProfilePage() {
     return () => clearTimeout(remove);
   }, [notification?.exiting]);
 
+  useEffect(() => {
+    if (!rawAddress || walletSyncedRef.current) return;
+    (async () => {
+      const token = await ensureValidToken();
+      if (!token) return;
+      const res = await api<{ status: string }>('/api/v1/market/me/wallet', {
+        method: 'PUT',
+        body: JSON.stringify({ wallet_address: rawAddress }),
+      });
+      if (res.ok) walletSyncedRef.current = true;
+    })();
+  }, [rawAddress]);
+
   const isFullscreen =
     typeof window !== 'undefined' &&
     (window as Window & { Telegram?: { WebApp?: { isFullscreen?: boolean } } }).Telegram?.WebApp?.isFullscreen === true;
@@ -215,6 +235,47 @@ export default function ProfilePage() {
 
       {/* Channels only — no tab bar */}
       <div className="mx-auto max-w-2xl px-4 py-5">
+        {/* Wallet */}
+        {hasToken && (
+          <div className="mb-4 rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wallet size={18} className="text-muted-foreground" />
+                <span className="text-sm font-medium">Wallet</span>
+              </div>
+              {!wallet ? (
+                <button
+                  type="button"
+                  onClick={() => tonConnectUI.openModal()}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
+                >
+                  Connect
+                </button>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                    {truncateAddressDisplay(rawAddress || '')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const token = await ensureValidToken();
+                      if (token) {
+                        await api<{ status: string }>('/api/v1/market/me/wallet', { method: 'DELETE' });
+                      }
+                      walletSyncedRef.current = false;
+                      tonConnectUI.disconnect();
+                    }}
+                    className="text-sm text-destructive hover:underline"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             My channels

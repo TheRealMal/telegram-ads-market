@@ -126,6 +126,14 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, err
 	}
 
+	user, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	if user == nil || user.WalletAddress == nil || *user.WalletAddress == "" {
+		return nil, apperrors.ServiceError{Err: nil, Message: "connect wallet before creating a listing", Code: apperrors.ErrorCodeBadRequest}
+	}
+
 	var req model.CreateListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}

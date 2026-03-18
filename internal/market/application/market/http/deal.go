@@ -109,6 +109,14 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 		return nil, err
 	}
 
+	creator, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	if creator == nil || creator.WalletAddress == nil || *creator.WalletAddress == "" {
+		return nil, apperrors.ServiceError{Err: nil, Message: "connect wallet before creating a deal", Code: apperrors.ErrorCodeBadRequest}
+	}
+
 	var req model.CreateDealRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}

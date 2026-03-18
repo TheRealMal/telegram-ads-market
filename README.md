@@ -83,7 +83,7 @@ make start
 
 # Set up Telegram bot webhook
 # Replace <bot_token>, <domain>, and <secret> with your values
-curl "https://api.telegram.org/bot<bot_token>/setWebhook?url=https://<domain>/api/v1/telegram/webhook&secret_token=<secret>&allowed_updates=[%22chat_member%22,%22my_chat_member%22,%22message%22]"
+curl "https://api.telegram.org/bot<bot_token>/setWebhook?url=https://<domain>/api/v1/telegram/webhook&secret_token=<secret>&allowed_updates=[%22chat_member%22,%22my_chat_member%22,%22message%22,%22callback_query%22]"
 ```
 
 ## Frontend
