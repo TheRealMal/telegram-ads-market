@@ -88,12 +88,13 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			// dealPostMessageRepo := deal_post_message.New(pg)
 			// dealActionLockRepo := deal_action_lock.New(pg)
 			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc)
-			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, cfg.Telegram.BotUsername)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, cfg.Telegram.BotUsername)
 
 			// Bot updates service
 			updatesSvc := botupdates.NewService(
 				telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc,
 				channelRepo, channelAdminRepo, listingRepo, dealRepo, telegramNotifyEventSvc, userbotStateRepo,
+				cfg.Telegram.BotUsername,
 			)
 			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
 			go updatesSvc.StartBackgroundProcessingNotifications(ctxRun)

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
@@ -440,38 +441,56 @@ func getEntitiesFromDetails(details json.RawMessage) []telegram.MessageEntity {
 	return entities
 }
 
-// sendAdPreview sends the ad message preview (with media, entities, and provided markup) to a forum thread.
+// sendAdPreview sends the ad message preview (with media, entities, and provided markup) to a forum thread via the notification event system.
 func (s *service) sendAdPreview(ctx context.Context, chatID, threadID int64, details json.RawMessage, markup *telegram.InlineKeyboardMarkup) {
+	if s.notificationAdder == nil {
+		return
+	}
+
 	msg := domain.GetMessageFromDetails(details)
 	mediaType, mediaFileID := domain.GetMediaFromDetails(details)
 	entities := getEntitiesFromDetails(details)
 
+	event := &evententity.EventTelegramNotification{
+		ChatID:   chatID,
+		ThreadID: threadID,
+		Message:  msg,
+	}
+
 	switch mediaType {
 	case "photo":
-		if err := s.telegramForum.SendPhotoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, entities); err != nil {
-			slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
-		}
+		event.Photo = mediaFileID
 	case "video":
-		if err := s.telegramForum.SendVideoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, entities); err != nil {
-			slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
+		event.Video = mediaFileID
+	}
+
+	if len(entities) > 0 {
+		if b, err := json.Marshal(entities); err == nil {
+			event.Entities = string(b)
 		}
-	default:
-		if markup != nil {
-			if _, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, chatID, threadID, msg, markup, entities); err != nil {
-				slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
-			}
-		} else {
-			if err := s.telegramForum.SendMessageToThread(ctx, chatID, threadID, msg, entities); err != nil {
-				slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
-			}
+	}
+	if markup != nil && len(markup.InlineKeyboard) > 0 {
+		if b, err := json.Marshal(markup.InlineKeyboard); err == nil {
+			event.Buttons = string(b)
 		}
+	}
+
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, event); err != nil {
+		slog.Error("failed to add notification", "type", "ad_preview", "chat_id", chatID, "thread_id", threadID, "error", err)
 	}
 }
 
-// sendToThread is a helper that sends a plain text message to a forum topic, logging errors.
+// sendToThread is a helper that sends a plain text message to a forum topic via the notification event system.
 func (s *service) sendToThread(ctx context.Context, chatID int64, threadID int64, text string) {
-	if err := s.telegramForum.SendMessageToThread(ctx, chatID, threadID, text, nil); err != nil {
-		slog.Error("send message to thread", "chat_id", chatID, "thread_id", threadID, "error", err)
+	if s.notificationAdder == nil {
+		return
+	}
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+		ChatID:   chatID,
+		ThreadID: threadID,
+		Message:  text,
+	}); err != nil {
+		slog.Error("failed to add notification", "type", "send_to_thread_helper", "msg", text, "chat_id", chatID, "thread_id", threadID, "error", err)
 	}
 }
 

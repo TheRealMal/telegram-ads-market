@@ -2,9 +2,9 @@ package updates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
@@ -47,8 +47,7 @@ type telegramNotificationEventService interface {
 }
 
 type telegramService interface {
-	SendWelcomeMessage(ctx context.Context, chatID int64) error
-	SendMessageSimple(ctx context.Context, chatID int64, text string) error
+	SendNotification(ctx context.Context, msg telegram.NotificationMessage) error
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 	GetChatAdministrators(ctx context.Context, chatID int64) ([]*telegram.ChatMember, error)
 	GetChannelPhotoBase64(ctx context.Context, chatID int64) (string, error)
@@ -87,7 +86,7 @@ type dealRepository interface {
 }
 
 type notificationAdder interface {
-	AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error
+	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
 type userbotStateRepository interface {
@@ -105,6 +104,7 @@ type service struct {
 	dealRepo              dealRepository
 	notificationAdder     notificationAdder
 	userbotStateRepo      userbotStateRepository
+	botUsername           string
 }
 
 func NewService(
@@ -118,6 +118,7 @@ func NewService(
 	dealRepo dealRepository,
 	notificationAdder notificationAdder,
 	userbotStateRepo userbotStateRepository,
+	botUsername string,
 ) *service {
 	return &service{
 		telegramClient:        telegramClient,
@@ -130,6 +131,7 @@ func NewService(
 		dealRepo:              dealRepo,
 		notificationAdder:     notificationAdder,
 		userbotStateRepo:      userbotStateRepo,
+		botUsername:           botUsername,
 	}
 }
 
@@ -193,13 +195,7 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 	updateType := s.getUpdateType(update)
 	switch updateType {
 	case UpdateCommandStart:
-		err := s.telegramClient.SendWelcomeMessage(ctx, update.Message.Chat.ID)
-		if err != nil {
-			if strings.Contains(err.Error(), "USER_FORBIDDEN") {
-				return nil
-			}
-			return fmt.Errorf("failed to send welcome message: %w", err)
-		}
+		s.sendWelcomeNotification(ctx, update.Message.Chat.ID)
 	case UpdateMyChatMember:
 		return s.handleMyChatMember(ctx, update.MyChatMember)
 	case UpdateChatMember:
@@ -293,5 +289,19 @@ func (s *service) streamCleaner(ctx context.Context) {
 			}
 			ticker.Reset(tickerPeriod)
 		}
+	}
+}
+
+func (s *service) sendWelcomeNotification(ctx context.Context, chatID int64) {
+	buttons, _ := json.Marshal([][]telegram.InlineKeyboardButton{
+		{{Text: "Open", URL: fmt.Sprintf("https://t.me/%s?startapp=", s.botUsername)}},
+	})
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+		ChatID:  chatID,
+		Message: "Start message",
+		Buttons: string(buttons),
+	}); err != nil {
+		slog.Error("failed to add notification", "type", "welcome", "chat_id", chatID, "error", err)
+
 	}
 }

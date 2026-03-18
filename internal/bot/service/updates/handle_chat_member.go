@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/market/repository/deal/model"
@@ -84,8 +85,13 @@ func (s *service) handleAdminRemoved(ctx context.Context, channelID, userID int6
 	if len(rejectedDeals) > 0 {
 		msg += " and related deals have been canceled"
 	}
-	msg += "."
-	_ = s.notificationAdder.AddTelegramNotificationEvent(ctx, userID, msg)
+
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+		ChatID:  userID,
+		Message: msg,
+	}); err != nil {
+		slog.Error("failed to add notification", "type", "admin_removed", "channel_id", channelID, "user_id", userID, "error", err)
+	}
 
 	s.notifyDealCounterparties(ctx, rejectedDeals, userID)
 }
@@ -96,7 +102,11 @@ func (s *service) notifyDealCounterparties(ctx context.Context, deals []model.Re
 		if removedUserID == d.LesseeID {
 			counterpartyID = d.LessorID
 		}
-		_ = s.notificationAdder.AddTelegramNotificationEvent(ctx, counterpartyID,
-			"Deal #"+strconv.FormatInt(d.ID, 10)+" was canceled because the channel admin was removed.")
+		if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+			ChatID:  counterpartyID,
+			Message: "Deal #" + strconv.FormatInt(d.ID, 10) + " was canceled because the channel admin was removed.",
+		}); err != nil {
+			slog.Error("failed to add notification", "type", "admin_removed_counterparties", "deal_id", d.ID, "user_id", counterpartyID, "error", err)
+		}
 	}
 }

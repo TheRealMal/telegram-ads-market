@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
@@ -19,12 +20,12 @@ type telegramForum interface {
 	CreateForumTopic(ctx context.Context, chatID int64, name string) (messageThreadID int64, err error)
 	DeleteForumTopic(ctx context.Context, chatID int64, messageThreadID int64) error
 	CopyMessage(ctx context.Context, fromChatID int64, messageID int64, toChatID int64, toMessageThreadID *int64) (copiedMessageID int64, err error)
-	SendMessageToThread(ctx context.Context, chatID int64, messageThreadID int64, text string, entities []telegram.MessageEntity) error
-	SendMessageToThreadWithMarkup(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *telegram.InlineKeyboardMarkup, entities []telegram.MessageEntity) (*telegram.SentMessage, error)
-	SendPhotoToThread(ctx context.Context, chatID int64, messageThreadID int64, photoFileID string, caption string, markup *telegram.InlineKeyboardMarkup, captionEntities []telegram.MessageEntity) error
-	SendVideoToThread(ctx context.Context, chatID int64, messageThreadID int64, videoFileID string, caption string, markup *telegram.InlineKeyboardMarkup, captionEntities []telegram.MessageEntity) error
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int64, markup *telegram.InlineKeyboardMarkup) error
+}
+
+type notificationAdder interface {
+	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
 type dealRepository interface {
@@ -44,20 +45,22 @@ type dealSigner interface {
 }
 
 type service struct {
-	dealRepo       dealRepository
-	forumTopicRepo dealForumTopicRepository
-	telegramForum  telegramForum
-	dealSigner     dealSigner
-	botUsername    string
+	dealRepo          dealRepository
+	forumTopicRepo    dealForumTopicRepository
+	telegramForum     telegramForum
+	dealSigner        dealSigner
+	notificationAdder notificationAdder
+	botUsername       string
 }
 
-func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, dealSigner dealSigner, botUsername string) *service {
+func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, dealSigner dealSigner, notificationAdder notificationAdder, botUsername string) *service {
 	return &service{
-		dealRepo:       dealRepo,
-		forumTopicRepo: forumTopicRepo,
-		telegramForum:  telegramForum,
-		dealSigner:     dealSigner,
-		botUsername:    strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
+		dealRepo:          dealRepo,
+		forumTopicRepo:    forumTopicRepo,
+		telegramForum:     telegramForum,
+		dealSigner:        dealSigner,
+		notificationAdder: notificationAdder,
+		botUsername:       strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
 	}
 }
 
@@ -163,11 +166,15 @@ func (s *service) buildInitialMessages(deal *entity.Deal, listingType entity.Lis
 }
 
 func (s *service) sendInitialMessage(ctx context.Context, chatID int64, threadID int64, text string) {
-	if s.telegramForum == nil {
+	if s.notificationAdder == nil {
 		return
 	}
-	if err := s.telegramForum.SendMessageToThread(ctx, chatID, threadID, text, nil); err != nil {
-		slog.Error("send initial forum message", "chat_id", chatID, "thread_id", threadID, "error", err)
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+		ChatID:   chatID,
+		ThreadID: threadID,
+		Message:  text,
+	}); err != nil {
+		slog.Error("failed to add notification", "type", "initial_deal_message", "chat_id", chatID, "thread_id", threadID, "error", err)
 	}
 }
 

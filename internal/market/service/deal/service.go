@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/market/domain/entity"
 	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 )
@@ -34,7 +35,7 @@ type escrowService interface {
 }
 
 type telegramNotificationAdder interface {
-	AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error
+	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
 type dealService struct {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"ads-mrkt/internal/helpers/telegram"
 )
 
 const (
@@ -39,7 +41,15 @@ func (s *service) runNotificationWorker(ctx context.Context) {
 			}
 			var ids []string
 			for _, ev := range events {
-				if err := s.telegramClient.SendMessageSimple(ctx, ev.ChatID, ev.Message); err != nil {
+				if err := s.telegramClient.SendNotification(ctx, telegram.NotificationMessage{
+					ChatID:   ev.ChatID,
+					Message:  ev.Message,
+					ThreadID: ev.ThreadID,
+					Photo:    ev.Photo,
+					Video:    ev.Video,
+					Entities: ev.Entities,
+					Buttons:  ev.Buttons,
+				}); err != nil {
 					slog.Error("send telegram notification", "chat_id", ev.ChatID, "error", err)
 					continue
 				}
@@ -92,7 +102,15 @@ func (s *service) processPendingNotifications(ctx context.Context) {
 			}
 			var ids []string
 			for _, ev := range events {
-				if err := s.telegramClient.SendMessageSimple(ctx, ev.ChatID, ev.Message); err != nil {
+				if err := s.telegramClient.SendNotification(ctx, telegram.NotificationMessage{
+					ChatID:   ev.ChatID,
+					Message:  ev.Message,
+					ThreadID: ev.ThreadID,
+					Photo:    ev.Photo,
+					Video:    ev.Video,
+					Entities: ev.Entities,
+					Buttons:  ev.Buttons,
+				}); err != nil {
 					slog.Error("send pending telegram notification", "chat_id", ev.ChatID, "error", err)
 					continue
 				}

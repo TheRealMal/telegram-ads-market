@@ -17,8 +17,8 @@ const (
 
 var eventTelegramNotificationStream = (*entity.EventTelegramNotification)(nil).StreamKey()
 
-func (s *Service) AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error {
-	return s.repository.PushEvent(ctx, &entity.EventTelegramNotification{ChatID: chatID, Message: message})
+func (s *Service) AddTelegramNotificationEvent(ctx context.Context, event *entity.EventTelegramNotification) error {
+	return s.repository.PushEvent(ctx, event)
 }
 
 func (s *Service) ReadTelegramNotificationEvents(ctx context.Context, group string, consumer string, limit int64) ([]*entity.EventTelegramNotification, error) {

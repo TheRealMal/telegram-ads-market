@@ -2,9 +2,10 @@ package deal_signer
 
 import (
 	"context"
-	"strconv"
+	"log/slog"
 	"strings"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
@@ -20,7 +21,7 @@ type userRepository interface {
 }
 
 type notificationAdder interface {
-	AddTelegramNotificationEvent(ctx context.Context, chatID int64, message string) error
+	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
 type Service struct {
@@ -74,10 +75,15 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) erro
 	if userID == existing.LesseeID {
 		otherID = existing.LessorID
 	}
-	_ = s.notificationAdder.AddTelegramNotificationEvent(
+	if err := s.notificationAdder.AddTelegramNotificationEvent(
 		ctx,
-		otherID,
-		"Deal #"+strconv.FormatInt(dealID, 10)+" was signed by the other party.",
-	)
+		&evententity.EventTelegramNotification{
+			ChatID:  otherID,
+			Message: "Deal was signed by the other party",
+		},
+	); err != nil {
+		slog.Error("failed to add notification", "type", "deal_sign", "chat_id", otherID, "error", err)
+
+	}
 	return nil
 }

@@ -288,39 +288,78 @@ func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string, 
 	if !allow {
 		return nil, fmt.Errorf("too many requests to send message in telegram")
 	}
-
-	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"text":    text,
-	}
-	if len(entities) > 0 {
-		payload["entities"] = entities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf(errorMarshallingJson, err)
-	}
-
-	body, err := c.sendRequest(ctx, url, jsonData)
-	if err != nil {
-		return nil, err
-	}
-
-	var result SendMessageResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal sendMessage response: %w", err)
-	}
-	if !result.OK || result.Result == nil {
-		return nil, fmt.Errorf("sendMessage returned ok=false or empty result")
-	}
-	return result.Result, nil
+	return c.sendMessageInternal(ctx, chatID, text, entities)
 }
 
 // SendMessageSimple sends a text message to the chat and returns only an error (for use by notification workers).
 func (c *APIClient) SendMessageSimple(ctx context.Context, chatID int64, text string) error {
 	_, err := c.SendMessage(ctx, chatID, text, nil)
 	return err
+}
+
+// NotificationMessage is a unified notification payload for the event-driven notification worker.
+// Entities and Buttons are JSON-serialized strings (as stored in Redis streams).
+type NotificationMessage struct {
+	ChatID   int64
+	Message  string // text or caption
+	ThreadID int64  // 0 = no thread
+	Photo    string // photo file_id (empty = no photo)
+	Video    string // video file_id (empty = no video)
+	Entities string // JSON-serialized []MessageEntity
+	Buttons  string // JSON-serialized [][]InlineKeyboardButton
+}
+
+// SendNotification sends a notification message, dispatching to the appropriate Bot API
+// method based on which fields are populated. It handles text, photo, and video messages
+// with optional thread_id, entities, and inline keyboard buttons.
+func (c *APIClient) SendNotification(ctx context.Context, msg NotificationMessage) error {
+	allow, err := c.rateLimiter.CheckLimits(ctx)
+	if err != nil {
+		return fmt.Errorf("check rate limiting failed: %w", err)
+	}
+	if !allow {
+		return fmt.Errorf("too many requests to send notification in telegram")
+	}
+
+	// Parse optional entities
+	var entities []MessageEntity
+	if msg.Entities != "" {
+		if err := json.Unmarshal([]byte(msg.Entities), &entities); err != nil {
+			slog.Error("failed to unmarshal notification entities", "error", err)
+		}
+	}
+
+	// Parse optional buttons
+	var markup *InlineKeyboardMarkup
+	if msg.Buttons != "" {
+		var buttons [][]InlineKeyboardButton
+		if err := json.Unmarshal([]byte(msg.Buttons), &buttons); err != nil {
+			slog.Error("failed to unmarshal notification buttons", "error", err)
+		} else if len(buttons) > 0 {
+			markup = &InlineKeyboardMarkup{InlineKeyboard: buttons}
+		}
+	}
+
+	// Dispatch based on media type and thread
+	switch {
+	case msg.Photo != "" && msg.ThreadID != 0:
+		return c.sendPhotoToThread(ctx, msg.ChatID, msg.ThreadID, msg.Photo, msg.Message, markup, entities)
+	case msg.Photo != "":
+		return c.sendPhoto(ctx, msg.ChatID, msg.Photo, msg.Message, markup, entities)
+	case msg.Video != "" && msg.ThreadID != 0:
+		return c.sendVideoToThread(ctx, msg.ChatID, msg.ThreadID, msg.Video, msg.Message, markup, entities)
+	case msg.Video != "":
+		return c.sendVideo(ctx, msg.ChatID, msg.Video, msg.Message, markup, entities)
+	case msg.ThreadID != 0 && markup != nil:
+		return c.sendMessageToThreadWithMarkup(ctx, msg.ChatID, msg.ThreadID, msg.Message, markup, entities)
+	case msg.ThreadID != 0:
+		return c.sendMessageToThread(ctx, msg.ChatID, msg.ThreadID, msg.Message, entities)
+	case markup != nil:
+		return c.sendMessageWithMarkup(ctx, msg.ChatID, msg.Message, entities, markup)
+	default:
+		_, err := c.sendMessageInternal(ctx, msg.ChatID, msg.Message, entities)
+		return err
+	}
 }
 
 // ForceReplyMarkup is the reply_markup for "Reply to this message" (Bot API ForceReply).
@@ -568,6 +607,10 @@ func (c *APIClient) SendMessageToThread(ctx context.Context, chatID int64, messa
 	if !allow {
 		return fmt.Errorf("too many requests to send message in telegram")
 	}
+	return c.sendMessageToThread(ctx, chatID, messageThreadID, text, entities)
+}
+
+func (c *APIClient) sendMessageToThread(ctx context.Context, chatID int64, messageThreadID int64, text string, entities []MessageEntity) error {
 	url := c.buildTelegramURL(telegramPathSendMessage)
 	payload := map[string]interface{}{
 		"chat_id":           chatID,
@@ -594,6 +637,15 @@ func (c *APIClient) SendMessageToThreadWithMarkup(ctx context.Context, chatID in
 	if !allow {
 		return nil, fmt.Errorf("too many requests to send message in telegram")
 	}
+	return c.sendMessageToThreadWithMarkupFull(ctx, chatID, messageThreadID, text, markup, entities)
+}
+
+func (c *APIClient) sendMessageToThreadWithMarkup(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *InlineKeyboardMarkup, entities []MessageEntity) error {
+	_, err := c.sendMessageToThreadWithMarkupFull(ctx, chatID, messageThreadID, text, markup, entities)
+	return err
+}
+
+func (c *APIClient) sendMessageToThreadWithMarkupFull(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *InlineKeyboardMarkup, entities []MessageEntity) (*SentMessage, error) {
 	url := c.buildTelegramURL(telegramPathSendMessage)
 	payload := map[string]interface{}{
 		"chat_id":           chatID,
@@ -633,11 +685,38 @@ func (c *APIClient) SendPhotoToThread(ctx context.Context, chatID int64, message
 	if !allow {
 		return fmt.Errorf("too many requests to send message in telegram")
 	}
+	return c.sendPhotoToThread(ctx, chatID, messageThreadID, photoFileID, caption, markup, captionEntities)
+}
+
+func (c *APIClient) sendPhotoToThread(ctx context.Context, chatID int64, messageThreadID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
 	url := c.buildTelegramURL(telegramPathSendPhoto)
 	payload := map[string]interface{}{
 		"chat_id":           chatID,
 		"message_thread_id": messageThreadID,
 		"photo":             photoFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendPhoto payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+func (c *APIClient) sendPhoto(ctx context.Context, chatID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	url := c.buildTelegramURL(telegramPathSendPhoto)
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"photo":   photoFileID,
 	}
 	if caption != "" {
 		payload["caption"] = caption
@@ -665,6 +744,10 @@ func (c *APIClient) SendVideoToThread(ctx context.Context, chatID int64, message
 	if !allow {
 		return fmt.Errorf("too many requests to send message in telegram")
 	}
+	return c.sendVideoToThread(ctx, chatID, messageThreadID, videoFileID, caption, markup, captionEntities)
+}
+
+func (c *APIClient) sendVideoToThread(ctx context.Context, chatID int64, messageThreadID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
 	url := c.buildTelegramURL(telegramPathSendVideo)
 	payload := map[string]interface{}{
 		"chat_id":           chatID,
@@ -686,6 +769,76 @@ func (c *APIClient) SendVideoToThread(ctx context.Context, chatID int64, message
 	}
 	_, err = c.sendRequest(ctx, url, jsonData)
 	return err
+}
+
+func (c *APIClient) sendVideo(ctx context.Context, chatID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	url := c.buildTelegramURL(telegramPathSendVideo)
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"video":   videoFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendVideo payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+func (c *APIClient) sendMessageWithMarkup(ctx context.Context, chatID int64, text string, entities []MessageEntity, markup *InlineKeyboardMarkup) error {
+	url := c.buildTelegramURL(telegramPathSendMessage)
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(entities) > 0 {
+		payload["entities"] = entities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendMessage payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+func (c *APIClient) sendMessageInternal(ctx context.Context, chatID int64, text string, entities []MessageEntity) (*SentMessage, error) {
+	url := c.buildTelegramURL(telegramPathSendMessage)
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+	}
+	if len(entities) > 0 {
+		payload["entities"] = entities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal sendMessage payload: %w", err)
+	}
+	body, err := c.sendRequest(ctx, url, jsonData)
+	if err != nil {
+		return nil, err
+	}
+	var result SendMessageResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal sendMessage response: %w", err)
+	}
+	if !result.OK || result.Result == nil {
+		return nil, fmt.Errorf("sendMessage returned ok=false or empty result")
+	}
+	return result.Result, nil
 }
 
 // AnswerCallbackQuery sends a response to a callback query from an inline keyboard button.

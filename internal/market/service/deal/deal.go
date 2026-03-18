@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -20,15 +20,6 @@ func (s *dealService) CreateDeal(ctx context.Context, d *entity.Deal, otherSideI
 	if err := s.dealRepo.CreateDeal(ctx, d); err != nil {
 		return err
 	}
-	notifMsg := "New deal #" + strconv.FormatInt(d.ID, 10) + " on your listing."
-	if d.Status == entity.DealStatusApproved {
-		notifMsg = "New instant deal #" + strconv.FormatInt(d.ID, 10) + " approved on your listing."
-	}
-	_ = s.notificationAdder.AddTelegramNotificationEvent(
-		ctx,
-		otherSideID,
-		notifMsg,
-	)
 	return nil
 }
 
@@ -125,11 +116,16 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	if userID == existing.LesseeID {
 		otherID = existing.LessorID
 	}
-	_ = s.notificationAdder.AddTelegramNotificationEvent(
+	if err := s.notificationAdder.AddTelegramNotificationEvent(
 		ctx,
-		otherID,
-		"Deal #"+strconv.FormatInt(dealID, 10)+" was rejected.",
-	)
+		&evententity.EventTelegramNotification{
+			ChatID:  otherID,
+			Message: "Deal was rejected",
+		},
+	); err != nil {
+		slog.Error("failed to add notification", "type", "deal_rejected", "deal_id", dealID, "chat_id", otherID, "error", err)
+
+	}
 
 	return nil
 }
