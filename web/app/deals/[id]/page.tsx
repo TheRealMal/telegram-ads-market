@@ -897,7 +897,7 @@ export default function DealDetailPage() {
                       const token = await ensureValidToken();
                       if (!token) return;
                       const r = priceRows[draftPriceIndex] ?? priceRows[0];
-                      const type = r.duration + 'hr';
+                      const type = r.adType;
                       const duration = parseInt(r.duration, 10) || 24;
                       setDraftSaving(true);
                       const res = await api<Deal>(`/api/v1/market/deals/${id}`, {

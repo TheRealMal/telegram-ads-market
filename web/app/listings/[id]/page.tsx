@@ -101,7 +101,7 @@ export default function ListingDetailPage() {
       alert('No price configured for this listing.');
       return;
     }
-    const type = row.duration + 'hr';
+    const type = row.adType;
     const duration = parseInt(row.duration, 10) || 24;
     setCreateDealSubmitting(true);
     const details: { message?: string; posted_at?: string } = {
@@ -228,7 +228,9 @@ export default function ListingDetailPage() {
                     key={i}
                     className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
                   >
-                    <span className="text-sm text-muted-foreground">{formatPriceKey(row.duration)}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {row.adType === 'instant_post' ? 'Instant' : 'Post'} · {formatPriceKey(row.duration)}
+                    </span>
                     <span className="font-semibold tabular-nums text-primary">{formatPriceValue(row.price)}</span>
                   </div>
                 ))}
@@ -396,7 +398,7 @@ export default function ListingDetailPage() {
                   >
                     {priceRowsForListing.map((row, i) => (
                       <option key={i} value={i}>
-                        {formatPriceEntry(row.duration, row.price)}
+                        {row.adType === 'instant_post' ? 'Instant' : 'Post'} · {formatPriceEntry(row.duration, row.price)}
                       </option>
                     ))}
                   </select>

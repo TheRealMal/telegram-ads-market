@@ -1,55 +1,41 @@
-/** Normalized price row: duration as number string (e.g. "24"), price as number. */
+/** Normalized price row: ad type, duration as number string (e.g. "24"), price as number. */
 export interface PriceRow {
+  adType: string;
   duration: string;
   price: number;
 }
 
 /**
- * Parse listing prices from API: array of [durationStr, price] (e.g. [["24hr", 100]])
- * or object like { "24hr": 100 }. Returns unified { duration, price }[].
+ * Parse listing prices from API: array of [adType, durationStr, price]
+ * (e.g. [["post", "24hr", 100]]). Returns unified { adType, duration, price }[].
  */
 export function parseListingPrices(prices: unknown): PriceRow[] {
   if (Array.isArray(prices)) {
     return prices
-      .filter((entry): entry is [string, number] => Array.isArray(entry) && entry.length >= 2)
-      .map(([dur, p]) => ({
+      .filter((entry): entry is [string, string, number] => Array.isArray(entry) && entry.length >= 3)
+      .map(([adType, dur, p]) => ({
+        adType: String(adType ?? 'post'),
         duration: String(dur ?? '').replace(/hr$/i, '').trim() || '—',
         price: Number(p),
       }))
       .filter((row) => row.duration !== '—' && !Number.isNaN(row.price));
   }
-  if (prices && typeof prices === 'object' && !Array.isArray(prices)) {
-    return Object.entries(prices).map(([k, v]) => ({
-      duration: String(k).replace(/hr$/i, '').trim() || '—',
-      price: Number(v),
-    })).filter((row) => row.duration !== '—' && !Number.isNaN(row.price));
-  }
   return [];
 }
 
 /**
- * Get first price pair for deal creation: { type, duration, price }.
+ * Get first price pair for deal creation: { adType, duration, price }.
  */
-export function getFirstPricePair(prices: unknown): { type: string; duration: number; price: number } | null {
+export function getFirstPricePair(prices: unknown): { adType: string; duration: number; price: number } | null {
   if (Array.isArray(prices) && prices.length > 0) {
     const first = prices[0];
-    if (Array.isArray(first) && first.length >= 2) {
-      const type = String(first[0] ?? '24hr');
+    if (Array.isArray(first) && first.length >= 3) {
+      const adType = String(first[0] ?? 'post');
+      const durStr = String(first[1] ?? '24hr');
       return {
-        type,
-        duration: parseInt(type.replace(/\D/g, ''), 10) || 24,
-        price: Number(first[1]),
-      };
-    }
-  }
-  if (prices && typeof prices === 'object' && !Array.isArray(prices)) {
-    const ent = Object.entries(prices)[0];
-    if (ent) {
-      const type = String(ent[0] ?? '24hr');
-      return {
-        type,
-        duration: parseInt(type.replace(/\D/g, ''), 10) || 24,
-        price: Number(ent[1]),
+        adType,
+        duration: parseInt(durStr.replace(/\D/g, ''), 10) || 24,
+        price: Number(first[2]),
       };
     }
   }

@@ -15,7 +15,10 @@ import { PageTopSpacer } from '@/components/PageTopSpacer';
 type ListingType = 'lessor' | 'lessee';
 type ListingStatus = 'active' | 'inactive';
 
+type AdType = 'post' | 'instant_post';
+
 interface PriceRow {
+  adType: AdType;
   duration: string; // e.g. "24" -> "24hr"
   price: string;    // input string
 }
@@ -26,7 +29,7 @@ export default function CreateListingPage() {
   const [type, setType] = useState<ListingType>('lessor');
   const [status, setStatus] = useState<ListingStatus>('inactive');
   const [channelId, setChannelId] = useState<string>('');
-  const [prices, setPrices] = useState<PriceRow[]>([{ duration: '', price: '' }]);
+  const [prices, setPrices] = useState<PriceRow[]>([{ adType: 'post', duration: '', price: '' }]);
   const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -52,7 +55,7 @@ export default function CreateListingPage() {
   }, [authed]);
 
   const addPriceRow = () => {
-    setPrices((prev) => [...prev, { duration: '', price: '' }]);
+    setPrices((prev) => [...prev, { adType: 'post', duration: '', price: '' }]);
   };
 
   const removePriceRow = (index: number) => {
@@ -65,7 +68,7 @@ export default function CreateListingPage() {
     );
   };
 
-  const updatePriceRow = (index: number, field: 'duration' | 'price', value: string) => {
+  const updatePriceRow = (index: number, field: 'adType' | 'duration' | 'price', value: string) => {
     setPrices((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -82,14 +85,14 @@ export default function CreateListingPage() {
       return;
     }
 
-    const pricePairs: [string, number][] = [];
+    const pricePairs: [string, string, number][] = [];
     for (const row of prices) {
       const dur = row.duration.trim();
       const priceStr = row.price.trim().replace(',', '.');
       const num = parseFloat(priceStr);
       if (!dur || Number.isNaN(num) || num < 0) continue;
       const durationStr = /^\d+$/.test(dur) ? `${dur}hr` : dur.endsWith('hr') ? dur : `${dur}hr`;
-      pricePairs.push([durationStr, num]);
+      pricePairs.push([row.adType, durationStr, num]);
     }
     if (pricePairs.length === 0) {
       setError('Add at least one price (e.g. 24 hours, 100 or 99.5).');
@@ -101,7 +104,7 @@ export default function CreateListingPage() {
       type: ListingType;
       status: ListingStatus;
       channel_id?: number;
-      prices: [string, number][];
+      prices: [string, string, number][];
       categories?: string[];
       description?: string;
     } = {
@@ -276,6 +279,14 @@ export default function CreateListingPage() {
           <CardContent className="space-y-2">
             {prices.map((row, index) => (
               <div key={index} className="flex gap-2">
+                <select
+                  value={row.adType}
+                  onChange={(e) => updatePriceRow(index, 'adType', e.target.value)}
+                  className="w-28 shrink-0 rounded-md border border-input bg-transparent px-2 py-2 text-sm"
+                >
+                  <option value="post">Post</option>
+                  <option value="instant_post">Instant</option>
+                </select>
                 <div className="flex-1">
                   <Input
                     type="text"
