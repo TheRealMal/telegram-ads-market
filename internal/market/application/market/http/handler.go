@@ -39,7 +39,7 @@ type dealService interface {
 
 type dealChatService interface {
 	GetDealChatLink(ctx context.Context, dealID, userID int64) (chatLink string, err error)
-	CreateDealForumTopics(ctx context.Context, dealID int64) error
+	CreateDealForumTopics(ctx context.Context, dealID int64, listingType entity.ListingType) error
 }
 
 type channelService interface {

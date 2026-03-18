@@ -89,36 +89,14 @@ func (s *service) handlePreview(ctx context.Context, deal *entity.Deal, chatID i
 		return nil
 	}
 
-	mediaType, mediaFileID := domain.GetMediaFromDetails(deal.Details)
 	button := domain.GetButtonFromDetails(deal.Details)
-
 	var markup *telegram.InlineKeyboardMarkup
 	if button != nil {
 		markup = buildURLButton(button)
 	}
 
-	// Extract entities from details
-	var textEntities []telegram.MessageEntity
-	var captionEntities []telegram.MessageEntity
-	if raw := domain.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
-		_ = json.Unmarshal(raw, &textEntities)
-	}
-	if raw := domain.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
-		_ = json.Unmarshal(raw, &captionEntities)
-	}
-
-	switch mediaType {
-	case "photo":
-		return s.telegramForum.SendPhotoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, captionEntities)
-	case "video":
-		return s.telegramForum.SendVideoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, captionEntities)
-	default:
-		if markup != nil {
-			_, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, chatID, threadID, msg, markup, textEntities)
-			return err
-		}
-		return s.telegramForum.SendMessageToThread(ctx, chatID, threadID, msg, textEntities)
-	}
+	s.sendAdPreview(ctx, chatID, threadID, deal.Details, markup)
+	return nil
 }
 
 func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int64, threadID int64, message *telegram.UpdateMessage) error {
@@ -153,11 +131,6 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 		mediaFileID = message.Video.FileID
 	}
 
-	// Determine which entities key to use:
-	// If the message has media, the text came from Caption -> store as caption_entities.
-	// If no media, the text came from Text -> store as entities.
-	isCaption := mediaType != ""
-
 	// Update deal details
 	details := deal.Details
 	var err error
@@ -172,7 +145,7 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 		return fmt.Errorf("set media in details: %w", err)
 	}
 
-	// Marshal adjusted entities to JSON for storage
+	// Marshal adjusted entities to JSON for storage — always store under "entities"
 	var entitiesJSON json.RawMessage
 	if len(adjustedEntities) > 0 {
 		entitiesJSON, err = json.Marshal(adjustedEntities)
@@ -180,26 +153,13 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 			return fmt.Errorf("marshal entities: %w", err)
 		}
 	}
-
-	// Store entities in the appropriate key, clear the other
-	if isCaption {
-		details, err = domain.SetRawEntitiesInDetails(details, nil)
-		if err != nil {
-			return fmt.Errorf("clear entities: %w", err)
-		}
-		details, err = domain.SetRawCaptionEntitiesInDetails(details, entitiesJSON)
-		if err != nil {
-			return fmt.Errorf("set caption_entities: %w", err)
-		}
-	} else {
-		details, err = domain.SetRawEntitiesInDetails(details, entitiesJSON)
-		if err != nil {
-			return fmt.Errorf("set entities: %w", err)
-		}
-		details, err = domain.SetRawCaptionEntitiesInDetails(details, nil)
-		if err != nil {
-			return fmt.Errorf("clear caption_entities: %w", err)
-		}
+	details, err = domain.SetRawEntitiesInDetails(details, entitiesJSON)
+	if err != nil {
+		return fmt.Errorf("set entities: %w", err)
+	}
+	details, err = domain.SetRawCaptionEntitiesInDetails(details, nil)
+	if err != nil {
+		return fmt.Errorf("clear caption_entities: %w", err)
 	}
 
 	// Save to DB (clears both signatures)
@@ -208,12 +168,10 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 		return fmt.Errorf("update deal details: %w", err)
 	}
 
-	// Send confirmation with "Confirm & Sign" button to editor
-	confirmMarkup := buildConfirmSignMarkup(deal.ID)
-	confirmText := "Message updated. Review and press Confirm & Sign to proceed."
-	if _, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, chatID, threadID, confirmText, confirmMarkup, nil); err != nil {
-		slog.Error("send confirm sign message after edit", "deal_id", deal.ID, "error", err)
-	}
+	// Send the ad preview with "Confirm & Sign" button to the editor
+	button := domain.GetButtonFromDetails(details)
+	confirmMarkup := buildConfirmSignMarkup(deal.ID, button)
+	s.sendAdPreview(ctx, chatID, threadID, details, confirmMarkup)
 
 	return nil
 }
@@ -281,16 +239,9 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 		return fmt.Errorf("update deal details: %w", err)
 	}
 
-	// Send confirmation with "Confirm & Sign" button to editor
-	confirmMsg := fmt.Sprintf("Button set: %s -> %s (style: %s", btnText, btnURL, style)
-	if emoji != "" {
-		confirmMsg += ", emoji: " + emoji
-	}
-	confirmMsg += ") Review and press Confirm & Sign to proceed."
-	confirmMarkup := buildConfirmSignMarkup(deal.ID)
-	if _, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, chatID, threadID, confirmMsg, confirmMarkup, nil); err != nil {
-		slog.Error("send confirm sign message after set_button", "deal_id", deal.ID, "error", err)
-	}
+	// Send the ad preview with "Confirm & Sign" button to the editor
+	confirmMarkup := buildConfirmSignMarkup(deal.ID, button)
+	s.sendAdPreview(ctx, chatID, threadID, details, confirmMarkup)
 
 	return nil
 }
@@ -364,15 +315,22 @@ func (s *service) buildMarkupWithoutApprove(ctx context.Context, dealID int64) *
 	return &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{}}
 }
 
-// buildConfirmSignMarkup builds an InlineKeyboardMarkup with a single "Confirm & Sign" callback button.
-func buildConfirmSignMarkup(dealID int64) *telegram.InlineKeyboardMarkup {
-	return &telegram.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telegram.InlineKeyboardButton{
-			{
-				{Text: "Confirm & Sign", CallbackData: fmt.Sprintf("confirm_sign:%d", dealID)},
-			},
-		},
+// buildConfirmSignMarkup builds an InlineKeyboardMarkup with an optional URL button row and a "Confirm & Sign" callback button row.
+func buildConfirmSignMarkup(dealID int64, button *domain.DealDetailsButton) *telegram.InlineKeyboardMarkup {
+	var rows [][]telegram.InlineKeyboardButton
+	if button != nil {
+		btnText := button.Text
+		if button.Emoji != "" {
+			btnText = button.Emoji + " " + btnText
+		}
+		rows = append(rows, []telegram.InlineKeyboardButton{
+			{Text: btnText, URL: button.URL},
+		})
 	}
+	rows = append(rows, []telegram.InlineKeyboardButton{
+		{Text: "Confirm & Sign", CallbackData: fmt.Sprintf("confirm_sign:%d", dealID)},
+	})
+	return &telegram.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
 // HandleConfirmSignCallback handles the "Confirm & Sign" button callback query.
@@ -398,22 +356,29 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 		return nil
 	}
 
-	// Success: answer callback and remove "Confirm & Sign" button
+	// Success: answer callback and remove "Confirm & Sign" button (preserve URL button)
 	if err := s.telegramForum.AnswerCallbackQuery(ctx, callbackQuery.ID, "Signed!", false); err != nil {
 		slog.Error("answer confirm sign callback query", "error", err)
 	}
 
-	if callbackQuery.Message != nil && callbackQuery.Message.Chat != nil {
-		emptyMarkup := &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{}}
-		if err := s.telegramForum.EditMessageReplyMarkup(ctx, callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, emptyMarkup); err != nil {
-			slog.Error("edit message reply markup after confirm sign", "error", err)
-		}
-	}
-
-	// Get deal and topic to notify the other side
+	// Get deal to remove Confirm & Sign button (preserve URL button) and notify other side
 	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil || deal == nil {
 		return nil
+	}
+
+	button := domain.GetButtonFromDetails(deal.Details)
+
+	if callbackQuery.Message != nil && callbackQuery.Message.Chat != nil {
+		var markup *telegram.InlineKeyboardMarkup
+		if button != nil {
+			markup = buildURLButton(button)
+		} else {
+			markup = &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{}}
+		}
+		if err := s.telegramForum.EditMessageReplyMarkup(ctx, callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, markup); err != nil {
+			slog.Error("edit message reply markup after confirm sign", "error", err)
+		}
 	}
 
 	topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
@@ -427,21 +392,10 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 		side = "lessor"
 	}
 
-	// Notify the other side with Approve button + ad message preview
+	// Notify the other side with the actual ad preview + Approve button
 	otherChatID, otherThreadID := s.otherSide(topic, side)
-	msg := domain.GetMessageFromDetails(deal.Details)
-	mediaType, _ := domain.GetMediaFromDetails(deal.Details)
-	button := domain.GetButtonFromDetails(deal.Details)
-
-	notifyText := fmt.Sprintf("The other party proposed an ad message:\n\n%s", msg)
-	if mediaType != "" {
-		notifyText += fmt.Sprintf("\n\n[%s attached]", mediaType)
-	}
-	notifyText += "\n\nPress Approve to accept, or use /edit to propose changes."
 	approveMarkup := buildApproveMarkup(dealID, button)
-	if _, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, otherChatID, otherThreadID, notifyText, approveMarkup, nil); err != nil {
-		slog.Error("send confirm sign notification to other side", "deal_id", dealID, "error", err)
-	}
+	s.sendAdPreview(ctx, otherChatID, otherThreadID, deal.Details, approveMarkup)
 
 	return nil
 }
@@ -470,6 +424,48 @@ func (s *service) otherSide(topic *entity.DealForumTopic, side string) (int64, i
 		return topic.LesseeChatID, topic.LesseeMessageThreadID
 	}
 	return topic.LessorChatID, topic.LessorMessageThreadID
+}
+
+// getEntitiesFromDetails extracts entities from deal details, falling back to caption_entities for backward compat.
+func getEntitiesFromDetails(details json.RawMessage) []telegram.MessageEntity {
+	var entities []telegram.MessageEntity
+	if raw := domain.GetRawEntitiesFromDetails(details); len(raw) > 0 {
+		_ = json.Unmarshal(raw, &entities)
+	}
+	if len(entities) == 0 {
+		if raw := domain.GetRawCaptionEntitiesFromDetails(details); len(raw) > 0 {
+			_ = json.Unmarshal(raw, &entities)
+		}
+	}
+	return entities
+}
+
+// sendAdPreview sends the ad message preview (with media, entities, and provided markup) to a forum thread.
+func (s *service) sendAdPreview(ctx context.Context, chatID, threadID int64, details json.RawMessage, markup *telegram.InlineKeyboardMarkup) {
+	msg := domain.GetMessageFromDetails(details)
+	mediaType, mediaFileID := domain.GetMediaFromDetails(details)
+	entities := getEntitiesFromDetails(details)
+
+	switch mediaType {
+	case "photo":
+		if err := s.telegramForum.SendPhotoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, entities); err != nil {
+			slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
+		}
+	case "video":
+		if err := s.telegramForum.SendVideoToThread(ctx, chatID, threadID, mediaFileID, msg, markup, entities); err != nil {
+			slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
+		}
+	default:
+		if markup != nil {
+			if _, err := s.telegramForum.SendMessageToThreadWithMarkup(ctx, chatID, threadID, msg, markup, entities); err != nil {
+				slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
+			}
+		} else {
+			if err := s.telegramForum.SendMessageToThread(ctx, chatID, threadID, msg, entities); err != nil {
+				slog.Error("send ad preview", "chat_id", chatID, "thread_id", threadID, "error", err)
+			}
+		}
+	}
 }
 
 // sendToThread is a helper that sends a plain text message to a forum topic, logging errors.

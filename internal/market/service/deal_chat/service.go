@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"ads-mrkt/internal/helpers/telegram"
+	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -47,7 +48,7 @@ type service struct {
 	forumTopicRepo dealForumTopicRepository
 	telegramForum  telegramForum
 	dealSigner     dealSigner
-	botUsername     string
+	botUsername    string
 }
 
 func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, dealSigner dealSigner, botUsername string) *service {
@@ -56,7 +57,7 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 		forumTopicRepo: forumTopicRepo,
 		telegramForum:  telegramForum,
 		dealSigner:     dealSigner,
-		botUsername:     strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
+		botUsername:    strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
 	}
 }
 
@@ -64,7 +65,7 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 // if topics already exist in the DB, returns nil without creating new ones.
 // The flow is: check DB → create Telegram topics → INSERT ON CONFLICT DO NOTHING.
 // If a concurrent caller inserted first, the orphaned Telegram topics are cleaned up.
-func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64) error {
+func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64, listingType entity.ListingType) error {
 	if s.telegramForum == nil {
 		return nil
 	}
@@ -115,30 +116,50 @@ func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64) error
 		return nil
 	}
 
-	initialMsg := s.buildInitialMessage(deal)
-	s.sendInitialMessage(ctx, deal.LessorID, lessorThreadID, initialMsg)
-	s.sendInitialMessage(ctx, deal.LesseeID, lesseeThreadID, initialMsg)
+	lessorMessage, lesseeMessage := s.buildInitialMessages(deal, listingType)
+	s.sendInitialMessage(ctx, deal.LessorID, lessorThreadID, lessorMessage)
+	s.sendInitialMessage(ctx, deal.LesseeID, lesseeThreadID, lesseeMessage)
 
 	return nil
 }
 
-func (s *service) buildInitialMessage(deal *entity.Deal) string {
-	var b strings.Builder
-	b.WriteString("Deal #")
-	b.WriteString(strconv.FormatInt(deal.ID, 10))
-	b.WriteString(" created.\n")
-
-	if deal.Message != "" {
-		b.WriteString("\nMessage from the other party:\n")
-		b.WriteString(deal.Message)
-		b.WriteString("\n")
+func (s *service) buildInitialMessages(deal *entity.Deal, listingType entity.ListingType) (lessorMsg, lesseeMsg string) {
+	priceTON := strconv.FormatFloat(domain.NanotonToTON(deal.Price), 'f', -1, 64)
+	postDate := deal.CreatedAt.Format("02.01.2006 15:04")
+	channelID := ""
+	if deal.ChannelID != nil {
+		channelID = strconv.FormatInt(*deal.ChannelID, 10)
 	}
 
-	b.WriteString("\nCommands:\n")
-	b.WriteString("/edit <text> — propose or update the ad message\n")
-	b.WriteString("/set_button <text> <url> <style> <emoji> — add a CTA button\n")
-	b.WriteString("/preview — preview the current ad draft")
-	return b.String()
+	buildMsg := func(prefix string) string {
+		var b strings.Builder
+		b.WriteString(prefix)
+		b.WriteString(" ")
+		b.WriteString(deal.Type)
+		b.WriteString("\nChannel: ")
+		b.WriteString(channelID)
+		b.WriteString("\n\n💰 ")
+		b.WriteString(priceTON)
+		b.WriteString(" TON")
+		b.WriteString("\n⏰ ")
+		b.WriteString(postDate)
+		if deal.Message != "" {
+			b.WriteString("\n\n")
+			b.WriteString(deal.Message)
+		}
+		return b.String()
+	}
+
+	switch listingType {
+	case entity.ListingTypeLessee:
+		lessorMsg = buildMsg("Applied for")
+		lesseeMsg = buildMsg("Offer for")
+	case entity.ListingTypeLessor:
+		lessorMsg = buildMsg("Request for")
+		lesseeMsg = buildMsg("Requested for")
+	}
+
+	return lessorMsg, lesseeMsg
 }
 
 func (s *service) sendInitialMessage(ctx context.Context, chatID int64, threadID int64, text string) {
@@ -167,22 +188,12 @@ func (s *service) GetDealChatLink(ctx context.Context, dealID int64, userID int6
 		return "", marketerrors.ErrUnauthorizedSide
 	}
 
-	existing, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
+	forumTopic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
 	if err != nil {
 		return "", fmt.Errorf("get deal forum topic: %w", err)
 	}
-	if existing == nil {
-		// Topics not yet created (race condition or CreateDealForumTopics failed).
-		// Try to create them now as a fallback.
-		if createErr := s.CreateDealForumTopics(ctx, dealID); createErr != nil {
-			return "", fmt.Errorf("create forum topics fallback: %w", createErr)
-		}
-		existing, err = s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
-		if err != nil || existing == nil {
-			return "", marketerrors.ErrNotFound
-		}
-	}
-	return s.chatLinkForUser(existing, deal, userID), nil
+
+	return s.chatLinkForUser(forumTopic, deal, userID), nil
 }
 
 func (s *service) threadIDForUser(t *entity.DealForumTopic, deal *entity.Deal, userID int64) int64 {

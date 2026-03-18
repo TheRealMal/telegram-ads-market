@@ -147,16 +147,13 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 
 	isInstantPost := req.Type == string(entity.AdTypeInstantPost)
 
-	var canonDetails json.RawMessage
+	canonDetails := json.RawMessage("{}")
 	if isInstantPost {
 		// For instant_post, use the listing's prepared post as the deal message.
 		canonDetails, err = domain.ValidateDealDetails(listing.PreparedPost)
 		if err != nil {
 			return nil, apperrors.ServiceError{Err: err, Message: "listing prepared_post is invalid: " + err.Error(), Code: apperrors.ErrorCodeBadRequest}
 		}
-	} else {
-		// For standard post deals, details starts empty. Ad content is formed via /edit in forum topics.
-		canonDetails = json.RawMessage("{}")
 	}
 
 	d := buildDealFromCreateRequest(&req, lessorID, lesseeID, dealChannelID, canonDetails)
@@ -172,7 +169,7 @@ func (h *handler) CreateDeal(w http.ResponseWriter, r *http.Request) (interface{
 	}
 
 	// Create forum topics eagerly (best-effort, don't fail the deal creation)
-	if err := h.dealChatService.CreateDealForumTopics(r.Context(), d.ID); err != nil {
+	if err := h.dealChatService.CreateDealForumTopics(r.Context(), d.ID, listing.Type); err != nil {
 		slog.Error("create deal forum topics", "deal_id", d.ID, "error", err)
 	}
 

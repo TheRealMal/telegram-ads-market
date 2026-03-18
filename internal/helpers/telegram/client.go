@@ -336,8 +336,9 @@ type ForceReplyMarkup struct {
 func (c *APIClient) CreateForumTopic(ctx context.Context, chatID int64, name string) (messageThreadID int64, err error) {
 	uri := c.buildTelegramURL(telegramPathCreateForumTopic)
 	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"name":    name,
+		"chat_id":              chatID,
+		"name":                 name,
+		"icon_custom_emoji_id": 5377575719205353824, // Custom emoji ID for initial topic state
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
