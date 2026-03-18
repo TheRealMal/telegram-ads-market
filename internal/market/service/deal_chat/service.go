@@ -69,9 +69,6 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 // The flow is: check DB → create Telegram topics → INSERT ON CONFLICT DO NOTHING.
 // If a concurrent caller inserted first, the orphaned Telegram topics are cleaned up.
 func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64, listingType entity.ListingType) error {
-	if s.telegramForum == nil {
-		return nil
-	}
 	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return fmt.Errorf("get deal: %w", err)
@@ -181,9 +178,6 @@ func (s *service) sendInitialMessage(ctx context.Context, chatID int64, threadID
 // GetDealChatLink returns the chat link for an existing deal forum topic.
 // If topics do not yet exist (e.g., CreateDealForumTopics failed at deal creation), it creates them as a fallback.
 func (s *service) GetDealChatLink(ctx context.Context, dealID int64, userID int64) (string, error) {
-	if s.telegramForum == nil {
-		return "", ErrForumNotConfigured
-	}
 	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return "", err
@@ -219,9 +213,6 @@ func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, u
 }
 
 func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error {
-	if s.telegramForum == nil {
-		return nil
-	}
 	t, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
 	if err != nil || t == nil {
 		return err
@@ -232,9 +223,6 @@ func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error 
 }
 
 func (s *service) CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error {
-	if s.telegramForum == nil {
-		return nil
-	}
 	t, side, err := s.forumTopicRepo.GetDealForumTopicByChatAndThread(ctx, chatID, messageThreadID)
 	if err != nil || t == nil {
 		return err
