@@ -6,7 +6,7 @@ import (
 )
 
 // buildDetails is a helper to create a JSON object from a map for test input.
-func buildDetails(m map[string]interface{}) json.RawMessage {
+func buildDetails(m map[string]any) json.RawMessage {
 	b, err := json.Marshal(m)
 	if err != nil {
 		panic(err)
@@ -19,7 +19,7 @@ func buildDetails(m map[string]interface{}) json.RawMessage {
 func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 	tests := []struct {
 		name          string
-		input         map[string]interface{}
+		input         map[string]any
 		wantMessage   string
 		wantMediaType string
 		wantMediaFile string
@@ -27,12 +27,12 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 	}{
 		{
 			name:        "text only",
-			input:       map[string]interface{}{"message": "Hello world"},
+			input:       map[string]any{"message": "Hello world"},
 			wantMessage: "Hello world",
 		},
 		{
 			name: "text + image",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":       "Check this out",
 				"media_type":    "photo",
 				"media_file_id": "file_abc123",
@@ -43,7 +43,7 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "text + video",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":       "Watch this",
 				"media_type":    "video",
 				"media_file_id": "file_vid456",
@@ -54,11 +54,11 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "text + image + button",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":       "Ad with photo and button",
 				"media_type":    "photo",
 				"media_file_id": "file_photo789",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Click me",
 					"url":   "https://example.com",
 					"style": "primary",
@@ -72,11 +72,11 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "text + video + button",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":       "Ad with video and button",
 				"media_type":    "video",
 				"media_file_id": "file_vid999",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Learn more",
 					"url":   "https://example.com/promo",
 					"style": "success",
@@ -90,10 +90,10 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "image + button",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"media_type":    "photo",
 				"media_file_id": "file_photo_btn",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Buy now",
 					"url":   "https://shop.example.com",
 					"style": "danger",
@@ -106,7 +106,7 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "image only",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"media_type":    "photo",
 				"media_file_id": "file_photo_only",
 			},
@@ -115,10 +115,10 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "video + button",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"media_type":    "video",
 				"media_file_id": "file_vid_btn",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Watch trailer",
 					"url":   "http://cdn.example.com/video",
 					"style": "default",
@@ -131,7 +131,7 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 		},
 		{
 			name: "video only",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"media_type":    "video",
 				"media_file_id": "file_vid_only",
 			},
@@ -192,11 +192,11 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 	tests := []struct {
 		name  string
-		input map[string]interface{}
+		input map[string]any
 	}{
 		{
 			name: "media_type without media_file_id",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":    "text only but media_type set",
 				"media_type": "photo",
 				// media_file_id missing
@@ -204,23 +204,23 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name: "invalid media_type value",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"media_type":    "gif",
 				"media_file_id": "file_xyz",
 			},
 		},
 		{
 			name: "unknown top-level key",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":     "hello",
 				"unknown_key": "value",
 			},
 		},
 		{
 			name: "button with invalid style",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": "text",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Click",
 					"url":   "https://example.com",
 					"style": "purple", // not allowed
@@ -230,9 +230,9 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name: "button with non-http URL",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": "text",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Click",
 					"url":   "ftp://example.com/file",
 					"style": "default",
@@ -242,9 +242,9 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name: "button with invalid URL format",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": "text",
-				"button": map[string]interface{}{
+				"button": map[string]any{
 					"text":  "Click",
 					"url":   "not-a-url",
 					"style": "default",
@@ -254,23 +254,23 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name: "message field is not a string",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": 12345,
 			},
 		},
 		{
 			name: "entities field is not an array",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message":  "hello",
 				"entities": "not-an-array",
 			},
 		},
 		{
 			name: "text_link entity with empty url",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": "hello",
-				"entities": []interface{}{
-					map[string]interface{}{
+				"entities": []any{
+					map[string]any{
 						"type": "text_link",
 						"url":  "",
 					},
@@ -279,10 +279,10 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name: "text_link entity with non-http url",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"message": "hello",
-				"entities": []interface{}{
-					map[string]interface{}{
+				"entities": []any{
+					map[string]any{
 						"type": "text_link",
 						"url":  "ftp://bad-scheme.com",
 					},
@@ -333,9 +333,9 @@ func TestValidateDealDetails_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("button url can be empty string", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{
+		raw := buildDetails(map[string]any{
 			"message": "text",
-			"button": map[string]interface{}{
+			"button": map[string]any{
 				"text":  "Click",
 				"url":   "", // empty URL is allowed
 				"style": "default",
@@ -363,7 +363,7 @@ func TestSetMessageInDetails(t *testing.T) {
 	})
 
 	t.Run("update existing message preserves other keys", func(t *testing.T) {
-		initial := buildDetails(map[string]interface{}{
+		initial := buildDetails(map[string]any{
 			"message":       "old message",
 			"media_type":    "photo",
 			"media_file_id": "file_123",
@@ -407,7 +407,7 @@ func TestSetMediaInDetails(t *testing.T) {
 	})
 
 	t.Run("set video media preserves message", func(t *testing.T) {
-		initial := buildDetails(map[string]interface{}{"message": "keep me"})
+		initial := buildDetails(map[string]any{"message": "keep me"})
 		result, err := SetMediaInDetails(initial, "video", "file_vid")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -422,7 +422,7 @@ func TestSetMediaInDetails(t *testing.T) {
 	})
 
 	t.Run("remove media with empty strings", func(t *testing.T) {
-		initial := buildDetails(map[string]interface{}{
+		initial := buildDetails(map[string]any{
 			"message":       "text",
 			"media_type":    "photo",
 			"media_file_id": "file_abc",
@@ -434,6 +434,90 @@ func TestSetMediaInDetails(t *testing.T) {
 		mt, mf := GetMediaFromDetails(result)
 		if mt != "" || mf != "" {
 			t.Errorf("expected media removed, got (%q, %q)", mt, mf)
+		}
+	})
+}
+
+// TestSetAndGetVideoMedia verifies the full roundtrip of storing and retrieving video media
+// via SetMediaInDetails and GetMediaFromDetails, matching the /edit command's code path.
+func TestSetAndGetVideoMedia(t *testing.T) {
+	t.Run("video file_id is stored and retrieved exactly", func(t *testing.T) {
+		fileID := "BAACAgIAAxkBAAIBXWC3hKz9example_video_file_id"
+		result, err := SetMediaInDetails(json.RawMessage("{}"), "video", fileID)
+		if err != nil {
+			t.Fatalf("SetMediaInDetails returned unexpected error: %v", err)
+		}
+		mt, mf := GetMediaFromDetails(result)
+		if mt != "video" {
+			t.Errorf("GetMediaFromDetails mediaType = %q, want %q", mt, "video")
+		}
+		if mf != fileID {
+			t.Errorf("GetMediaFromDetails mediaFileID = %q, want %q", mf, fileID)
+		}
+	})
+
+	t.Run("video media overwrites previous photo media", func(t *testing.T) {
+		initial := buildDetails(map[string]any{
+			"media_type":    "photo",
+			"media_file_id": "photo_file_id",
+		})
+		videoFileID := "video_file_id_replacement"
+		result, err := SetMediaInDetails(initial, "video", videoFileID)
+		if err != nil {
+			t.Fatalf("SetMediaInDetails returned unexpected error: %v", err)
+		}
+		mt, mf := GetMediaFromDetails(result)
+		if mt != "video" {
+			t.Errorf("GetMediaFromDetails mediaType = %q, want %q", mt, "video")
+		}
+		if mf != videoFileID {
+			t.Errorf("GetMediaFromDetails mediaFileID = %q, want %q", mf, videoFileID)
+		}
+	})
+
+	t.Run("video with empty file_id removes media keys (not stored)", func(t *testing.T) {
+		// If detectMediaFromMessage returns mediaType="video" but mediaFileID="",
+		// SetMediaInDetails should delete media keys rather than storing empty file_id.
+		initial := buildDetails(map[string]any{"message": "text"})
+		result, err := SetMediaInDetails(initial, "video", "")
+		if err != nil {
+			t.Fatalf("SetMediaInDetails returned unexpected error: %v", err)
+		}
+		mt, mf := GetMediaFromDetails(result)
+		if mt != "" || mf != "" {
+			t.Errorf("expected media removed when fileID empty, got (%q, %q)", mt, mf)
+		}
+		// message must still be preserved
+		if got := GetMessageFromDetails(result); got != "text" {
+			t.Errorf("message lost after SetMediaInDetails with empty fileID: got %q", got)
+		}
+	})
+
+	t.Run("video media and message coexist after sequential Set calls", func(t *testing.T) {
+		// Simulate the /edit flow: SetMessageInDetails then SetMediaInDetails
+		details := json.RawMessage("{}")
+		var err error
+
+		details, err = SetMessageInDetails(details, "ad text")
+		if err != nil {
+			t.Fatalf("SetMessageInDetails error: %v", err)
+		}
+
+		videoFileID := "video_file_abc123"
+		details, err = SetMediaInDetails(details, "video", videoFileID)
+		if err != nil {
+			t.Fatalf("SetMediaInDetails error: %v", err)
+		}
+
+		if got := GetMessageFromDetails(details); got != "ad text" {
+			t.Errorf("GetMessageFromDetails = %q, want %q", got, "ad text")
+		}
+		mt, mf := GetMediaFromDetails(details)
+		if mt != "video" {
+			t.Errorf("GetMediaFromDetails mediaType = %q, want %q", mt, "video")
+		}
+		if mf != videoFileID {
+			t.Errorf("GetMediaFromDetails mediaFileID = %q, want %q", mf, videoFileID)
 		}
 	})
 }
@@ -457,9 +541,9 @@ func TestSetButtonInDetails(t *testing.T) {
 	})
 
 	t.Run("remove button with nil", func(t *testing.T) {
-		initial := buildDetails(map[string]interface{}{
+		initial := buildDetails(map[string]any{
 			"message": "text",
-			"button": map[string]interface{}{
+			"button": map[string]any{
 				"text":  "Click",
 				"url":   "https://example.com",
 				"style": "danger",
@@ -476,7 +560,7 @@ func TestSetButtonInDetails(t *testing.T) {
 	})
 
 	t.Run("update button preserves media", func(t *testing.T) {
-		initial := buildDetails(map[string]interface{}{
+		initial := buildDetails(map[string]any{
 			"media_type":    "video",
 			"media_file_id": "file_v1",
 		})
@@ -529,7 +613,7 @@ func TestGetMediaFromDetails_NilAndEmpty(t *testing.T) {
 	})
 
 	t.Run("details without media returns empty strings", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{"message": "hello"})
+		raw := buildDetails(map[string]any{"message": "hello"})
 		mt, mf := GetMediaFromDetails(raw)
 		if mt != "" || mf != "" {
 			t.Errorf("expected empty, got (%q, %q)", mt, mf)
@@ -553,7 +637,7 @@ func TestGetMessageFromDetails_NilAndEmpty(t *testing.T) {
 	})
 
 	t.Run("details without message returns empty", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{
+		raw := buildDetails(map[string]any{
 			"media_type":    "photo",
 			"media_file_id": "file_x",
 		})
@@ -567,10 +651,10 @@ func TestGetMessageFromDetails_NilAndEmpty(t *testing.T) {
 
 func TestValidateDealDetails_EntitiesValid(t *testing.T) {
 	t.Run("valid text_link entity", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{
+		raw := buildDetails(map[string]any{
 			"message": "click here",
-			"entities": []interface{}{
-				map[string]interface{}{
+			"entities": []any{
+				map[string]any{
 					"type":   "text_link",
 					"url":    "https://example.com",
 					"offset": 6,
@@ -589,10 +673,10 @@ func TestValidateDealDetails_EntitiesValid(t *testing.T) {
 	})
 
 	t.Run("non-text_link entity type allowed without url", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{
+		raw := buildDetails(map[string]any{
 			"message": "bold text",
-			"entities": []interface{}{
-				map[string]interface{}{
+			"entities": []any{
+				map[string]any{
 					"type":   "bold",
 					"offset": 0,
 					"length": 4,
@@ -606,11 +690,11 @@ func TestValidateDealDetails_EntitiesValid(t *testing.T) {
 	})
 
 	t.Run("caption_entities preserved", func(t *testing.T) {
-		raw := buildDetails(map[string]interface{}{
+		raw := buildDetails(map[string]any{
 			"media_type":    "photo",
 			"media_file_id": "file_photo",
-			"caption_entities": []interface{}{
-				map[string]interface{}{
+			"caption_entities": []any{
+				map[string]any{
 					"type":   "bold",
 					"offset": 0,
 					"length": 5,

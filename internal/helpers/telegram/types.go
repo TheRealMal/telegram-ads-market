@@ -165,10 +165,12 @@ type WebAppInfo struct {
 }
 
 type InlineKeyboardButton struct {
-	Text         string     `json:"text"`                    // Label text on the button.
-	WebApp       WebAppInfo `json:"web_app,omitempty"`       // Optional. Description of the Web App that will be launched when the user presses the button.
-	URL          string     `json:"url,omitempty"`           // Optional. HTTP or tg:// URL to be opened when the button is pressed.
-	CallbackData string     `json:"callback_data,omitempty"` // Optional. Data to be sent in a callback query to the bot when the button is pressed, 1-64 bytes
+	Text              string     `json:"text"`                           // Label text on the button.
+	WebApp            WebAppInfo `json:"web_app,omitempty"`              // Optional. Description of the Web App that will be launched when the user presses the button.
+	URL               string     `json:"url,omitempty"`                  // Optional. HTTP or tg:// URL to be opened when the button is pressed.
+	CallbackData      string     `json:"callback_data,omitempty"`        // Optional. Data to be sent in a callback query to the bot when the button is pressed, 1-64 bytes
+	Style             string     `json:"style,omitempty"`                // Optional. Button style color variant.
+	IconCustomEmojiID string     `json:"icon_custom_emoji_id,omitempty"` // Optional. Custom emoji identifier to be shown on the button.
 }
 
 type InlineKeyboardMarkup struct {

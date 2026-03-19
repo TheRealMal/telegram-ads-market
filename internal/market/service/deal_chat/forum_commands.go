@@ -111,9 +111,9 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 	// Parse the message text after "/edit" prefix
 	var newMessage string
 	var adjustedEntities []telegram.MessageEntity
-	if strings.HasPrefix(rawText, "/edit ") {
+	if after, found := strings.CutPrefix(rawText, "/edit "); found {
 		// Has text after "/edit "
-		newMessage = strings.TrimPrefix(rawText, "/edit ")
+		newMessage = after
 		// Adjust entity offsets: "/edit " is 6 UTF-16 code units (all ASCII)
 		const editPrefixUTF16Len = 6
 		adjustedEntities = telegram.AdjustEntitiesOffset(rawEntities, editPrefixUTF16Len)
@@ -122,6 +122,7 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 
 	// Detect media from the message
 	mediaType, mediaFileID := detectMediaFromMessage(message)
+	slog.Debug("handleEdit: detected media", "media_type", mediaType, "media_file_id_len", len(mediaFileID), "new_message_len", len(newMessage))
 
 	// Validate: must have either text or media
 	if strings.TrimSpace(newMessage) == "" && mediaType == "" {
@@ -237,9 +238,12 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 		emoji = ""
 	}
 
-	// Check that message is set
+	slog.Debug("set_button parsed", "deal_id", deal.ID, "btn_text", btnText, "btn_url", btnURL, "style", style, "emoji", emoji)
+
+	// Check that message or media is set
 	msg := entity.GetMessageFromDetails(deal.Details)
-	if strings.TrimSpace(msg) == "" {
+	mediaType, _ := entity.GetMediaFromDetails(deal.Details)
+	if strings.TrimSpace(msg) == "" && mediaType == "" {
 		s.sendToThread(ctx, chatID, threadID, "Set the ad message first with /edit before adding a button.")
 		return nil
 	}
@@ -342,13 +346,7 @@ func (s *service) buildMarkupWithoutApprove(ctx context.Context, dealID int64) *
 func buildConfirmSignMarkup(dealID int64, button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
 	var rows [][]telegram.InlineKeyboardButton
 	if button != nil {
-		btnText := button.Text
-		if button.Emoji != "" {
-			btnText = button.Emoji + " " + btnText
-		}
-		rows = append(rows, []telegram.InlineKeyboardButton{
-			{Text: btnText, URL: button.URL},
-		})
+		rows = append(rows, []telegram.InlineKeyboardButton{toInlineKeyboardButton(button)})
 	}
 	rows = append(rows, []telegram.InlineKeyboardButton{
 		{Text: "Confirm & Sign", CallbackData: fmt.Sprintf("confirm_sign:%d", dealID)},
@@ -422,13 +420,7 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 func buildApproveMarkup(dealID int64, button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
 	var rows [][]telegram.InlineKeyboardButton
 	if button != nil {
-		btnText := button.Text
-		if button.Emoji != "" {
-			btnText = button.Emoji + " " + btnText
-		}
-		rows = append(rows, []telegram.InlineKeyboardButton{
-			{Text: btnText, URL: button.URL},
-		})
+		rows = append(rows, []telegram.InlineKeyboardButton{toInlineKeyboardButton(button)})
 	}
 	rows = append(rows, []telegram.InlineKeyboardButton{
 		{Text: "Approve", CallbackData: fmt.Sprintf("approve_edit:%d", dealID)},
@@ -523,20 +515,22 @@ func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFi
 	return "", ""
 }
 
+// toInlineKeyboardButton converts a DealDetailsButton to a Telegram InlineKeyboardButton
+// with Style and IconCustomEmojiID set from the deal button config.
+func toInlineKeyboardButton(button *entity.DealDetailsButton) telegram.InlineKeyboardButton {
+	return telegram.InlineKeyboardButton{
+		Text:              button.Text,
+		URL:               button.URL,
+		Style:             button.Style,
+		IconCustomEmojiID: button.Emoji,
+	}
+}
+
 // buildURLButton creates an InlineKeyboardMarkup with a single URL button.
 func buildURLButton(button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
-	btnText := button.Text
-	if button.Emoji != "" {
-		btnText = button.Emoji + " " + btnText
-	}
 	return &telegram.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
-			{
-				{
-					Text: btnText,
-					URL:  button.URL,
-				},
-			},
+			{toInlineKeyboardButton(button)},
 		},
 	}
 }
