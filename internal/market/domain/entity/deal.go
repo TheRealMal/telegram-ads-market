@@ -55,6 +55,17 @@ type Deal struct {
 	UpdatedAt           time.Time       `json:"updated_at,omitempty"`
 }
 
+// ForumTopicEmojiForStatus maps deal statuses to custom emoji IDs for forum topic icons.
+var ForumTopicEmojiForStatus = map[DealStatus]string{
+	DealStatusWaitingEscrowDeposit:   "5310107765874632305", // 💱
+	DealStatusEscrowDepositConfirmed: "5348227245599105972", // 💼
+	DealStatusCompleted:              "5237699328843200968", // ✅
+	DealStatusWaitingEscrowRelease:   "5309929258443874898", // 💸
+	DealStatusWaitingEscrowRefund:    "5309929258443874898", // 💸
+	DealStatusExpired:                "5386395194029515402", // 🏴‍☠️
+	DealStatusRejected:               "5386395194029515402", // 🏴‍☠️
+}
+
 // CanBeEdited reports whether the deal can be edited (only draft deals are editable).
 func (d *Deal) CanBeEdited() bool {
 	return d.Status == DealStatusDraft

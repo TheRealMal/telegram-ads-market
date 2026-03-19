@@ -54,6 +54,7 @@ type redisCache interface {
 
 type dealChatService interface {
 	DeleteDealForumTopic(ctx context.Context, dealID int64) error
+	UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, status entity.DealStatus)
 }
 
 type service struct {
@@ -109,6 +110,7 @@ func (s *service) CreateEscrow(ctx context.Context, dealID int64) error {
 	if err = s.dealRepo.SetDealEscrowAddress(ctx, dealID, rawAddr); err != nil {
 		return err
 	}
+	s.dealChatService.UpdateDealForumTopicEmoji(ctx, dealID, entity.DealStatusWaitingEscrowDeposit)
 	if err = s.redis.Set(ctx, rawAddr, "1", escrowRedisTTL); err != nil {
 		slog.Error("failed to set escrow wallet for observer", "address", rawAddr, "deal_id", dealID)
 	}

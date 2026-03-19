@@ -22,6 +22,7 @@ type telegramForum interface {
 	CopyMessage(ctx context.Context, fromChatID int64, messageID int64, toChatID int64, toMessageThreadID *int64) (copiedMessageID int64, err error)
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int64, markup *telegram.InlineKeyboardMarkup) error
+	EditForumTopic(ctx context.Context, chatID int64, messageThreadID int64, iconCustomEmojiID string)
 }
 
 type notificationAdder interface {
@@ -212,6 +213,21 @@ func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error 
 	_ = s.telegramForum.DeleteForumTopic(ctx, t.LessorChatID, t.LessorMessageThreadID)
 	_ = s.telegramForum.DeleteForumTopic(ctx, t.LesseeChatID, t.LesseeMessageThreadID)
 	return s.forumTopicRepo.DeleteDealForumTopic(ctx, dealID)
+}
+
+// UpdateDealForumTopicEmoji edits both sides' forum topic icons to reflect the current deal status.
+// Fire-and-forget: errors are logged but not returned.
+func (s *service) UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, status entity.DealStatus) {
+	emojiID, ok := entity.ForumTopicEmojiForStatus[status]
+	if !ok {
+		return
+	}
+	topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
+	if err != nil || topic == nil {
+		return
+	}
+	s.telegramForum.EditForumTopic(ctx, topic.LessorChatID, topic.LessorMessageThreadID, emojiID)
+	s.telegramForum.EditForumTopic(ctx, topic.LesseeChatID, topic.LesseeMessageThreadID, emojiID)
 }
 
 func (s *service) CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error {

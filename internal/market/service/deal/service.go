@@ -43,6 +43,10 @@ type telegramNotificationAdder interface {
 	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
+type dealChatService interface {
+	UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, status entity.DealStatus)
+}
+
 // CreateDealInput holds the request inputs for creating a deal.
 type CreateDealInput struct {
 	ListingID int64
@@ -68,16 +72,18 @@ type dealService struct {
 	listingRepo       listingRepository
 	escrowSvc         escrowService
 	notificationAdder telegramNotificationAdder
+	dealChatSvc       dealChatService
 	signerSvc         *dealsigner.Service
 }
 
-func NewDealService(dealRepo dealRepository, userRepo userRepository, listingRepo listingRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder) *dealService {
+func NewDealService(dealRepo dealRepository, userRepo userRepository, listingRepo listingRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder, dealChatSvc dealChatService) *dealService {
 	return &dealService{
 		dealRepo:          dealRepo,
 		userRepo:          userRepo,
 		listingRepo:       listingRepo,
 		escrowSvc:         escrowSvc,
 		notificationAdder: notificationAdder,
+		dealChatSvc:       dealChatSvc,
 		signerSvc:         dealsigner.NewService(dealRepo, userRepo, notificationAdder),
 	}
 }
