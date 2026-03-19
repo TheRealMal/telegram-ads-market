@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 )
 
@@ -43,7 +42,7 @@ func DealToResponse(d *entity.Deal) *DealResponse {
 		ChannelID:           d.ChannelID,
 		Type:                string(d.Type),
 		Duration:            d.Duration,
-		Price:               domain.NanotonToTON(d.Price),
+		Price:               entity.NanotonToTON(d.Price),
 		EscrowAmount:        d.EscrowAmount,
 		Details:             d.Details,
 		Message:             d.Message,

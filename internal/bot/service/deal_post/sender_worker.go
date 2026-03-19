@@ -7,7 +7,6 @@ import (
 	"time"
 
 	telegram "ads-mrkt/internal/helpers/telegram"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 )
 
@@ -55,23 +54,23 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			continue
 		}
 
-		text := domain.GetMessageFromDetails(deal.Details)
+		text := entity.GetMessageFromDetails(deal.Details)
 		if text == "" {
 			logger.Error("skip deal, no message in details", "deal_id", deal.ID)
 			continue
 		}
-		if postedAt, ok := domain.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
+		if postedAt, ok := entity.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
 			logger.Debug("skip deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
 			continue
 		}
 
 		// Extract entities (prefer "entities", fall back to "caption_entities")
 		var entities []telegram.MessageEntity
-		if raw := domain.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
+		if raw := entity.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
 			_ = json.Unmarshal(raw, &entities)
 		}
 		if len(entities) == 0 {
-			if raw := domain.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
+			if raw := entity.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
 				_ = json.Unmarshal(raw, &entities)
 			}
 		}

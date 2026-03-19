@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/repository/deal/model"
@@ -340,7 +339,7 @@ func (r *repository) SignDealInTx(ctx context.Context, dealID int64, userID int6
 		existing.LesseeSignature = &sig
 	}
 
-	if domain.DealSignaturesMatch(existing) {
+	if entity.DealSignaturesMatch(existing) {
 		if err = r.SetDealStatusApproved(txCtx, dealID); err != nil {
 			return nil, err
 		}

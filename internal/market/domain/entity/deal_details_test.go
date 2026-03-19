@@ -1,4 +1,4 @@
-package domain
+package entity
 
 import (
 	"encoding/json"
@@ -212,7 +212,7 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		{
 			name: "unknown top-level key",
 			input: map[string]interface{}{
-				"message":    "hello",
+				"message":     "hello",
 				"unknown_key": "value",
 			},
 		},

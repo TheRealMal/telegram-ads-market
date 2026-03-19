@@ -8,7 +8,6 @@ import (
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -36,7 +35,7 @@ func (s *dealService) CreateDealFromRequest(ctx context.Context, userID int64, i
 	if listing.UserID == userID {
 		return nil, "", marketerrors.ErrOwnListing
 	}
-	if !domain.DealPriceMatchesListing(listing.Prices, input.Type, input.Duration, domain.TONToNanoton(input.PriceTON)) {
+	if !entity.DealPriceMatchesListing(listing.Prices, input.Type, input.Duration, entity.TONToNanoton(input.PriceTON)) {
 		return nil, "", marketerrors.ErrPriceMismatch
 	}
 
@@ -68,12 +67,12 @@ func (s *dealService) CreateDealFromRequest(ctx context.Context, userID int64, i
 	canonDetails := json.RawMessage("{}")
 	isInstantPost := entity.AdType(input.Type) == entity.AdTypeInstantPost
 	if isInstantPost {
-		canonDetails, err = domain.ValidateDealDetails(listing.PreparedPost)
+		canonDetails, err = entity.ValidateDealDetails(listing.PreparedPost)
 		if err != nil {
 			return nil, "", fmt.Errorf("%w: %s", marketerrors.ErrInvalidDealDetails, err.Error())
 		}
 	} else if len(input.Details) > 0 {
-		canonDetails, err = domain.ValidateDealDetails(input.Details)
+		canonDetails, err = entity.ValidateDealDetails(input.Details)
 		if err != nil {
 			return nil, "", fmt.Errorf("%w: %s", marketerrors.ErrInvalidDealDetails, err.Error())
 		}
@@ -86,7 +85,7 @@ func (s *dealService) CreateDealFromRequest(ctx context.Context, userID int64, i
 		ChannelID:           dealChannelID,
 		Type:                entity.AdType(input.Type),
 		Duration:            input.Duration,
-		Price:               domain.TONToNanoton(input.PriceTON),
+		Price:               entity.TONToNanoton(input.PriceTON),
 		Details:             canonDetails,
 		Message:             input.Message,
 		LessorPayoutAddress: lessor.WalletAddress,
@@ -121,8 +120,8 @@ func (s *dealService) prepareInstantPost(d *entity.Deal, lessor, lessee *entity.
 
 	d.Status = entity.DealStatusApproved
 
-	lessorSig := domain.ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, lessor.ID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
-	lesseeSig := domain.ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, lessee.ID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
+	lessorSig := entity.ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, lessor.ID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
+	lesseeSig := entity.ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, lessee.ID, *d.LessorPayoutAddress, *d.LesseePayoutAddress)
 	d.LessorSignature = &lessorSig
 	d.LesseeSignature = &lesseeSig
 	return nil
@@ -183,10 +182,10 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, dealID 
 		d.Duration = *input.Duration
 	}
 	if input.PriceTON != nil {
-		d.Price = domain.TONToNanoton(*input.PriceTON)
+		d.Price = entity.TONToNanoton(*input.PriceTON)
 	}
 	if len(input.Details) > 0 {
-		canonDetails, err := domain.ValidateDealDetails(input.Details)
+		canonDetails, err := entity.ValidateDealDetails(input.Details)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", marketerrors.ErrInvalidDealDetails, err.Error())
 		}
@@ -198,7 +197,7 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, dealID 
 		if err != nil {
 			return nil, err
 		}
-		if listing != nil && !domain.DealPriceMatchesListing(listing.Prices, string(d.Type), d.Duration, d.Price) {
+		if listing != nil && !entity.DealPriceMatchesListing(listing.Prices, string(d.Type), d.Duration, d.Price) {
 			return nil, marketerrors.ErrPriceMismatch
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -56,7 +55,7 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*en
 		existing.LesseePayoutAddress == nil || *existing.LesseePayoutAddress == "" {
 		return nil, marketerrors.ErrPayoutNotSet
 	}
-	if strings.TrimSpace(domain.GetMessageFromDetails(existing.Details)) == "" {
+	if strings.TrimSpace(entity.GetMessageFromDetails(existing.Details)) == "" {
 		return nil, marketerrors.ErrDealDetailsMessageRequired
 	}
 	myPayout := *existing.LesseePayoutAddress
@@ -68,7 +67,7 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*en
 	}
 	lessorPayout := *existing.LessorPayoutAddress
 	lesseePayout := *existing.LesseePayoutAddress
-	sig := domain.ComputeDealSignature(string(existing.Type), existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
+	sig := entity.ComputeDealSignature(string(existing.Type), existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
 	d, err := s.dealRepo.SignDealInTx(ctx, dealID, userID, sig)
 	if err != nil {
 		return nil, err

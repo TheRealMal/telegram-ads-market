@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -21,14 +20,14 @@ func (s *listingService) CreateListing(ctx context.Context, userID int64, input 
 		return nil, marketerrors.ErrWalletRequired
 	}
 
-	if err := domain.ValidateListingPrices(input.PricesTON); err != nil {
+	if err := entity.ValidateListingPrices(input.PricesTON); err != nil {
 		return nil, fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 	}
-	if err := domain.ValidateListingCategories(input.Categories); err != nil {
+	if err := entity.ValidateListingCategories(input.Categories); err != nil {
 		return nil, fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 	}
 
-	pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(input.PricesTON)
+	pricesNanoton, err := entity.ConvertListingPricesTONToNanoton(input.PricesTON)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 	}
@@ -94,12 +93,12 @@ func (s *listingService) UpdateListing(ctx context.Context, userID int64, id int
 	}
 
 	if len(input.PricesTON) > 0 {
-		if err := domain.ValidateListingPrices(input.PricesTON); err != nil {
+		if err := entity.ValidateListingPrices(input.PricesTON); err != nil {
 			return fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 		}
 	}
 	if input.Categories != nil {
-		if err := domain.ValidateListingCategories(*input.Categories); err != nil {
+		if err := entity.ValidateListingCategories(*input.Categories); err != nil {
 			return fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 		}
 	}
@@ -113,7 +112,7 @@ func (s *listingService) UpdateListing(ctx context.Context, userID int64, id int
 		l.Type = entity.ListingType(*input.Type)
 	}
 	if len(input.PricesTON) > 0 {
-		pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(input.PricesTON)
+		pricesNanoton, err := entity.ConvertListingPricesTONToNanoton(input.PricesTON)
 		if err != nil {
 			return fmt.Errorf("%w: %s", marketerrors.ErrInvalidInput, err.Error())
 		}
@@ -182,7 +181,7 @@ func (s *listingService) ListListingsAll(ctx context.Context, typ *entity.Listin
 		if c == "" {
 			continue
 		}
-		if domain.ValidateListingCategories([]string{c}) == nil {
+		if entity.ValidateListingCategories([]string{c}) == nil {
 			validCategories = append(validCategories, c)
 		}
 	}
@@ -191,13 +190,13 @@ func (s *listingService) ListListingsAll(ctx context.Context, typ *entity.Listin
 
 // validateInstantPostListing checks instant_post constraints when the listing has that ad type.
 func validateInstantPostListing(typ entity.ListingType, prices json.RawMessage, preparedPost json.RawMessage) error {
-	if !domain.ListingHasAdType(prices, string(entity.AdTypeInstantPost)) {
+	if !entity.ListingHasAdType(prices, string(entity.AdTypeInstantPost)) {
 		return nil
 	}
 	if typ != entity.ListingTypeLessee {
 		return marketerrors.ErrInstantPostLesseeOnly
 	}
-	msg := domain.GetMessageFromDetails(preparedPost)
+	msg := entity.GetMessageFromDetails(preparedPost)
 	if strings.TrimSpace(msg) == "" {
 		return marketerrors.ErrInvalidInstantPost
 	}
