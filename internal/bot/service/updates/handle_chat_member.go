@@ -3,7 +3,6 @@ package updates
 import (
 	"context"
 	"log/slog"
-	"strconv"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
@@ -102,10 +101,21 @@ func (s *service) notifyDealCounterparties(ctx context.Context, deals []model.Re
 		if removedUserID == d.LesseeID {
 			counterpartyID = d.LessorID
 		}
-		if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+
+		notification := &evententity.EventTelegramNotification{
 			ChatID:  counterpartyID,
-			Message: "Deal #" + strconv.FormatInt(d.ID, 10) + " was canceled because the channel admin was removed.",
-		}); err != nil {
+			Message: "Deal was canceled because the channel admin was removed.",
+		}
+
+		if topic, err := s.dealForumTopicRepo.GetDealForumTopicByDealID(ctx, d.ID); err == nil && topic != nil {
+			if counterpartyID == d.LessorID {
+				notification.ThreadID = topic.LessorMessageThreadID
+			} else {
+				notification.ThreadID = topic.LesseeMessageThreadID
+			}
+		}
+
+		if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, notification); err != nil {
 			slog.Error("failed to add notification", "type", "admin_removed_counterparties", "deal_id", d.ID, "user_id", counterpartyID, "error", err)
 		}
 	}

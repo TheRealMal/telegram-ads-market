@@ -57,6 +57,7 @@ type Deal struct {
 
 // ForumTopicEmojiForStatus maps deal statuses to custom emoji IDs for forum topic icons.
 var ForumTopicEmojiForStatus = map[DealStatus]string{
+	DealStatusDraft:                  "5373251851074415873", // 📝
 	DealStatusWaitingEscrowDeposit:   "5310107765874632305", // 💱
 	DealStatusEscrowDepositConfirmed: "5348227245599105972", // 💼
 	DealStatusCompleted:              "5237699328843200968", // ✅

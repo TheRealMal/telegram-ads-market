@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
@@ -82,20 +81,23 @@ func (s *service) handleBotRemovedOrDemoted(ctx context.Context, channelID int64
 		slog.Error("reset access_hash on bot removal", "channel_id", channelID, "error", err)
 	}
 
-	// Notify all affected deal parties
-	notified := make(map[int64]bool)
+	// Notify all affected deal parties in their deal topics
 	for _, d := range rejectedDeals {
+		topic, _ := s.dealForumTopicRepo.GetDealForumTopicByDealID(ctx, d.ID)
 		for _, userID := range []int64{d.LessorID, d.LesseeID} {
-			if notified[userID] {
-				continue
-			}
-			notified[userID] = true
-			if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, &evententity.EventTelegramNotification{
+			notification := &evententity.EventTelegramNotification{
 				ChatID:  userID,
-				Message: "Deal #" + strconv.FormatInt(d.ID, 10) + " was canceled because the bot was removed from the channel.",
-			}); err != nil {
+				Message: "Deal was canceled because the bot was removed from the channel.",
+			}
+			if topic != nil {
+				if userID == d.LessorID {
+					notification.ThreadID = topic.LessorMessageThreadID
+				} else {
+					notification.ThreadID = topic.LesseeMessageThreadID
+				}
+			}
+			if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, notification); err != nil {
 				slog.Error("failed to add notification", "type", "bot_removed", "deal_id", d.ID, "user_id", userID, "error", err)
-
 			}
 		}
 	}

@@ -23,17 +23,23 @@ type notificationAdder interface {
 	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
+type dealForumTopicRepository interface {
+	GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*entity.DealForumTopic, error)
+}
+
 type Service struct {
 	dealRepo          dealRepository
 	userRepo          userRepository
 	notificationAdder notificationAdder
+	forumTopicRepo    dealForumTopicRepository
 }
 
-func NewService(dealRepo dealRepository, userRepo userRepository, notificationAdder notificationAdder) *Service {
+func NewService(dealRepo dealRepository, userRepo userRepository, notificationAdder notificationAdder, forumTopicRepo dealForumTopicRepository) *Service {
 	return &Service{
 		dealRepo:          dealRepo,
 		userRepo:          userRepo,
 		notificationAdder: notificationAdder,
+		forumTopicRepo:    forumTopicRepo,
 	}
 }
 
@@ -76,13 +82,22 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*en
 	if userID == existing.LesseeID {
 		otherID = existing.LessorID
 	}
-	if err := s.notificationAdder.AddTelegramNotificationEvent(
-		ctx,
-		&evententity.EventTelegramNotification{
-			ChatID:  otherID,
-			Message: "Deal was signed by the other party",
-		},
-	); err != nil {
+
+	notification := &evententity.EventTelegramNotification{
+		ChatID:  otherID,
+		Message: "Deal was signed by the other party",
+	}
+
+	// Try to route notification into the deal's forum topic
+	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil && topic != nil {
+		if otherID == existing.LessorID {
+			notification.ThreadID = topic.LessorMessageThreadID
+		} else {
+			notification.ThreadID = topic.LesseeMessageThreadID
+		}
+	}
+
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, notification); err != nil {
 		slog.Error("failed to add notification", "type", "deal_sign", "chat_id", otherID, "error", err)
 	}
 	return d, nil

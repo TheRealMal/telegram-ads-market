@@ -47,6 +47,10 @@ type dealChatService interface {
 	UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, status entity.DealStatus)
 }
 
+type dealForumTopicRepository interface {
+	GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*entity.DealForumTopic, error)
+}
+
 // CreateDealInput holds the request inputs for creating a deal.
 type CreateDealInput struct {
 	ListingID int64
@@ -73,10 +77,11 @@ type dealService struct {
 	escrowSvc         escrowService
 	notificationAdder telegramNotificationAdder
 	dealChatSvc       dealChatService
+	forumTopicRepo    dealForumTopicRepository
 	signerSvc         *dealsigner.Service
 }
 
-func NewDealService(dealRepo dealRepository, userRepo userRepository, listingRepo listingRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder, dealChatSvc dealChatService) *dealService {
+func NewDealService(dealRepo dealRepository, userRepo userRepository, listingRepo listingRepository, escrowSvc escrowService, notificationAdder telegramNotificationAdder, dealChatSvc dealChatService, forumTopicRepo dealForumTopicRepository) *dealService {
 	return &dealService{
 		dealRepo:          dealRepo,
 		userRepo:          userRepo,
@@ -84,6 +89,7 @@ func NewDealService(dealRepo dealRepository, userRepo userRepository, listingRep
 		escrowSvc:         escrowSvc,
 		notificationAdder: notificationAdder,
 		dealChatSvc:       dealChatSvc,
-		signerSvc:         dealsigner.NewService(dealRepo, userRepo, notificationAdder),
+		forumTopicRepo:    forumTopicRepo,
+		signerSvc:         dealsigner.NewService(dealRepo, userRepo, notificationAdder, forumTopicRepo),
 	}
 }

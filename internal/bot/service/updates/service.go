@@ -49,7 +49,6 @@ type telegramNotificationEventService interface {
 
 type telegramService interface {
 	SendNotification(ctx context.Context, msg telegram.NotificationMessage) error
-	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 	GetChatAdministrators(ctx context.Context, chatID int64) ([]*telegram.ChatMember, error)
 	GetChannelPhotoBase64(ctx context.Context, chatID int64) (string, error)
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
@@ -94,6 +93,10 @@ type userbotStateRepository interface {
 	GetUserbotUserID(ctx context.Context) (int64, error)
 }
 
+type dealForumTopicRepository interface {
+	GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*marketentity.DealForumTopic, error)
+}
+
 type service struct {
 	telegramClient        telegramService
 	eventService          eventService
@@ -105,6 +108,7 @@ type service struct {
 	dealRepo              dealRepository
 	notificationAdder     notificationAdder
 	userbotStateRepo      userbotStateRepository
+	dealForumTopicRepo    dealForumTopicRepository
 	botUsername           string
 }
 
@@ -119,6 +123,7 @@ func NewService(
 	dealRepo dealRepository,
 	notificationAdder notificationAdder,
 	userbotStateRepo userbotStateRepository,
+	dealForumTopicRepo dealForumTopicRepository,
 	botUsername string,
 ) *service {
 	return &service{
@@ -132,6 +137,7 @@ func NewService(
 		dealRepo:              dealRepo,
 		notificationAdder:     notificationAdder,
 		userbotStateRepo:      userbotStateRepo,
+		dealForumTopicRepo:    dealForumTopicRepo,
 		botUsername:           botUsername,
 	}
 }

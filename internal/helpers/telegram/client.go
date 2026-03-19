@@ -25,10 +25,6 @@ const (
 	telegramPathSendMessage            TelegramPath = "/sendMessage"
 	telegramPathSendVideo              TelegramPath = "/sendVideo"
 	telegramPathGetFile                TelegramPath = "/getFile"
-	telegramPathCreateInvoiceLink      TelegramPath = "/createInvoiceLink"
-	telegramPathAnswerPreCheckoutQuery TelegramPath = "/answerPreCheckoutQuery"
-	telegramPathRefundStarPayment      TelegramPath = "/refundStarPayment"
-	telegramPathSetMessageReaction     TelegramPath = "/setMessageReaction"
 	telegramPathCreateForumTopic       TelegramPath = "/createForumTopic"
 	telegramPathDeleteForumTopic       TelegramPath = "/deleteForumTopic"
 	telegramPathCopyMessage            TelegramPath = "/copyMessage"
@@ -61,29 +57,23 @@ type APIClient struct {
 	secretToken   string
 	httpClient    *http.Client
 	rateLimiter   *ratelimiter.RateLimiter
+	pipeline      *pipeline
 }
 
 func NewAPIClient(ctx context.Context, cfg config.Config, redisClient redisClient) *APIClient {
+	rl := ratelimiter.NewRateLimiter(ctx, redisClient, cfg.RateLimit, time.Second)
 	return &APIClient{
 		token:         cfg.Token,
 		botUsername:   cfg.BotUsername,
 		botWebAppName: cfg.BotWebAppName,
 		secretToken:   cfg.SecretToken,
 		httpClient:    &http.Client{},
-		rateLimiter:   ratelimiter.NewRateLimiter(ctx, redisClient, cfg.RateLimit, time.Second),
+		rateLimiter:   rl,
+		pipeline:      newPipeline(ctx, rl),
 	}
 }
 
 func (c *APIClient) SendWelcomeMessage(ctx context.Context, chatID int64) error {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return fmt.Errorf("check rate limiting failed: %w", err)
-	}
-
-	if !allow {
-		return fmt.Errorf("too many requests to send welcome message in telegram")
-	}
-
 	url := c.buildTelegramURL(telegramPathSendMessage)
 	payload := MessagePayload{
 		Payload: Payload{
@@ -111,106 +101,6 @@ func (c *APIClient) SendWelcomeMessage(ctx context.Context, chatID int64) error 
 	return err
 }
 
-func (c *APIClient) CreateInvoiceLink(ctx context.Context, payload InvoiceLinkPayload) (string, error) {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return "", fmt.Errorf("check rate limiting failed: %w", err)
-	}
-
-	if !allow {
-		return "", fmt.Errorf("too many requests to create invoice link in telegram")
-	}
-
-	uri := c.buildTelegramURL(telegramPathCreateInvoiceLink)
-	slog.Debug("Creating invoice link", "uri", uri)
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("error marshaling JSON: %w", err)
-	}
-
-	slog.Debug("The payload is", "payload", payload, "serialized", jsonData)
-
-	req, err := http.NewRequest("POST", uri, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		httpError := errors.Unwrap(err)
-		return "", fmt.Errorf("error sending request: %w", httpError)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error parsing response body: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("request failed with status %d, response body: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var result InvoiceLinkResponse
-
-	err = json.Unmarshal(bodyBytes, &result)
-	if err != nil {
-		return "", fmt.Errorf("couldn't unmarshal response: %w", err)
-	}
-
-	return result.Result, nil
-}
-
-func (c *APIClient) AnswerPreCheckoutQuery(ctx context.Context, queryID string, ok bool, errorMessage string) error {
-	if queryID == "" {
-		return nil
-	}
-
-	uri := c.buildTelegramURL(telegramPathAnswerPreCheckoutQuery)
-
-	message := PreCheckoutAnswerPayload{
-		PreCheckoutQueryID: queryID,
-		OK:                 ok,
-		ErrorMessage:       errorMessage,
-	}
-
-	jsonData, err := json.Marshal(message)
-	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
-	}
-
-	slog.Debug("The payload is", "payload", message, "serialized", jsonData)
-
-	_, err = c.sendRequest(ctx, uri, jsonData)
-	return err
-}
-
-func (c *APIClient) RefundStarPayment(ctx context.Context, userID int64, telegramPaymentChargeID string) error {
-	if userID == 0 || telegramPaymentChargeID == "" {
-		return fmt.Errorf("invalid refund parameters %d, %s", userID, telegramPaymentChargeID)
-	}
-
-	uri := c.buildTelegramURL(telegramPathRefundStarPayment)
-
-	message := RefundStarPaymentPayload{
-		UserID:                  userID,
-		TelegramPaymentChargeID: telegramPaymentChargeID,
-	}
-
-	jsonData, err := json.Marshal(message)
-	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
-	}
-
-	slog.Debug("The payload is", "payload", message, "serialized", jsonData)
-
-	_, err = c.sendRequest(ctx, uri, jsonData)
-	return err
-}
-
 func (c *APIClient) buildTelegramURL(path TelegramPath) string { //nolint:unparam
 	b := strings.Builder{}
 	b.Grow(len(telegramBasePath) + len(c.token) + len(path))
@@ -220,8 +110,16 @@ func (c *APIClient) buildTelegramURL(path TelegramPath) string { //nolint:unpara
 	return b.String()
 }
 
-// sendRequest sends a POST request and returns the response body on success.
+// sendRequest submits the API call through the rate-limited pipeline and returns the response body on success.
 func (c *APIClient) sendRequest(ctx context.Context, uri string, payload []byte) ([]byte, error) {
+	return c.pipeline.submit(ctx, uri, func() ([]byte, error) {
+		return c.sendRequestDirect(ctx, uri, payload)
+	})
+}
+
+// sendRequestDirect performs the actual HTTP request without pipeline/rate-limiting.
+// Used internally by the pipeline worker.
+func (c *APIClient) sendRequestDirect(ctx context.Context, uri string, payload []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", uri, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -255,46 +153,9 @@ func (c *APIClient) sendRequest(ctx context.Context, uri string, payload []byte)
 	return bodyBytes, nil
 }
 
-// ReactionTypeEmoji is used in setMessageReaction (Bot API: type "emoji").
-type ReactionTypeEmoji struct {
-	Type  string `json:"type"`  // "emoji"
-	Emoji string `json:"emoji"` // e.g. "👍"
-}
-
-// SetMessageReaction sets the chosen reactions on a message. See https://core.telegram.org/bots/api#setmessagereaction.
-// Pass empty emoji to clear reactions. Bots can set up to one reaction per message (non-premium).
-func (c *APIClient) SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error {
-	uri := c.buildTelegramURL(telegramPathSetMessageReaction)
-	payload := map[string]interface{}{
-		"chat_id":    chatID,
-		"message_id": messageID,
-	}
-	if emoji != "" {
-		payload["reaction"] = []ReactionTypeEmoji{{Type: "emoji", Emoji: emoji}}
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal setMessageReaction payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, uri, jsonData)
-	return err
-}
-
-// SendMessage sends a text message to the chat and returns the sent message (chat_id, message_id) on success.
-func (c *APIClient) SendMessage(ctx context.Context, chatID int64, text string, entities []MessageEntity) (*SentMessage, error) {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return nil, fmt.Errorf("too many requests to send message in telegram")
-	}
-	return c.sendMessageInternal(ctx, chatID, text, entities)
-}
-
 // SendMessageSimple sends a text message to the chat and returns only an error (for use by notification workers).
 func (c *APIClient) SendMessageSimple(ctx context.Context, chatID int64, text string) error {
-	_, err := c.SendMessage(ctx, chatID, text, nil)
+	_, err := c.sendMessageInternal(ctx, chatID, text, nil)
 	return err
 }
 
@@ -314,14 +175,6 @@ type NotificationMessage struct {
 // method based on which fields are populated. It handles text, photo, and video messages
 // with optional thread_id, entities, and inline keyboard buttons.
 func (c *APIClient) SendNotification(ctx context.Context, msg NotificationMessage) error {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return fmt.Errorf("too many requests to send notification in telegram")
-	}
-
 	// Parse optional entities
 	var entities []MessageEntity
 	if msg.Entities != "" {
@@ -373,12 +226,12 @@ type ForceReplyMarkup struct {
 
 // CreateForumTopic creates a forum topic in a supergroup. Returns the message_thread_id of the new topic.
 // See https://core.telegram.org/bots/api#createforumtopic
-func (c *APIClient) CreateForumTopic(ctx context.Context, chatID int64, name string) (messageThreadID int64, err error) {
+func (c *APIClient) CreateForumTopic(ctx context.Context, chatID int64, name string, emojiID string) (messageThreadID int64, err error) {
 	uri := c.buildTelegramURL(telegramPathCreateForumTopic)
 	payload := map[string]interface{}{
 		"chat_id":              chatID,
 		"name":                 name,
-		"icon_custom_emoji_id": 5373251851074415873, // Custom emoji ID for initial topic state
+		"icon_custom_emoji_id": emojiID, // Custom emoji ID for initial topic state
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
@@ -561,7 +414,7 @@ func (c *APIClient) GetChannelPhotoBase64(ctx context.Context, chatID int64) (st
 // SendChannelMessage sends a text message to a channel and returns the message ID.
 // chatID must be in Bot API format (negative -100 prefix).
 func (c *APIClient) SendChannelMessage(ctx context.Context, chatID int64, text string, entities []MessageEntity) (int64, error) {
-	sent, err := c.SendMessage(ctx, chatID, text, entities)
+	sent, err := c.sendMessageInternal(ctx, chatID, text, entities)
 	if err != nil {
 		return 0, err
 	}
@@ -601,13 +454,6 @@ func (c *APIClient) CheckMessageExists(ctx context.Context, chatID int64, messag
 
 // SendMessageToThread sends a text message to a specific forum topic (message_thread_id).
 func (c *APIClient) SendMessageToThread(ctx context.Context, chatID int64, messageThreadID int64, text string, entities []MessageEntity) error {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return fmt.Errorf("too many requests to send message in telegram")
-	}
 	return c.sendMessageToThread(ctx, chatID, messageThreadID, text, entities)
 }
 
@@ -631,13 +477,6 @@ func (c *APIClient) sendMessageToThread(ctx context.Context, chatID int64, messa
 
 // SendMessageToThreadWithMarkup sends a text message to a forum topic with optional inline keyboard.
 func (c *APIClient) SendMessageToThreadWithMarkup(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *InlineKeyboardMarkup, entities []MessageEntity) (*SentMessage, error) {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return nil, fmt.Errorf("too many requests to send message in telegram")
-	}
 	return c.sendMessageToThreadWithMarkupFull(ctx, chatID, messageThreadID, text, markup, entities)
 }
 
@@ -679,13 +518,6 @@ func (c *APIClient) sendMessageToThreadWithMarkupFull(ctx context.Context, chatI
 
 // SendPhotoToThread sends a photo (by file_id) to a forum topic with optional caption and inline keyboard.
 func (c *APIClient) SendPhotoToThread(ctx context.Context, chatID int64, messageThreadID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return fmt.Errorf("too many requests to send message in telegram")
-	}
 	return c.sendPhotoToThread(ctx, chatID, messageThreadID, photoFileID, caption, markup, captionEntities)
 }
 
@@ -738,13 +570,6 @@ func (c *APIClient) sendPhoto(ctx context.Context, chatID int64, photoFileID str
 
 // SendVideoToThread sends a video (by file_id) to a forum topic with optional caption and inline keyboard.
 func (c *APIClient) SendVideoToThread(ctx context.Context, chatID int64, messageThreadID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	allow, err := c.rateLimiter.CheckLimits(ctx)
-	if err != nil {
-		return fmt.Errorf("check rate limiting failed: %w", err)
-	}
-	if !allow {
-		return fmt.Errorf("too many requests to send message in telegram")
-	}
 	return c.sendVideoToThread(ctx, chatID, messageThreadID, videoFileID, caption, markup, captionEntities)
 }
 

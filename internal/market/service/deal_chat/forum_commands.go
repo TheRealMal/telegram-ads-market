@@ -107,21 +107,27 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 		rawText = message.Caption
 		rawEntities = message.CaptionEntities
 	}
-	newMessage := ""
-	if strings.HasPrefix(rawText, "/edit ") {
-		newMessage = strings.TrimPrefix(rawText, "/edit ")
-	}
-	if strings.TrimSpace(newMessage) == "" {
-		s.sendToThread(ctx, chatID, threadID, "Usage: /edit <message text>")
-		return nil
-	}
 
-	// Adjust entity offsets: "/edit " is 6 UTF-16 code units (all ASCII)
-	const editPrefixUTF16Len = 6
-	adjustedEntities := telegram.AdjustEntitiesOffset(rawEntities, editPrefixUTF16Len)
+	// Parse the message text after "/edit" prefix
+	var newMessage string
+	var adjustedEntities []telegram.MessageEntity
+	if strings.HasPrefix(rawText, "/edit ") {
+		// Has text after "/edit "
+		newMessage = strings.TrimPrefix(rawText, "/edit ")
+		// Adjust entity offsets: "/edit " is 6 UTF-16 code units (all ASCII)
+		const editPrefixUTF16Len = 6
+		adjustedEntities = telegram.AdjustEntitiesOffset(rawEntities, editPrefixUTF16Len)
+	}
+	// else: rawText is "/edit" exactly (bare command) — newMessage stays ""
 
 	// Detect media from the message
 	mediaType, mediaFileID := detectMediaFromMessage(message)
+
+	// Validate: must have either text or media
+	if strings.TrimSpace(newMessage) == "" && mediaType == "" {
+		s.sendToThread(ctx, chatID, threadID, "Usage: /edit <message text>\nYou can also send a photo or video with /edit as caption.")
+		return nil
+	}
 
 	// Update deal details
 	details := deal.Details
@@ -169,18 +175,44 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 }
 
 func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID int64, threadID int64, text string) error {
-	// Parse: /set_button <text> <url> <style> <emoji>
-	// Last 3 fields are url, style, emoji. Everything between /set_button and those 3 is the button text.
+	// Parse: /set_button <text> <url> [style] [emoji]
+	// style defaults to "default", emoji defaults to "0" (no emoji).
+	// URL is always required (http:// or https://).
+	const usageMsg = "Usage: /set_button <text> <url> [style] [emoji]\nStyles: danger, success, primary, default (default: default)\nEmoji: any emoji or 0 for none (default: 0)\nExample: /set_button Buy Now https://example.com primary \U0001f525"
 	parts := strings.Fields(text)
-	if len(parts) < 5 {
-		s.sendToThread(ctx, chatID, threadID, "Usage: /set_button <text> <url> <style> <emoji>\nStyles: danger, success, primary, default\nEmoji: any emoji or 0 for none\nExample: /set_button Buy Now https://example.com primary \U0001f525")
+	if len(parts) < 3 {
+		s.sendToThread(ctx, chatID, threadID, usageMsg)
 		return nil
 	}
 
-	emoji := parts[len(parts)-1]
-	style := parts[len(parts)-2]
-	btnURL := parts[len(parts)-3]
-	btnText := strings.Join(parts[1:len(parts)-3], " ")
+	// Find the URL: scan from the end for the rightmost http/https token.
+	urlIdx := -1
+	for i := len(parts) - 1; i >= 1; i-- {
+		if strings.HasPrefix(parts[i], "http://") || strings.HasPrefix(parts[i], "https://") {
+			urlIdx = i
+			break
+		}
+	}
+	// urlIdx must be >= 2 so there is at least one text token before the URL.
+	if urlIdx < 2 {
+		s.sendToThread(ctx, chatID, threadID, usageMsg)
+		return nil
+	}
+
+	btnText := strings.Join(parts[1:urlIdx], " ")
+	btnURL := parts[urlIdx]
+
+	// Optional style (defaults to "default")
+	style := "default"
+	if urlIdx+1 < len(parts) {
+		style = parts[urlIdx+1]
+	}
+
+	// Optional emoji (defaults to "0" meaning no emoji)
+	emoji := "0"
+	if urlIdx+2 < len(parts) {
+		emoji = parts[urlIdx+2]
+	}
 
 	if btnText == "" {
 		s.sendToThread(ctx, chatID, threadID, "Button text cannot be empty.")
@@ -195,7 +227,7 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 	}
 
 	// Validate style
-	if !domain.ValidButtonStyles[style] {
+	if !entity.ValidButtonStyles[style] {
 		s.sendToThread(ctx, chatID, threadID, "Invalid style. Must be one of: danger, success, primary, default")
 		return nil
 	}

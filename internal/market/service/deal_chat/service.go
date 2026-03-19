@@ -16,7 +16,7 @@ import (
 )
 
 type telegramForum interface {
-	CreateForumTopic(ctx context.Context, chatID int64, name string) (messageThreadID int64, err error)
+	CreateForumTopic(ctx context.Context, chatID int64, name string, emoji string) (messageThreadID int64, err error)
 	DeleteForumTopic(ctx context.Context, chatID int64, messageThreadID int64) error
 	CopyMessage(ctx context.Context, fromChatID int64, messageID int64, toChatID int64, toMessageThreadID *int64) (copiedMessageID int64, err error)
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
@@ -78,11 +78,11 @@ func (s *service) CreateDealForumTopics(ctx context.Context, deal *entity.Deal, 
 	}
 
 	name := "Deal #" + strconv.FormatInt(deal.ID, 10)
-	lessorThreadID, err := s.telegramForum.CreateForumTopic(ctx, deal.LessorID, name)
+	lessorThreadID, err := s.telegramForum.CreateForumTopic(ctx, deal.LessorID, name, entity.ForumTopicEmojiForStatus[entity.DealStatusDraft])
 	if err != nil {
 		return fmt.Errorf("create lessor forum topic: %w", err)
 	}
-	lesseeThreadID, err := s.telegramForum.CreateForumTopic(ctx, deal.LesseeID, name)
+	lesseeThreadID, err := s.telegramForum.CreateForumTopic(ctx, deal.LesseeID, name, entity.ForumTopicEmojiForStatus[entity.DealStatusDraft])
 	if err != nil {
 		_ = s.telegramForum.DeleteForumTopic(ctx, deal.LessorID, lessorThreadID)
 		return fmt.Errorf("create lessee forum topic: %w", err)

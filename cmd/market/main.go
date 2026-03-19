@@ -120,7 +120,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo, userRepo)
 
 			// Standalone deal signer for deal chat (breaks circular dep: dealChatSvc -> dealSigner -> escrowSvc -> dealChatSvc).
-			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc)
+			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc, dealForumTopicRepo)
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, cfg.Telegram.BotUsername)
 			vaultClient, err := vault.NewClient(cfg.Vault)
 			if err != nil {
@@ -129,7 +129,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
 			channelSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
-			dealSvc := dealservice.NewDealService(dealRepo, userRepo, listingRepo, escrowSvc, telegramNotifyEventSvc, dealChatSvc)
+			dealSvc := dealservice.NewDealService(dealRepo, userRepo, listingRepo, escrowSvc, telegramNotifyEventSvc, dealChatSvc, dealForumTopicRepo)
 			dealPostMessageSvc := dealpostmessage.NewService(dealPostMessageRepo, dealChatSvc)
 			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
 			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)

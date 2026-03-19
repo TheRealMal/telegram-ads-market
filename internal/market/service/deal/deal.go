@@ -256,13 +256,22 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	if userID == existing.LesseeID {
 		otherID = existing.LessorID
 	}
-	if err := s.notificationAdder.AddTelegramNotificationEvent(
-		ctx,
-		&evententity.EventTelegramNotification{
-			ChatID:  otherID,
-			Message: "Deal was rejected",
-		},
-	); err != nil {
+
+	notification := &evententity.EventTelegramNotification{
+		ChatID:  otherID,
+		Message: "Deal was rejected",
+	}
+
+	// Try to route notification into the deal's forum topic
+	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil && topic != nil {
+		if otherID == existing.LessorID {
+			notification.ThreadID = topic.LessorMessageThreadID
+		} else {
+			notification.ThreadID = topic.LesseeMessageThreadID
+		}
+	}
+
+	if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, notification); err != nil {
 		slog.Error("failed to add notification", "type", "deal_rejected", "deal_id", dealID, "chat_id", otherID, "error", err)
 	}
 
