@@ -16,13 +16,19 @@ type repository interface {
 	FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx context.Context, ids []int64) error
 }
 
-type service struct {
-	repository repository
+type dealChatService interface {
+	UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, status entity.DealStatus)
 }
 
-func NewService(repository repository) *service {
+type service struct {
+	repository  repository
+	dealChatSvc dealChatService
+}
+
+func NewService(repository repository, dealChatSvc dealChatService) *service {
 	return &service{
-		repository: repository,
+		repository:  repository,
+		dealChatSvc: dealChatSvc,
 	}
 }
 
@@ -46,6 +52,9 @@ func (s *service) RunPassedWorker(ctx context.Context) {
 					slog.Error("deal_post_message worker: complete (passed)", "error", err)
 				} else {
 					slog.Info("deal_post_message worker: completed (passed)", "count", len(ids), "ids", ids)
+					for _, m := range passedList {
+						s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRelease)
+					}
 				}
 			}
 			deletedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusDeleted)
@@ -60,6 +69,9 @@ func (s *service) RunPassedWorker(ctx context.Context) {
 					slog.Error("deal_post_message worker: fail (deleted)", "error", err)
 				} else {
 					slog.Info("deal_post_message worker: failed (deleted)", "count", len(ids), "ids", ids)
+					for _, m := range deletedList {
+						s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRefund)
+					}
 				}
 			}
 		}

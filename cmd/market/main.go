@@ -129,8 +129,8 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
 			channelSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
-			dealSvc := dealservice.NewDealService(dealRepo, userRepo, listingRepo, escrowSvc, telegramNotifyEventSvc)
-			dealPostMessageSvc := dealpostmessage.NewService(dealPostMessageRepo)
+			dealSvc := dealservice.NewDealService(dealRepo, userRepo, listingRepo, escrowSvc, telegramNotifyEventSvc, dealChatSvc)
+			dealPostMessageSvc := dealpostmessage.NewService(dealPostMessageRepo, dealChatSvc)
 			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
 			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)
 			if errPreload := dealSvc.ExpireTimedOutDeposits(preloadCtx, time.Now().Add(-1*time.Hour)); errPreload != nil {

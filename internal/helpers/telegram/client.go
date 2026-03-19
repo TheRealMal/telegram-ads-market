@@ -39,6 +39,7 @@ const (
 	telegramPathSendPhoto              TelegramPath = "/sendPhoto"
 	telegramPathAnswerCallbackQuery    TelegramPath = "/answerCallbackQuery"
 	telegramPathEditMessageReplyMarkup TelegramPath = "/editMessageReplyMarkup"
+	telegramPathEditForumTopic         TelegramPath = "/editForumTopic"
 
 	messageWelcome = "Start message"
 	openAppURL     = "https://t.me/%s?startapp="
@@ -877,6 +878,24 @@ func (c *APIClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, me
 	}
 	_, err = c.sendRequest(ctx, uri, jsonData)
 	return err
+}
+
+// EditForumTopic edits a forum topic's icon. See https://core.telegram.org/bots/api#editforumtopic
+func (c *APIClient) EditForumTopic(ctx context.Context, chatID int64, messageThreadID int64, iconCustomEmojiID string) {
+	uri := c.buildTelegramURL(telegramPathEditForumTopic)
+	payload := map[string]interface{}{
+		"chat_id":              chatID,
+		"message_thread_id":    messageThreadID,
+		"icon_custom_emoji_id": iconCustomEmojiID,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("marshal editForumTopic payload", "error", err)
+		return
+	}
+	if _, err := c.sendRequest(ctx, uri, jsonData); err != nil {
+		slog.Error("editForumTopic failed", "chat_id", chatID, "thread_id", messageThreadID, "error", err)
+	}
 }
 
 // SendMessageWithForceReply sends a text message with reply_markup force_reply so the user is asked to reply.

@@ -251,6 +251,7 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	if d == nil {
 		return nil, marketerrors.ErrDealNotDraft
 	}
+	s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, dealID, entity.DealStatusRejected)
 	otherID := existing.LesseeID
 	if userID == existing.LesseeID {
 		otherID = existing.LessorID
@@ -280,6 +281,7 @@ func (s *dealService) ExpireTimedOutDeposits(ctx context.Context, olderThan time
 			slog.Error("set deal status expired", "deal_id", d.ID, "error", err)
 			continue
 		}
+		s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, d.ID, entity.DealStatusExpired)
 	}
 	return nil
 }
@@ -304,6 +306,7 @@ func (s *dealService) RunCompletedWorker(ctx context.Context) {
 					logger.Error("set deal completed", "deal_id", d.ID, "error", err)
 					continue
 				}
+				s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, d.ID, entity.DealStatusCompleted)
 				logger.Info("deal set completed", "deal_id", d.ID)
 			}
 		}

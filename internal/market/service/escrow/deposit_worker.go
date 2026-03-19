@@ -6,6 +6,7 @@ import (
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
+	"ads-mrkt/internal/market/domain/entity"
 )
 
 const (
@@ -60,6 +61,7 @@ func (s *service) processDepositEvents(ctx context.Context, eventService escrowD
 			logger.Error("set status", "deal_id", deal.ID, "error", err)
 			continue
 		}
+		s.dealChatService.UpdateDealForumTopicEmoji(ctx, deal.ID, entity.DealStatusEscrowDepositConfirmed)
 		if deal.EscrowAddress != nil && *deal.EscrowAddress != "" {
 			_ = s.redis.Del(ctx, *deal.EscrowAddress)
 		}
