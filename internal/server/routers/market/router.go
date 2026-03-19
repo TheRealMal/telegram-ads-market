@@ -60,11 +60,11 @@ func NewRouter(config serverconfig.Config, handler handler, authMiddleware authM
 }
 
 func (r *Router) GetRoutes() http.Handler {
-	// corsConfig := server.CORSConfig{
-	// 	AllowOrigin:  []string{r.Config.ClientDomain},
-	// 	AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete},
-	// 	AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
-	// }
+	corsConfig := server.CORSConfig{
+		AllowOrigin:  []string{"*"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete},
+		AllowHeaders: []string{"Content-Type", "Authorization", "X-Telegram-InitData"},
+	}
 
 	mux := http.NewServeMux()
 
@@ -310,6 +310,5 @@ func (r *Router) GetRoutes() http.Handler {
 		"/api/v1",
 	))
 
-	return mux
-	// return server.MuxWithCORS(mux, &corsConfig)
+	return server.MuxWithCORS(mux, &corsConfig)
 }

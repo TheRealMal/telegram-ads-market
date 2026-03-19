@@ -58,6 +58,7 @@ type UpdateMessage struct {
 	CaptionEntities   []MessageEntity    `json:"caption_entities,omitempty"`
 	Photo             []PhotoSize        `json:"photo,omitempty"`
 	Video             *Video             `json:"video,omitempty"`
+	Animation         *Animation         `json:"animation,omitempty"`
 	ReplyToMessage    *ReplyToMessage    `json:"reply_to_message,omitempty"`
 	SuccessfulPayment *SuccessfulPayment `json:"successful_payment,omitempty"` // Optional. Message is a service message about a successful payment, information about the payment.
 	RefundedPayment   *RefundedPayment   `json:"refunded_payment,omitempty"`
@@ -134,6 +135,15 @@ type PhotoSize struct {
 }
 
 type Video struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id,omitempty"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	Duration     int    `json:"duration,omitempty"`
+	FileSize     int64  `json:"file_size,omitempty"`
+}
+
+type Animation struct {
 	FileID       string `json:"file_id"`
 	FileUniqueID string `json:"file_unique_id,omitempty"`
 	Width        int    `json:"width,omitempty"`

@@ -84,7 +84,7 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 		if !ok {
 			return nil, ErrDealDetailsInvalid
 		}
-		if mtStr != "photo" && mtStr != "video" {
+		if mtStr != "photo" && mtStr != "video" && mtStr != "animation" {
 			return nil, ErrDealDetailsInvalid
 		}
 		mediaType = mtStr

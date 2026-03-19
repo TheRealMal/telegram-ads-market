@@ -9,10 +9,11 @@ type EventTelegramNotification struct {
 	ChatID   int64  `json:"chat_id"`
 	Message  string `json:"message"`
 	ThreadID int64  `json:"thread_id,omitempty"` // forum topic message_thread_id
-	Photo    string `json:"photo,omitempty"`     // photo file_id
-	Video    string `json:"video,omitempty"`     // video file_id
-	Entities string `json:"entities,omitempty"`  // JSON-serialized []telegram.MessageEntity
-	Buttons  string `json:"buttons,omitempty"`   // JSON-serialized [][]telegram.InlineKeyboardButton
+	Photo     string `json:"photo,omitempty"`     // photo file_id
+	Video     string `json:"video,omitempty"`     // video file_id
+	Animation string `json:"animation,omitempty"` // animation file_id
+	Entities  string `json:"entities,omitempty"`  // JSON-serialized []telegram.MessageEntity
+	Buttons   string `json:"buttons,omitempty"`   // JSON-serialized [][]telegram.InlineKeyboardButton
 }
 
 var _ Event = (*EventTelegramNotification)(nil)
@@ -31,6 +32,9 @@ func (e *EventTelegramNotification) ToMap() map[string]interface{} {
 	if e.Video != "" {
 		m["video"] = e.Video
 	}
+	if e.Animation != "" {
+		m["animation"] = e.Animation
+	}
 	if e.Entities != "" {
 		m["entities"] = e.Entities
 	}
@@ -46,6 +50,7 @@ func (e *EventTelegramNotification) FromMap(m map[string]interface{}) {
 	e.ThreadID = int64FromMap(m, "thread_id")
 	e.Photo = stringFromMap(m, "photo")
 	e.Video = stringFromMap(m, "video")
+	e.Animation = stringFromMap(m, "animation")
 	e.Entities = stringFromMap(m, "entities")
 	e.Buttons = stringFromMap(m, "buttons")
 }

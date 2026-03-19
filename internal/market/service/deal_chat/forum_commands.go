@@ -84,7 +84,8 @@ func (s *service) HandleForumCommand(ctx context.Context, message *telegram.Upda
 
 func (s *service) handlePreview(ctx context.Context, deal *entity.Deal, chatID int64, threadID int64) error {
 	msg := entity.GetMessageFromDetails(deal.Details)
-	if strings.TrimSpace(msg) == "" {
+	mediaType, _ := entity.GetMediaFromDetails(deal.Details)
+	if strings.TrimSpace(msg) == "" && mediaType == "" {
 		s.sendToThread(ctx, chatID, threadID, "No message set yet. Use /edit <text> to set the ad message.")
 		return nil
 	}
@@ -471,6 +472,8 @@ func (s *service) sendAdPreview(ctx context.Context, chatID, threadID int64, det
 		event.Photo = mediaFileID
 	case "video":
 		event.Video = mediaFileID
+	case "animation":
+		event.Animation = mediaFileID
 	}
 
 	if len(entities) > 0 {
@@ -511,6 +514,9 @@ func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFi
 	}
 	if message.Video != nil {
 		return "video", message.Video.FileID
+	}
+	if message.Animation != nil {
+		return "animation", message.Animation.FileID
 	}
 	return "", ""
 }

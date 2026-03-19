@@ -24,6 +24,7 @@ const (
 	telegramFileBasePath                            = "https://api.telegram.org/file/bot"
 	telegramPathSendMessage            TelegramPath = "/sendMessage"
 	telegramPathSendVideo              TelegramPath = "/sendVideo"
+	telegramPathSendAnimation          TelegramPath = "/sendAnimation"
 	telegramPathGetFile                TelegramPath = "/getFile"
 	telegramPathCreateForumTopic       TelegramPath = "/createForumTopic"
 	telegramPathDeleteForumTopic       TelegramPath = "/deleteForumTopic"
@@ -162,13 +163,14 @@ func (c *APIClient) SendMessageSimple(ctx context.Context, chatID int64, text st
 // NotificationMessage is a unified notification payload for the event-driven notification worker.
 // Entities and Buttons are JSON-serialized strings (as stored in Redis streams).
 type NotificationMessage struct {
-	ChatID   int64
-	Message  string // text or caption
-	ThreadID int64  // 0 = no thread
-	Photo    string // photo file_id (empty = no photo)
-	Video    string // video file_id (empty = no video)
-	Entities string // JSON-serialized []MessageEntity
-	Buttons  string // JSON-serialized [][]InlineKeyboardButton
+	ChatID    int64
+	Message   string // text or caption
+	ThreadID  int64  // 0 = no thread
+	Photo     string // photo file_id (empty = no photo)
+	Video     string // video file_id (empty = no video)
+	Animation string // animation file_id (empty = no animation)
+	Entities  string // JSON-serialized []MessageEntity
+	Buttons   string // JSON-serialized [][]InlineKeyboardButton
 }
 
 // SendNotification sends a notification message, dispatching to the appropriate Bot API
@@ -204,6 +206,10 @@ func (c *APIClient) SendNotification(ctx context.Context, msg NotificationMessag
 		return c.sendVideoToThread(ctx, msg.ChatID, msg.ThreadID, msg.Video, msg.Message, markup, entities)
 	case msg.Video != "":
 		return c.sendVideo(ctx, msg.ChatID, msg.Video, msg.Message, markup, entities)
+	case msg.Animation != "" && msg.ThreadID != 0:
+		return c.sendAnimationToThread(ctx, msg.ChatID, msg.ThreadID, msg.Animation, msg.Message, markup, entities)
+	case msg.Animation != "":
+		return c.sendAnimation(ctx, msg.ChatID, msg.Animation, msg.Message, markup, entities)
 	case msg.ThreadID != 0 && markup != nil:
 		return c.sendMessageToThreadWithMarkup(ctx, msg.ChatID, msg.ThreadID, msg.Message, markup, entities)
 	case msg.ThreadID != 0:
@@ -615,6 +621,58 @@ func (c *APIClient) sendVideo(ctx context.Context, chatID int64, videoFileID str
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal sendVideo payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+// SendAnimationToThread sends an animation (by file_id) to a forum topic with optional caption and inline keyboard.
+func (c *APIClient) SendAnimationToThread(ctx context.Context, chatID int64, messageThreadID int64, animationFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	return c.sendAnimationToThread(ctx, chatID, messageThreadID, animationFileID, caption, markup, captionEntities)
+}
+
+func (c *APIClient) sendAnimationToThread(ctx context.Context, chatID int64, messageThreadID int64, animationFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	url := c.buildTelegramURL(telegramPathSendAnimation)
+	payload := map[string]interface{}{
+		"chat_id":           chatID,
+		"message_thread_id": messageThreadID,
+		"animation":         animationFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendAnimation payload: %w", err)
+	}
+	_, err = c.sendRequest(ctx, url, jsonData)
+	return err
+}
+
+func (c *APIClient) sendAnimation(ctx context.Context, chatID int64, animationFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
+	url := c.buildTelegramURL(telegramPathSendAnimation)
+	payload := map[string]interface{}{
+		"chat_id":   chatID,
+		"animation": animationFileID,
+	}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	if len(captionEntities) > 0 {
+		payload["caption_entities"] = captionEntities
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal sendAnimation payload: %w", err)
 	}
 	_, err = c.sendRequest(ctx, url, jsonData)
 	return err

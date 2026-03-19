@@ -138,6 +138,42 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 			wantMediaType: "video",
 			wantMediaFile: "file_vid_only",
 		},
+		{
+			name: "animation only",
+			input: map[string]any{
+				"media_type":    "animation",
+				"media_file_id": "file_anim_only",
+			},
+			wantMediaType: "animation",
+			wantMediaFile: "file_anim_only",
+		},
+		{
+			name: "text + animation",
+			input: map[string]any{
+				"message":       "Watch this GIF",
+				"media_type":    "animation",
+				"media_file_id": "file_anim_123",
+			},
+			wantMessage:   "Watch this GIF",
+			wantMediaType: "animation",
+			wantMediaFile: "file_anim_123",
+		},
+		{
+			name: "animation + button",
+			input: map[string]any{
+				"media_type":    "animation",
+				"media_file_id": "file_anim_btn",
+				"button": map[string]any{
+					"text":  "Click here",
+					"url":   "https://example.com/anim",
+					"style": "primary",
+					"emoji": "",
+				},
+			},
+			wantMediaType: "animation",
+			wantMediaFile: "file_anim_btn",
+			wantButton:    &DealDetailsButton{Text: "Click here", URL: "https://example.com/anim", Style: "primary", Emoji: ""},
+		},
 	}
 
 	for _, tc := range tests {
@@ -418,6 +454,17 @@ func TestSetMediaInDetails(t *testing.T) {
 		}
 		if got := GetMessageFromDetails(result); got != "keep me" {
 			t.Errorf("message lost: got %q", got)
+		}
+	})
+
+	t.Run("set animation media on empty details", func(t *testing.T) {
+		result, err := SetMediaInDetails(json.RawMessage("{}"), "animation", "file_anim_xyz")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		mt, mf := GetMediaFromDetails(result)
+		if mt != "animation" || mf != "file_anim_xyz" {
+			t.Errorf("GetMediaFromDetails = (%q, %q), want (animation, file_anim_xyz)", mt, mf)
 		}
 	})
 
