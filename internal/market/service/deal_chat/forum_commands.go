@@ -174,7 +174,7 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 	// Last 3 fields are url, style, emoji. Everything between /set_button and those 3 is the button text.
 	parts := strings.Fields(text)
 	if len(parts) < 5 {
-		s.sendToThread(ctx, chatID, threadID, "Usage: /set_button <text> <url> <style> <emoji>\nStyles: red, green, blue, default\nEmoji: any emoji or 0 for none\nExample: /set_button Buy Now https://example.com blue \U0001f525")
+		s.sendToThread(ctx, chatID, threadID, "Usage: /set_button <text> <url> <style> <emoji>\nStyles: danger, success, primary, default\nEmoji: any emoji or 0 for none\nExample: /set_button Buy Now https://example.com primary \U0001f525")
 		return nil
 	}
 
@@ -196,9 +196,8 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 	}
 
 	// Validate style
-	validStyles := map[string]bool{"red": true, "green": true, "blue": true, "default": true}
-	if !validStyles[style] {
-		s.sendToThread(ctx, chatID, threadID, "Invalid style. Must be one of: red, green, blue, default")
+	if !domain.ValidButtonStyles[style] {
+		s.sendToThread(ctx, chatID, threadID, "Invalid style. Must be one of: danger, success, primary, default")
 		return nil
 	}
 

@@ -9,19 +9,19 @@ import (
 
 var ErrDealDetailsInvalid = errors.New("deal details contains invalid or disallowed fields")
 
-var validButtonStyles = map[string]bool{"red": true, "green": true, "blue": true, "default": true}
+var ValidButtonStyles = map[string]bool{"danger": true, "success": true, "primary": true, "default": true}
 
 // DealDetailsButton represents an inline button on the ad post.
 type DealDetailsButton struct {
 	Text  string `json:"text"`
 	URL   string `json:"url"`
-	Style string `json:"style"` // "red", "green", "blue", "default"
+	Style string `json:"style"` // "danger", "success", "primary", "default"
 	Emoji string `json:"emoji"` // emoji string, or "" for none
 }
 
 // IsValid reports whether the button has a valid style and a valid http/https URL if set.
 func (b *DealDetailsButton) IsValid() bool {
-	if !validButtonStyles[b.Style] {
+	if !ValidButtonStyles[b.Style] {
 		return false
 	}
 	if b.URL != "" {

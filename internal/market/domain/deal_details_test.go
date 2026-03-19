@@ -61,14 +61,14 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 				"button": map[string]interface{}{
 					"text":  "Click me",
 					"url":   "https://example.com",
-					"style": "blue",
+					"style": "primary",
 					"emoji": "👆",
 				},
 			},
 			wantMessage:   "Ad with photo and button",
 			wantMediaType: "photo",
 			wantMediaFile: "file_photo789",
-			wantButton:    &DealDetailsButton{Text: "Click me", URL: "https://example.com", Style: "blue", Emoji: "👆"},
+			wantButton:    &DealDetailsButton{Text: "Click me", URL: "https://example.com", Style: "primary", Emoji: "👆"},
 		},
 		{
 			name: "text + video + button",
@@ -79,14 +79,14 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 				"button": map[string]interface{}{
 					"text":  "Learn more",
 					"url":   "https://example.com/promo",
-					"style": "green",
+					"style": "success",
 					"emoji": "",
 				},
 			},
 			wantMessage:   "Ad with video and button",
 			wantMediaType: "video",
 			wantMediaFile: "file_vid999",
-			wantButton:    &DealDetailsButton{Text: "Learn more", URL: "https://example.com/promo", Style: "green", Emoji: ""},
+			wantButton:    &DealDetailsButton{Text: "Learn more", URL: "https://example.com/promo", Style: "success", Emoji: ""},
 		},
 		{
 			name: "image + button",
@@ -96,13 +96,13 @@ func TestValidateDealDetails_ValidCombinations(t *testing.T) {
 				"button": map[string]interface{}{
 					"text":  "Buy now",
 					"url":   "https://shop.example.com",
-					"style": "red",
+					"style": "danger",
 					"emoji": "🛒",
 				},
 			},
 			wantMediaType: "photo",
 			wantMediaFile: "file_photo_btn",
-			wantButton:    &DealDetailsButton{Text: "Buy now", URL: "https://shop.example.com", Style: "red", Emoji: "🛒"},
+			wantButton:    &DealDetailsButton{Text: "Buy now", URL: "https://shop.example.com", Style: "danger", Emoji: "🛒"},
 		},
 		{
 			name: "image only",
@@ -212,7 +212,7 @@ func TestValidateDealDetails_InvalidCombinations(t *testing.T) {
 		{
 			name: "unknown top-level key",
 			input: map[string]interface{}{
-				"message":    "hello",
+				"message":     "hello",
 				"unknown_key": "value",
 			},
 		},
@@ -442,7 +442,7 @@ func TestSetMediaInDetails(t *testing.T) {
 
 func TestSetButtonInDetails(t *testing.T) {
 	t.Run("set button on empty details", func(t *testing.T) {
-		btn := &DealDetailsButton{Text: "Go", URL: "https://go.dev", Style: "blue", Emoji: ""}
+		btn := &DealDetailsButton{Text: "Go", URL: "https://go.dev", Style: "primary", Emoji: ""}
 		result, err := SetButtonInDetails(json.RawMessage("{}"), btn)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -462,7 +462,7 @@ func TestSetButtonInDetails(t *testing.T) {
 			"button": map[string]interface{}{
 				"text":  "Click",
 				"url":   "https://example.com",
-				"style": "red",
+				"style": "danger",
 				"emoji": "",
 			},
 		})
@@ -480,7 +480,7 @@ func TestSetButtonInDetails(t *testing.T) {
 			"media_type":    "video",
 			"media_file_id": "file_v1",
 		})
-		btn := &DealDetailsButton{Text: "Buy", URL: "https://buy.example.com", Style: "green", Emoji: "💰"}
+		btn := &DealDetailsButton{Text: "Buy", URL: "https://buy.example.com", Style: "success", Emoji: "💰"}
 		result, err := SetButtonInDetails(initial, btn)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -490,7 +490,7 @@ func TestSetButtonInDetails(t *testing.T) {
 			t.Errorf("media lost: got (%q, %q)", mt, mf)
 		}
 		got := GetButtonFromDetails(result)
-		if got == nil || got.Style != "green" {
+		if got == nil || got.Style != "success" {
 			t.Errorf("button mismatch after update: %+v", got)
 		}
 	})
