@@ -1,12 +1,10 @@
-package domain
+package entity
 
 import (
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
-
-	"ads-mrkt/internal/market/domain/entity"
 )
 
 // ListingPricesFormat is the required JSON format: array of [ad_type, duration_string, price_number].
@@ -15,8 +13,8 @@ import (
 var durationRegex = regexp.MustCompile(`^\d+hr$`)
 
 var validAdTypes = map[string]bool{
-	string(entity.AdTypePost):        true,
-	string(entity.AdTypeInstantPost): true,
+	string(AdTypePost):        true,
+	string(AdTypeInstantPost): true,
 }
 
 // DealPriceMatchesListing checks that the deal's ad type, duration, and price correspond to an option in the listing's prices.

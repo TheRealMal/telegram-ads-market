@@ -3,7 +3,6 @@ package model
 import (
 	"encoding/json"
 
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 )
 
@@ -30,7 +29,7 @@ func ListingWithPricesInTON(l *entity.Listing) *entity.Listing {
 	if l == nil {
 		return nil
 	}
-	converted, _ := domain.ConvertListingPricesNanotonToTON(l.Prices)
+	converted, _ := entity.ConvertListingPricesNanotonToTON(l.Prices)
 	out := *l
 	out.Prices = converted
 	return &out

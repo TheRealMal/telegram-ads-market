@@ -11,7 +11,6 @@ import (
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -116,7 +115,7 @@ func (s *service) CreateDealForumTopics(ctx context.Context, deal *entity.Deal, 
 }
 
 func (s *service) buildInitialMessages(deal *entity.Deal, listingType entity.ListingType) (lessorMsg, lesseeMsg string) {
-	priceTON := strconv.FormatFloat(domain.NanotonToTON(deal.Price), 'f', -1, 64)
+	priceTON := strconv.FormatFloat(entity.NanotonToTON(deal.Price), 'f', -1, 64)
 	postDate := deal.CreatedAt.Format("02.01.2006 15:04")
 	channelID := ""
 	if deal.ChannelID != nil {

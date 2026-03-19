@@ -1,12 +1,10 @@
-package domain
+package entity
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-
-	"ads-mrkt/internal/market/domain/entity"
 )
 
 func ComputeDealSignature(dealType string, duration int64, priceNanoton int64, details json.RawMessage, userID int64, lessorPayoutRaw, lesseePayoutRaw string) string {
@@ -21,7 +19,7 @@ func ComputeDealSignature(dealType string, duration int64, priceNanoton int64, d
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func dealPayoutAddresses(d *entity.Deal) (lessorPayout, lesseePayout string) {
+func dealPayoutAddresses(d *Deal) (lessorPayout, lesseePayout string) {
 	if d.LessorPayoutAddress != nil {
 		lessorPayout = *d.LessorPayoutAddress
 	}
@@ -31,7 +29,7 @@ func dealPayoutAddresses(d *entity.Deal) (lessorPayout, lesseePayout string) {
 	return lessorPayout, lesseePayout
 }
 
-func DealSignaturesMatch(d *entity.Deal) bool {
+func DealSignaturesMatch(d *Deal) bool {
 	if d.LessorSignature == nil || d.LesseeSignature == nil {
 		return false
 	}

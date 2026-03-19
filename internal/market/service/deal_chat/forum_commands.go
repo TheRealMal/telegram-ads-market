@@ -12,7 +12,6 @@ import (
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
@@ -84,13 +83,13 @@ func (s *service) HandleForumCommand(ctx context.Context, message *telegram.Upda
 }
 
 func (s *service) handlePreview(ctx context.Context, deal *entity.Deal, chatID int64, threadID int64) error {
-	msg := domain.GetMessageFromDetails(deal.Details)
+	msg := entity.GetMessageFromDetails(deal.Details)
 	if strings.TrimSpace(msg) == "" {
 		s.sendToThread(ctx, chatID, threadID, "No message set yet. Use /edit <text> to set the ad message.")
 		return nil
 	}
 
-	button := domain.GetButtonFromDetails(deal.Details)
+	button := entity.GetButtonFromDetails(deal.Details)
 	var markup *telegram.InlineKeyboardMarkup
 	if button != nil {
 		markup = buildURLButton(button)
@@ -127,12 +126,12 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 	// Update deal details
 	details := deal.Details
 	var err error
-	details, err = domain.SetMessageInDetails(details, newMessage)
+	details, err = entity.SetMessageInDetails(details, newMessage)
 	if err != nil {
 		s.sendToThread(ctx, chatID, threadID, "Failed to update message.")
 		return fmt.Errorf("set message in details: %w", err)
 	}
-	details, err = domain.SetMediaInDetails(details, mediaType, mediaFileID)
+	details, err = entity.SetMediaInDetails(details, mediaType, mediaFileID)
 	if err != nil {
 		s.sendToThread(ctx, chatID, threadID, "Failed to update media.")
 		return fmt.Errorf("set media in details: %w", err)
@@ -146,11 +145,11 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 			return fmt.Errorf("marshal entities: %w", err)
 		}
 	}
-	details, err = domain.SetRawEntitiesInDetails(details, entitiesJSON)
+	details, err = entity.SetRawEntitiesInDetails(details, entitiesJSON)
 	if err != nil {
 		return fmt.Errorf("set entities: %w", err)
 	}
-	details, err = domain.SetRawCaptionEntitiesInDetails(details, nil)
+	details, err = entity.SetRawCaptionEntitiesInDetails(details, nil)
 	if err != nil {
 		return fmt.Errorf("clear caption_entities: %w", err)
 	}
@@ -162,7 +161,7 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 	}
 
 	// Send the ad preview with "Confirm & Sign" button to the editor
-	button := domain.GetButtonFromDetails(details)
+	button := entity.GetButtonFromDetails(details)
 	confirmMarkup := buildConfirmSignMarkup(deal.ID, button)
 	s.sendAdPreview(ctx, chatID, threadID, details, confirmMarkup)
 
@@ -207,20 +206,20 @@ func (s *service) handleSetButton(ctx context.Context, deal *entity.Deal, chatID
 	}
 
 	// Check that message is set
-	msg := domain.GetMessageFromDetails(deal.Details)
+	msg := entity.GetMessageFromDetails(deal.Details)
 	if strings.TrimSpace(msg) == "" {
 		s.sendToThread(ctx, chatID, threadID, "Set the ad message first with /edit before adding a button.")
 		return nil
 	}
 
-	button := &domain.DealDetailsButton{
+	button := &entity.DealDetailsButton{
 		Text:  btnText,
 		URL:   btnURL,
 		Style: style,
 		Emoji: emoji,
 	}
 
-	details, detailsErr := domain.SetButtonInDetails(deal.Details, button)
+	details, detailsErr := entity.SetButtonInDetails(deal.Details, button)
 	if detailsErr != nil {
 		s.sendToThread(ctx, chatID, threadID, "Failed to update button.")
 		return detailsErr
@@ -300,7 +299,7 @@ func (s *service) buildMarkupWithoutApprove(ctx context.Context, dealID int64) *
 	if err != nil || deal == nil {
 		return &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{}}
 	}
-	button := domain.GetButtonFromDetails(deal.Details)
+	button := entity.GetButtonFromDetails(deal.Details)
 	if button != nil {
 		return buildURLButton(button)
 	}
@@ -308,7 +307,7 @@ func (s *service) buildMarkupWithoutApprove(ctx context.Context, dealID int64) *
 }
 
 // buildConfirmSignMarkup builds an InlineKeyboardMarkup with an optional URL button row and a "Confirm & Sign" callback button row.
-func buildConfirmSignMarkup(dealID int64, button *domain.DealDetailsButton) *telegram.InlineKeyboardMarkup {
+func buildConfirmSignMarkup(dealID int64, button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
 	var rows [][]telegram.InlineKeyboardButton
 	if button != nil {
 		btnText := button.Text
@@ -354,7 +353,7 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 		slog.Error("answer confirm sign callback query", "error", err)
 	}
 
-	button := domain.GetButtonFromDetails(deal.Details)
+	button := entity.GetButtonFromDetails(deal.Details)
 
 	if callbackQuery.Message != nil && callbackQuery.Message.Chat != nil {
 		var markup *telegram.InlineKeyboardMarkup
@@ -388,7 +387,7 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 }
 
 // buildApproveMarkup builds an InlineKeyboardMarkup with an optional URL button row and an Approve callback button row.
-func buildApproveMarkup(dealID int64, button *domain.DealDetailsButton) *telegram.InlineKeyboardMarkup {
+func buildApproveMarkup(dealID int64, button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
 	var rows [][]telegram.InlineKeyboardButton
 	if button != nil {
 		btnText := button.Text
@@ -416,11 +415,11 @@ func (s *service) otherSide(topic *entity.DealForumTopic, side string) (int64, i
 // getEntitiesFromDetails extracts entities from deal details, falling back to caption_entities for backward compat.
 func getEntitiesFromDetails(details json.RawMessage) []telegram.MessageEntity {
 	var entities []telegram.MessageEntity
-	if raw := domain.GetRawEntitiesFromDetails(details); len(raw) > 0 {
+	if raw := entity.GetRawEntitiesFromDetails(details); len(raw) > 0 {
 		_ = json.Unmarshal(raw, &entities)
 	}
 	if len(entities) == 0 {
-		if raw := domain.GetRawCaptionEntitiesFromDetails(details); len(raw) > 0 {
+		if raw := entity.GetRawCaptionEntitiesFromDetails(details); len(raw) > 0 {
 			_ = json.Unmarshal(raw, &entities)
 		}
 	}
@@ -433,8 +432,8 @@ func (s *service) sendAdPreview(ctx context.Context, chatID, threadID int64, det
 		return
 	}
 
-	msg := domain.GetMessageFromDetails(details)
-	mediaType, mediaFileID := domain.GetMediaFromDetails(details)
+	msg := entity.GetMessageFromDetails(details)
+	mediaType, mediaFileID := entity.GetMediaFromDetails(details)
 	entities := getEntitiesFromDetails(details)
 
 	event := &evententity.EventTelegramNotification{
@@ -493,7 +492,7 @@ func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFi
 }
 
 // buildURLButton creates an InlineKeyboardMarkup with a single URL button.
-func buildURLButton(button *domain.DealDetailsButton) *telegram.InlineKeyboardMarkup {
+func buildURLButton(button *entity.DealDetailsButton) *telegram.InlineKeyboardMarkup {
 	btnText := button.Text
 	if button.Emoji != "" {
 		btnText = button.Emoji + " " + btnText
