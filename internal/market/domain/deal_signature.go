@@ -36,7 +36,7 @@ func DealSignaturesMatch(d *entity.Deal) bool {
 		return false
 	}
 	lessorPayout, lesseePayout := dealPayoutAddresses(d)
-	expectedLessor := ComputeDealSignature(d.Type, d.Duration, d.Price, d.Details, d.LessorID, lessorPayout, lesseePayout)
-	expectedLessee := ComputeDealSignature(d.Type, d.Duration, d.Price, d.Details, d.LesseeID, lessorPayout, lesseePayout)
+	expectedLessor := ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, d.LessorID, lessorPayout, lesseePayout)
+	expectedLessee := ComputeDealSignature(string(d.Type), d.Duration, d.Price, d.Details, d.LesseeID, lessorPayout, lesseePayout)
 	return *d.LessorSignature == expectedLessor && *d.LesseeSignature == expectedLessee
 }

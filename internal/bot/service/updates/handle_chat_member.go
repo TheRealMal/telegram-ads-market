@@ -22,7 +22,7 @@ func (s *service) handleChatMember(ctx context.Context, update *telegram.ChatMem
 
 	channelID := update.Chat.ID
 	userID := update.NewChatMember.User.ID
-	newStatus := update.NewChatMember.Status
+	newStatus := marketentity.BotMemberStatus(update.NewChatMember.Status)
 
 	slog.Info("channel chat member status changed",
 		"channel_id", channelID,
@@ -50,9 +50,9 @@ func (s *service) handleChatMember(ctx context.Context, update *telegram.ChatMem
 	}
 
 	// Check if admin/owner was removed or demoted
-	oldStatus := ""
+	var oldStatus marketentity.BotMemberStatus
 	if update.OldChatMember != nil {
-		oldStatus = update.OldChatMember.Status
+		oldStatus = marketentity.BotMemberStatus(update.OldChatMember.Status)
 	}
 	wasAdmin := oldStatus == marketentity.BotMemberStatusAdministrator || oldStatus == marketentity.BotMemberStatusCreator
 	isAdmin := newStatus == marketentity.BotMemberStatusAdministrator || newStatus == marketentity.BotMemberStatusCreator

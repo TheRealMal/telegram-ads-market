@@ -14,9 +14,10 @@ const (
 	telegramNotificationLimit    = 50
 	telegramNotificationInterval = 1 * time.Second
 
-	telegramNotificationPendingPeriod  = 15 * time.Second
-	telegramNotificationPendingMinIdle = 30 * time.Second
-	telegramNotificationStreamMaxAge   = 7 * 24 * time.Hour
+	telegramNotificationPendingPeriod     = 15 * time.Second
+	telegramNotificationPendingMinIdle    = 30 * time.Second
+	telegramNotificationStreamMaxAge      = 7 * 24 * time.Hour
+	telegramNotificationStreamCleanPeriod = 24 * time.Hour
 )
 
 func (s *service) StartBackgroundProcessingNotifications(ctx context.Context) {
@@ -51,19 +52,24 @@ func (s *service) runNotificationWorker(ctx context.Context) {
 					Buttons:  ev.Buttons,
 				}); err != nil {
 					slog.Error("send telegram notification", "chat_id", ev.ChatID, "error", err)
+					promNotificationsFailed.Inc()
 					continue
 				}
+				promNotificationsProcessed.Inc()
 				ids = append(ids, ev.ID)
 			}
 			if len(ids) > 0 {
-				_ = s.notificationEventSvc.AckTelegramNotificationMessages(ctx, telegramNotificationGroup, ids)
+				if err := s.notificationEventSvc.AckTelegramNotificationMessages(ctx, telegramNotificationGroup, ids); err != nil {
+					slog.Error("failed to ack telegram notification messages", "error", err)
+					promNotificationAcksFailed.Inc()
+				}
 			}
 		}
 	}
 }
 
 func (s *service) notificationStreamCleaner(ctx context.Context) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(telegramNotificationStreamCleanPeriod)
 	defer ticker.Stop()
 
 	for {
@@ -75,7 +81,7 @@ func (s *service) notificationStreamCleaner(ctx context.Context) {
 			if err := s.notificationEventSvc.TrimStreamByAge(ctx, telegramNotificationStreamMaxAge); err != nil {
 				slog.Error("failed to trim telegram notification stream by age", "err", err)
 			}
-			ticker.Reset(24 * time.Hour)
+			ticker.Reset(telegramNotificationStreamCleanPeriod)
 		}
 	}
 }
@@ -112,12 +118,17 @@ func (s *service) processPendingNotifications(ctx context.Context) {
 					Buttons:  ev.Buttons,
 				}); err != nil {
 					slog.Error("send pending telegram notification", "chat_id", ev.ChatID, "error", err)
+					promNotificationsFailed.Inc()
 					continue
 				}
+				promNotificationsProcessed.Inc()
 				ids = append(ids, ev.ID)
 			}
 			if len(ids) > 0 {
-				_ = s.notificationEventSvc.AckTelegramNotificationMessages(ctx, telegramNotificationGroup, ids)
+				if err := s.notificationEventSvc.AckTelegramNotificationMessages(ctx, telegramNotificationGroup, ids); err != nil {
+					slog.Error("failed to ack pending telegram notification messages", "error", err)
+					promNotificationAcksFailed.Inc()
+				}
 			}
 			ticker.Reset(telegramNotificationPendingPeriod)
 		}

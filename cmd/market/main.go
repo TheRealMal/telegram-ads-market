@@ -28,16 +28,16 @@ import (
 	channelservice "ads-mrkt/internal/market/service/channel"
 	dealservice "ads-mrkt/internal/market/service/deal"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
-	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 	dealpostmessage "ads-mrkt/internal/market/service/deal_post_message"
+	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 	escrowservice "ads-mrkt/internal/market/service/escrow"
 	listingservice "ads-mrkt/internal/market/service/listing"
 	userservice "ads-mrkt/internal/market/service/user"
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
 	"ads-mrkt/internal/server"
-	"ads-mrkt/internal/vault"
 	marketrouter "ads-mrkt/internal/server/routers/market"
+	"ads-mrkt/internal/vault"
 	"ads-mrkt/pkg/auth"
 	"ads-mrkt/pkg/health"
 
@@ -103,12 +103,21 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			analyticsSvc := analyticsservice.New(analyticsRepo, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
 			eventRepo := eventredis.New(redisClient)
-			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
-			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
-			telegramNotifyEventSvc := telegramnotifyevent.NewService(eventRepo)
+			escrowDepositEventSvc, err := escrowdepositevent.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create escrow deposit event service")
+			}
+			channelUpdateStatsEventSvc, err := channelupdateevent.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create channel update stats event service")
+			}
+			telegramNotifyEventSvc, err := telegramnotifyevent.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create telegram notification event service")
+			}
 
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
-			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo)
+			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo, userRepo)
 
 			// Standalone deal signer for deal chat (breaks circular dep: dealChatSvc -> dealSigner -> escrowSvc -> dealChatSvc).
 			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc)
@@ -120,7 +129,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
 			channelSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
-			dealSvc := dealservice.NewDealService(dealRepo, userRepo, escrowSvc, telegramNotifyEventSvc)
+			dealSvc := dealservice.NewDealService(dealRepo, userRepo, listingRepo, escrowSvc, telegramNotifyEventSvc)
 			dealPostMessageSvc := dealpostmessage.NewService(dealPostMessageRepo)
 			// Preload: mark deals in waiting_escrow_deposit past deposit deadline (updated_at + 1h) as expired
 			preloadCtx, preloadCancel := context.WithTimeout(ctxRun, 30*time.Second)

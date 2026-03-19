@@ -41,7 +41,7 @@ func DealToResponse(d *entity.Deal) *DealResponse {
 		LessorID:            d.LessorID,
 		LesseeID:            d.LesseeID,
 		ChannelID:           d.ChannelID,
-		Type:                d.Type,
+		Type:                string(d.Type),
 		Duration:            d.Duration,
 		Price:               domain.NanotonToTON(d.Price),
 		EscrowAmount:        d.EscrowAmount,

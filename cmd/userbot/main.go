@@ -58,7 +58,10 @@ func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealPostMessageRepo := deal_post_message.New(pg)
 			dealActionLockRepo := deal_action_lock.New(pg)
 			eventRepo := eventredis.New(redisClient)
-			channelUpdateStatsEventSvc := channelupdateevent.NewService(eventRepo)
+			channelUpdateStatsEventSvc, err := channelupdateevent.NewService(ctx, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create channel update stats event service")
+			}
 			telegramBotClient := telegram.NewAPIClient(ctx, cfg.Telegram, redisClient)
 			b := userbotservice.New(cfg.UserBot, stateStorage, channelRepo, listingRepo, dealRepo, dealPostMessageRepo, dealActionLockRepo, channelUpdateStatsEventSvc, telegramBotClient)
 

@@ -50,7 +50,7 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", channelID)
 			continue
 		}
-		if ch.BotMemberStatus != entity.BotMemberStatusAdministrator {
+		if !ch.CanPostMessages() {
 			logger.Error("skip deal, bot not admin in channel", "deal_id", deal.ID, "channel_id", channelID, "bot_status", ch.BotMemberStatus)
 			continue
 		}

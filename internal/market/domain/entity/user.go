@@ -1,6 +1,8 @@
 package entity
 
-import "ads-mrkt/pkg/auth/role"
+import (
+	"ads-mrkt/pkg/auth/role"
+)
 
 type User struct {
 	ID            int64     `json:"id"`
@@ -13,4 +15,14 @@ type User struct {
 	AllowsPM      bool      `json:"-"`
 	WalletAddress *string   `json:"wallet_address,omitempty"` // TON address in raw format
 	Role          role.Role `json:"role"`                     // user | admin
+}
+
+// HasWallet reports whether the user has a connected TON wallet address.
+func (u *User) HasWallet() bool {
+	return u.WalletAddress != nil && *u.WalletAddress != ""
+}
+
+// IsAdmin reports whether the user has the admin role.
+func (u *User) IsAdmin() bool {
+	return u.Role == role.AdminRole
 }

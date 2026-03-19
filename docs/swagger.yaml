@@ -1,18 +1,140 @@
 basePath: /api/v1
 definitions:
-  ads-mrkt_internal_market_domain_entity.Channel:
+  ads-mrkt_internal_analytics_application_http_model.HistoryResponse:
     properties:
+      avg_listings_per_user:
+        items:
+          type: number
+        type: array
+      commission_earned_ton:
+        items:
+          type: number
+        type: array
+      deal_amounts_by_status_ton:
+        additionalProperties:
+          items:
+            format: float64
+            type: number
+          type: array
+        type: object
+      deals_by_status:
+        additionalProperties:
+          items:
+            format: int64
+            type: integer
+          type: array
+        type: object
+      deals_count:
+        items:
+          type: integer
+        type: array
+      from:
+        type: string
+      listings_count:
+        items:
+          type: integer
+        type: array
+      period:
+        type: string
+      timestamps:
+        items:
+          type: integer
+        type: array
+      to:
+        type: string
+      users_count:
+        items:
+          type: integer
+        type: array
+    type: object
+  ads-mrkt_internal_analytics_application_http_model.LatestSnapshotResponse:
+    properties:
+      snapshot:
+        $ref: '#/definitions/ads-mrkt_internal_analytics_application_http_model.SnapshotResponse'
+    type: object
+  ads-mrkt_internal_analytics_application_http_model.SnapshotResponse:
+    properties:
+      avg_listings_per_user:
+        type: number
+      commission_earned_ton:
+        type: number
+      deal_amounts_by_status_ton:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      deals_by_status:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      deals_count:
+        type: integer
       id:
         type: integer
-      photo:
+      listings_count:
+        type: integer
+      recorded_at:
         type: string
-      title:
+      users_count:
+        type: integer
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.AuthUserRequest:
+    properties:
+      referrer:
+        type: integer
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.CreateDealRequest:
+    properties:
+      channel_id:
+        type: integer
+      details:
+        items:
+          type: integer
+        type: array
+      duration:
+        type: integer
+      listing_id:
+        type: integer
+      message:
         type: string
-      username:
+      price:
+        type: number
+      type:
         type: string
     type: object
-  ads-mrkt_internal_market_domain_entity.Deal:
+  ads-mrkt_internal_market_application_market_http_model.CreateListingRequest:
     properties:
+      categories:
+        items:
+          type: string
+        type: array
+      channel_id:
+        type: integer
+      description:
+        type: string
+      prepared_post:
+        items:
+          type: integer
+        type: array
+      prices:
+        items:
+          type: integer
+        type: array
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.DealChatLinkResponse:
+    properties:
+      chat_link:
+        type: string
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.DealResponse:
+    properties:
+      channel_id:
+        type: integer
       created_at:
         type: string
       details:
@@ -23,20 +145,30 @@ definitions:
         type: integer
       escrow_address:
         type: string
+      escrow_amount:
+        type: integer
+      escrow_release_time:
+        type: string
       id:
         type: integer
       lessee_id:
         type: integer
+      lessee_payout_address:
+        type: string
       lessee_signature:
         type: string
       lessor_id:
         type: integer
+      lessor_payout_address:
+        type: string
       lessor_signature:
         type: string
       listing_id:
         type: integer
+      message:
+        type: string
       price:
-        type: integer
+        type: number
       status:
         $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.DealStatus'
       type:
@@ -44,19 +176,70 @@ definitions:
       updated_at:
         type: string
     type: object
-  ads-mrkt_internal_market_domain_entity.DealChat:
+  ads-mrkt_internal_market_application_market_http_model.SetDealPayoutRequest:
     properties:
-      created_at:
+      wallet_address:
         type: string
-      deal_id:
-        type: integer
-      replied_message:
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.SetWalletRequest:
+    properties:
+      wallet_address:
         type: string
-      reply_to_chat_id:
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.UpdateDealDraftRequest:
+    properties:
+      details:
+        items:
+          type: integer
+        type: array
+      duration:
         type: integer
-      reply_to_message_id:
+      price:
+        type: number
+      type:
+        type: string
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.UpdateListingRequest:
+    properties:
+      categories:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      prepared_post:
+        items:
+          type: integer
+        type: array
+      prices:
+        items:
+          type: integer
+        type: array
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  ads-mrkt_internal_market_application_market_http_model.WaitlistResponse:
+    properties:
+      channels_connected:
+        items:
+          $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Channel'
+        type: array
+      referrals:
+        items:
+          $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.User'
+        type: array
+    type: object
+  ads-mrkt_internal_market_domain_entity.Channel:
+    properties:
+      id:
         type: integer
-      updated_at:
+      photo:
+        type: string
+      title:
+        type: string
+      username:
         type: string
     type: object
   ads-mrkt_internal_market_domain_entity.DealStatus:
@@ -69,6 +252,8 @@ definitions:
     - waiting_escrow_release
     - escrow_release_confirmed
     - completed
+    - waiting_escrow_refund
+    - escrow_refund_confirmed
     - expired
     - rejected
     type: string
@@ -81,16 +266,38 @@ definitions:
     - DealStatusWaitingEscrowRelease
     - DealStatusEscrowReleaseConfirmed
     - DealStatusCompleted
+    - DealStatusWaitingEscrowRefund
+    - DealStatusEscrowRefundConfirmed
     - DealStatusExpired
     - DealStatusRejected
   ads-mrkt_internal_market_domain_entity.Listing:
     properties:
+      categories:
+        description: JSON array of strings from predefined set
+        items:
+          type: integer
+        type: array
+      channel_followers:
+        type: integer
       channel_id:
         type: integer
+      channel_photo:
+        type: string
+      channel_title:
+        type: string
+      channel_username:
+        type: string
       created_at:
+        type: string
+      description:
         type: string
       id:
         type: integer
+      prepared_post:
+        description: 'JSON object, e.g. {"message": "ad text"}; extensible'
+        items:
+          type: integer
+        type: array
       prices:
         items:
           type: integer
@@ -120,6 +327,28 @@ definitions:
     x-enum-varnames:
     - ListingTypeLessor
     - ListingTypeLessee
+  ads-mrkt_internal_market_domain_entity.User:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      locale:
+        type: string
+      photo:
+        type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/ads-mrkt_pkg_auth_role.Role'
+        description: user | admin
+      username:
+        type: string
+      wallet_address:
+        description: TON address in raw format
+        type: string
+    type: object
   ads-mrkt_internal_server_templates_response.Template:
     properties:
       data: {}
@@ -128,69 +357,16 @@ definitions:
       ok:
         type: boolean
     type: object
-  internal_market_application_market_http.AuthUserRequest:
-    properties:
-      referrer:
-        description: optional, for future use
-        type: integer
-    type: object
-  internal_market_application_market_http.CreateDealRequest:
-    properties:
-      details:
-        items:
-          type: integer
-        type: array
-      duration:
-        type: integer
-      listing_id:
-        type: integer
-      price:
-        type: integer
-      type:
-        type: string
-    type: object
-  internal_market_application_market_http.CreateListingRequest:
-    properties:
-      channel_id:
-        type: integer
-      prices:
-        description: '[["<number_of_hours>hr", <price>], ...]'
-        items:
-          type: integer
-        type: array
-      status:
-        description: active | inactive
-        type: string
-      type:
-        description: lessor | lessee
-        type: string
-    type: object
-  internal_market_application_market_http.UpdateDealDraftRequest:
-    properties:
-      details:
-        items:
-          type: integer
-        type: array
-      duration:
-        type: integer
-      price:
-        type: integer
-      type:
-        type: string
-    type: object
-  internal_market_application_market_http.UpdateListingRequest:
-    properties:
-      channel_id:
-        type: integer
-      prices:
-        items:
-          type: integer
-        type: array
-      status:
-        type: string
-      type:
-        type: string
-    type: object
+  ads-mrkt_pkg_auth_role.Role:
+    enum:
+    - user
+    - admin
+    - ""
+    type: string
+    x-enum-varnames:
+    - UserRole
+    - AdminRole
+    - EmptyRole
 host: localhost:8080
 info:
   contact: {}
@@ -200,6 +376,76 @@ info:
   title: Swagger for Ads Market API
   version: "1.0"
 paths:
+  /analytics/snapshot/history:
+    get:
+      parameters:
+      - description: 'Time range: week (7d), month (30d), year (365d)'
+        enum:
+        - week
+        - month
+        - year
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Timestamps (Unix) and metric series
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  $ref: '#/definitions/ads-mrkt_internal_analytics_application_http_model.HistoryResponse'
+              type: object
+        "400":
+          description: Bad request (invalid period)
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "500":
+          description: Internal error
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      summary: Get analytics snapshot history for charts
+      tags:
+      - Analytics
+  /analytics/snapshot/latest:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Latest snapshot (snapshot field null when none)
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  $ref: '#/definitions/ads-mrkt_internal_analytics_application_http_model.LatestSnapshotResponse'
+              type: object
+        "500":
+          description: Internal error
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      summary: Get latest analytics snapshot
+      tags:
+      - Analytics
   /market/auth:
     post:
       consumes:
@@ -210,7 +456,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_market_application_market_http.AuthUserRequest'
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.AuthUserRequest'
       - description: Telegram init data
         in: header
         name: X-Telegram-InitData
@@ -302,6 +548,68 @@ paths:
       summary: Refresh (get) channel data by id; user must be admin of the channel
       tags:
       - Market
+  /market/channels/{id}/stats:
+    get:
+      parameters:
+      - description: Channel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Channel stats (Telegram broadcast stats shape)
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "404":
+          description: Not found
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Get channel statistics. Allowed for channel admins or users who have
+        a listing with this channel.
+      tags:
+      - Market
   /market/deals:
     post:
       consumes:
@@ -312,7 +620,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_market_application_market_http.CreateDealRequest'
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.CreateDealRequest'
       produces:
       - application/json
       responses:
@@ -323,7 +631,7 @@ paths:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
             - properties:
                 data:
-                  $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Deal'
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
               type: object
         "400":
           description: Bad request
@@ -384,10 +692,19 @@ paths:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
             - properties:
                 data:
-                  $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Deal'
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
               type: object
         "400":
           description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
           schema:
             allOf:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
@@ -404,7 +721,9 @@ paths:
                 data:
                   type: string
               type: object
-      summary: Get deal by ID
+      security:
+      - JWT: []
+      summary: Get deal by ID (only if caller is lessor or lessee)
       tags:
       - Market
     patch:
@@ -421,7 +740,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_market_application_market_http.UpdateDealDraftRequest'
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.UpdateDealDraftRequest'
       produces:
       - application/json
       responses:
@@ -432,7 +751,7 @@ paths:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
             - properties:
                 data:
-                  $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Deal'
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
               type: object
         "400":
           description: Bad request
@@ -475,71 +794,7 @@ paths:
       summary: Update deal draft (type, duration, price, details). Clears both signatures.
       tags:
       - Market
-  /market/deals/{id}/messages:
-    get:
-      parameters:
-      - description: Deal ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of deal chat messages
-          schema:
-            allOf:
-            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.DealChat'
-                  type: array
-              type: object
-        "400":
-          description: Bad request
-          schema:
-            allOf:
-            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
-            - properties:
-                data:
-                  type: string
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            allOf:
-            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
-            - properties:
-                data:
-                  type: string
-              type: object
-        "403":
-          description: Forbidden
-          schema:
-            allOf:
-            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
-            - properties:
-                data:
-                  type: string
-              type: object
-        "404":
-          description: Not found
-          schema:
-            allOf:
-            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
-            - properties:
-                data:
-                  type: string
-              type: object
-      security:
-      - JWT: []
-      summary: List deal messages (chat invite + replies) for the deal in chronological
-        order. Caller must be lessor or lessee.
-      tags:
-      - Market
-  /market/deals/{id}/send-chat-message:
+  /market/deals/{id}/chat-link:
     post:
       parameters:
       - description: Deal ID
@@ -551,13 +806,13 @@ paths:
       - application/json
       responses:
         "200":
-          description: Created deal chat row
+          description: Chat link to open in Telegram
           schema:
             allOf:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
             - properties:
                 data:
-                  $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.DealChat'
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealChatLinkResponse'
               type: object
         "400":
           description: Bad request
@@ -597,9 +852,130 @@ paths:
               type: object
       security:
       - JWT: []
-      summary: Send deal chat invite message to the current user. Sends "Reply to
-        this message to chat with the other side." and stores the message for reply
-        tracking.
+      summary: Get deal forum chat link. Caller must be lessor or lessee.
+      tags:
+      - Market
+  /market/deals/{id}/payout-address:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: wallet_address (raw)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.SetDealPayoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated deal
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "404":
+          description: Not found
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Set your payout address on the deal (lessor or lessee). Required before
+        signing. Draft only.
+      tags:
+      - Market
+  /market/deals/{id}/reject:
+    post:
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated deal
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "403":
+          description: Forbidden (deal not draft or not a side)
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "404":
+          description: Not found
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Reject deal. Only allowed when deal status is draft; caller must be
+        lessor or lessee.
       tags:
       - Market
   /market/deals/{id}/sign:
@@ -620,7 +996,7 @@ paths:
             - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
             - properties:
                 data:
-                  $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Deal'
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
               type: object
         "400":
           description: Bad request
@@ -671,6 +1047,14 @@ paths:
         in: query
         name: type
         type: string
+      - description: Comma-separated categories (e.g. Tech,Crypto)
+        in: query
+        name: categories
+        type: string
+      - description: Min channel followers (only lessor listings with stats)
+        in: query
+        name: min_followers
+        type: integer
       produces:
       - application/json
       responses:
@@ -685,7 +1069,8 @@ paths:
                     $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Listing'
                   type: array
               type: object
-      summary: List all listings with optional type filter (public, no auth)
+      summary: List all listings with optional type, categories, and min_followers
+        filter (public, no auth)
       tags:
       - Market
     post:
@@ -697,7 +1082,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_market_application_market_http.CreateListingRequest'
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.CreateListingRequest'
       produces:
       - application/json
       responses:
@@ -743,6 +1128,66 @@ paths:
       tags:
       - Market
   /market/listings/{id}:
+    delete:
+      parameters:
+      - description: Listing ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Deleted
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "404":
+          description: Not found
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Delete listing
+      tags:
+      - Market
     get:
       parameters:
       - description: Listing ID
@@ -797,7 +1242,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_market_application_market_http.UpdateListingRequest'
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.UpdateListingRequest'
       produces:
       - application/json
       responses:
@@ -870,7 +1315,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/ads-mrkt_internal_market_domain_entity.Deal'
+                    $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
                   type: array
               type: object
         "400":
@@ -882,7 +1327,91 @@ paths:
                 data:
                   type: string
               type: object
-      summary: List deals by listing ID
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: List deals by listing ID (only deals where caller is lessor or lessee)
+      tags:
+      - Market
+  /market/me/wallet:
+    delete:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Disconnect wallet (clear linked TON wallet for current user).
+      tags:
+      - Market
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: wallet_address (raw)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.SetWalletRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Set current user's TON wallet (raw format) for deal payouts.
       tags:
       - Market
   /market/my-channels:
@@ -913,6 +1442,36 @@ paths:
       security:
       - JWT: []
       summary: List channels where current user is admin
+      tags:
+      - Market
+  /market/my-deals:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user's deals
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: List deals for the current user (as lessor or lessee)
       tags:
       - Market
   /market/my-listings:
@@ -948,6 +1507,34 @@ paths:
       security:
       - JWT: []
       summary: List current user's listings with optional type filter
+      tags:
+      - Market
+  /market/waitlist:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Waitlist status with channel count
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  $ref: '#/definitions/ads-mrkt_internal_market_application_market_http_model.WaitlistResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/ads-mrkt_internal_server_templates_response.Template'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - JWT: []
+      summary: Get waitlist status for current user
       tags:
       - Market
   /telegram/webhook:

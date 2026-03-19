@@ -38,7 +38,7 @@ func (e *EventTelegramUpdate) FromMap(m map[string]interface{}) {
 	if err != nil {
 		return
 	}
-	e.Timestamp = mustParseInt64(m["timestamp"])
+	e.Timestamp = int64FromMap(m, "timestamp")
 }
 
 func (e *EventTelegramUpdate) StreamKey() string {

@@ -75,7 +75,7 @@ func (s *service) syncChannelAdmins(ctx context.Context, channelID int64) error 
 			continue
 		}
 		role := "admin"
-		if admin.Status == marketentity.BotMemberStatusCreator {
+		if marketentity.BotMemberStatus(admin.Status) == marketentity.BotMemberStatusCreator {
 			role = "owner"
 		}
 		if err := s.channelAdminRepo.UpsertChannelAdmin(ctx, admin.User.ID, channelID, role); err != nil {

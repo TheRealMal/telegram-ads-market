@@ -130,6 +130,15 @@ func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, acces
 	}
 	slog.Info("applied loaded graphs", "channel_id", channelID)
 
+	if err := s.storeStatsWithTimestamp(ctx, channelID, &stats); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// storeStatsWithTimestamp marshals broadcast stats, appends a requested_at timestamp, and upserts to the database.
+func (s *service) storeStatsWithTimestamp(ctx context.Context, channelID int64, stats *tg.StatsBroadcastStats) error {
 	jsonStats, err := json.Marshal(stats)
 	if err != nil {
 		return fmt.Errorf("failed to marshal stats: %w", err)
@@ -149,6 +158,5 @@ func (s *service) UpdateChannelStats(ctx context.Context, channelID int64, acces
 	if err := s.channelRepo.UpsertChannelStats(ctx, channelID, jsonStats); err != nil {
 		return fmt.Errorf("failed to upsert channel stats: %w", err)
 	}
-
 	return nil
 }

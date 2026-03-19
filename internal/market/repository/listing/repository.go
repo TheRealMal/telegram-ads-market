@@ -4,13 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/market/repository/listing/model"
+	"ads-mrkt/internal/market/repository/pgxutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// listingWithChannelSelectFrom is the common SELECT...FROM...JOIN fragment for listing queries with channel info.
+const listingWithChannelSelectFrom = "SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at, " +
+	"c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo, " +
+	"(cs.stats->'Followers'->>'Current')::bigint AS channel_followers " +
+	"FROM market.listing l " +
+	"LEFT JOIN market.channel c ON c.id = l.channel_id " +
+	"LEFT JOIN market.channel_stats cs ON cs.channel_id = l.channel_id"
 
 type database interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
@@ -47,13 +57,13 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 			"prepared_post": l.PreparedPost,
 		})
 	if err != nil {
-		return err
+		return fmt.Errorf("create listing: %w", err)
 	}
 	defer rows.Close()
 
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingReturnRow])
 	if err != nil {
-		return err
+		return fmt.Errorf("create listing: scan row: %w", err)
 	}
 	l.ID = row.ID
 	l.CreatedAt = row.CreatedAt
@@ -62,17 +72,11 @@ func (r *repository) CreateListing(ctx context.Context, l *entity.Listing) error
 }
 
 func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.Listing, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
-		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
-		FROM market.listing l
-		LEFT JOIN market.channel c ON c.id = l.channel_id
-		LEFT JOIN market.channel_stats cs ON cs.channel_id = l.channel_id
-		WHERE l.id = @id`,
+	rows, err := r.db.Query(ctx,
+		listingWithChannelSelectFrom+" WHERE l.id = @id",
 		pgx.NamedArgs{"id": id})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get listing by id %d: %w", id, err)
 	}
 	defer rows.Close()
 
@@ -81,7 +85,7 @@ func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.List
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("get listing by id %d: %w", id, err)
 	}
 	return model.ListingWithChannelRowToEntity(row), nil
 }
@@ -106,23 +110,22 @@ func (r *repository) UpdateListing(ctx context.Context, l *entity.Listing) error
 			"description":   l.Description,
 			"prepared_post": l.PreparedPost,
 		})
-	return err
+	if err != nil {
+		return fmt.Errorf("update listing %d: %w", l.ID, err)
+	}
+	return nil
 }
 
 func (r *repository) DeleteListing(ctx context.Context, id int64) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM market.listing WHERE id = @id`, pgx.NamedArgs{"id": id})
-	return err
+	if err != nil {
+		return fmt.Errorf("delete listing %d: %w", id, err)
+	}
+	return nil
 }
 
 func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error) {
-	q := `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
-		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
-		FROM market.listing l
-		LEFT JOIN market.channel c ON c.id = l.channel_id
-		LEFT JOIN market.channel_stats cs ON cs.channel_id = l.channel_id
-		WHERE l.user_id = @user_id`
+	q := listingWithChannelSelectFrom + " WHERE l.user_id = @user_id"
 	args := pgx.NamedArgs{"user_id": userID}
 	if typ != nil {
 		q += ` AND l.type = @type`
@@ -132,17 +135,13 @@ func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ
 
 	rows, err := r.db.Query(ctx, q, args)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list listings by user id %d: %w", userID, err)
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
+	list, err := pgxutil.CollectAndConvert(rows, model.ListingWithChannelRowToEntity)
 	if err != nil {
-		return nil, err
-	}
-	list := make([]*entity.Listing, 0, len(slice))
-	for _, row := range slice {
-		list = append(list, model.ListingWithChannelRowToEntity(row))
+		return nil, fmt.Errorf("list listings by user id %d: %w", userID, err)
 	}
 	return list, nil
 }
@@ -150,11 +149,11 @@ func (r *repository) ListListingsByUserID(ctx context.Context, userID int64, typ
 func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID int64) (bool, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT 1 AS one FROM market.listing
-		WHERE channel_id = @channel_id AND status = 'active'
+		WHERE channel_id = @channel_id AND status = @status_active
 		LIMIT 1`,
-		pgx.NamedArgs{"channel_id": channelID})
+		pgx.NamedArgs{"channel_id": channelID, "status_active": string(entity.ListingStatusActive)})
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("is channel %d has active listing: %w", channelID, err)
 	}
 	defer rows.Close()
 	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingExistsRow])
@@ -162,7 +161,7 @@ func (r *repository) IsChannelHasActiveListing(ctx context.Context, channelID in
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("is channel %d has active listing: %w", channelID, err)
 	}
 	return true, nil
 }
@@ -178,7 +177,7 @@ func (r *repository) DeactivateListingsByUserAndChannel(ctx context.Context, use
 			"status_active":   string(entity.ListingStatusActive),
 		})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("deactivate listings by user %d channel %d: %w", userID, channelID, err)
 	}
 	return cmd.RowsAffected(), nil
 }
@@ -193,21 +192,14 @@ func (r *repository) DeactivateListingsByChannel(ctx context.Context, channelID 
 			"status_active":   string(entity.ListingStatusActive),
 		})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("deactivate listings by channel %d: %w", channelID, err)
 	}
 	return cmd.RowsAffected(), nil
 }
 
 func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error) {
-	q := `
-		SELECT l.id, l.status, l.user_id, l.channel_id, l.type, l.prices, l.categories, l.description, l.prepared_post, l.created_at, l.updated_at,
-		       c.title AS channel_title, c.username AS channel_username, c.photo AS channel_photo,
-		       (cs.stats->'Followers'->>'Current')::bigint AS channel_followers
-		FROM market.listing l
-		LEFT JOIN market.channel c ON c.id = l.channel_id
-		LEFT JOIN market.channel_stats cs ON cs.channel_id = l.channel_id
-		WHERE l.status = 'active'`
-	args := pgx.NamedArgs{}
+	q := listingWithChannelSelectFrom + " WHERE l.status = @status_active"
+	args := pgx.NamedArgs{"status_active": string(entity.ListingStatusActive)}
 	if typ != nil {
 		q += ` AND l.type = @type`
 		args["type"] = string(*typ)
@@ -224,17 +216,13 @@ func (r *repository) ListListingsAll(ctx context.Context, typ *entity.ListingTyp
 
 	rows, err := r.db.Query(ctx, q, args)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list listings all: %w", err)
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
+	list, err := pgxutil.CollectAndConvert(rows, model.ListingWithChannelRowToEntity)
 	if err != nil {
-		return nil, err
-	}
-	list := make([]*entity.Listing, 0, len(slice))
-	for _, row := range slice {
-		list = append(list, model.ListingWithChannelRowToEntity(row))
+		return nil, fmt.Errorf("list listings all: %w", err)
 	}
 	return list, nil
 }

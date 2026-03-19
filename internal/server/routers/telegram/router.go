@@ -11,7 +11,7 @@ type telegramMiddleware interface {
 }
 
 type webhookHandler interface {
-	HandleUpdate(w http.ResponseWriter, r *http.Request)
+	HandleUpdate(w http.ResponseWriter, r *http.Request) (interface{}, error)
 }
 
 type Router struct {
@@ -33,7 +33,7 @@ func (r *Router) GetRoutes() http.Handler {
 	mux.HandleFunc("POST /api/v1/telegram/webhook", server.WithMetrics(
 		r.telegramMiddleware.TelegramMiddleware(
 			server.WithMethod(
-				r.webhookHandler.HandleUpdate,
+				server.WithJSONResponse(r.webhookHandler.HandleUpdate),
 				http.MethodPost,
 			),
 		),

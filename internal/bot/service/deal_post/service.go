@@ -38,7 +38,6 @@ type dealActionLockRepository interface {
 	GetLastDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (*entity.DealActionLock, error)
 }
 
-// TODO: (@TheRealMal) Remove at all if userbot flow is choosen
 type service struct {
 	telegramClient      telegramClient
 	channelRepo         channelRepository

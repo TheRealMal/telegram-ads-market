@@ -163,59 +163,73 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 
 	// If the last lock for this action is Locked and expired, previous run may have transferred then crashed: try to find outgoing tx by amount and recover.
 	lastLock, lerr := s.dealActionLockRepo.GetLastDealActionLock(ctx, dealID, actionType)
-	if lerr == nil && lastLock != nil && lastLock.Status == entity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
-		found, _ := s.liteclient.HasOutgoingTxTo(ctx, escrowAddr, amountNanoton, toAddr)
-		if found {
-			if release {
-				if err = s.dealRepo.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
-					return err
-				}
-			} else {
-				if err = s.dealRepo.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
-					return err
-				}
-			}
-			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusCompleted)
-			_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
-			logger.Info("escrow release/refund recovered from expired lock", "deal_id", dealID, "release", release)
-			return nil
-		}
-		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
-	}
-
-	err = func() error {
-		lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, dealID, actionType)
+	if lerr == nil && lastLock != nil {
+		recovered, err := s.checkAndRecoverExpiredLock(ctx, logger, dealID, actionType, lastLock, escrowAddr, amountNanoton, toAddr, release)
 		if err != nil {
 			return err
 		}
-		dealACtionLockStatus := entity.DealActionLockStatusFailed
-		defer func() {
-			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, dealACtionLockStatus)
-		}()
-
-		if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
-			logger.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
-			return err
+		if recovered {
+			return nil
 		}
+	}
 
-		if release {
-			if err = s.dealRepo.SetDealStatusEscrowReleaseConfirmed(ctx, dealID); err != nil {
-				return err
-			}
-		} else {
-			if err = s.dealRepo.SetDealStatusEscrowRefundConfirmed(ctx, dealID); err != nil {
-				return err
-			}
-		}
-		_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
-		dealACtionLockStatus = entity.DealActionLockStatusCompleted
-		return nil
-	}()
-	if err != nil {
+	if err := s.performTransfer(ctx, logger, dealID, actionType, w, toAddr, amount, release); err != nil {
 		return err
 	}
 
 	logger.Info("escrow release/refund completed", "deal_id", dealID, "release", release)
+	return nil
+}
+
+// setDealStatusAfterTransfer updates the deal status after a successful escrow transfer.
+func (s *service) setDealStatusAfterTransfer(ctx context.Context, dealID int64, release bool) error {
+	if release {
+		return s.dealRepo.SetDealStatusEscrowReleaseConfirmed(ctx, dealID)
+	}
+	return s.dealRepo.SetDealStatusEscrowRefundConfirmed(ctx, dealID)
+}
+
+// checkAndRecoverExpiredLock handles recovery when a previous run may have transferred but crashed.
+// Returns true if recovery succeeded (deal status updated, no further action needed).
+func (s *service) checkAndRecoverExpiredLock(ctx context.Context, logger *slog.Logger, dealID int64, actionType entity.DealActionType, lastLock *entity.DealActionLock, escrowAddr *address.Address, amountNanoton int64, toAddr *address.Address, release bool) (bool, error) {
+	if lastLock.Status != entity.DealActionLockStatusLocked || lastLock.ExpireAt.After(time.Now()) {
+		return false, nil
+	}
+	found, _ := s.liteclient.HasOutgoingTxTo(ctx, escrowAddr, amountNanoton, toAddr)
+	if found {
+		if err := s.setDealStatusAfterTransfer(ctx, dealID, release); err != nil {
+			return false, err
+		}
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusCompleted)
+		_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
+		logger.Info("escrow release/refund recovered from expired lock", "deal_id", dealID, "release", release)
+		return true, nil
+	}
+	_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
+	return false, nil
+}
+
+// performTransfer takes a deal action lock, executes the blockchain transfer, updates deal status, and cleans up.
+func (s *service) performTransfer(ctx context.Context, logger *slog.Logger, dealID int64, actionType entity.DealActionType, w *wallet.Wallet, toAddr *address.Address, amount tlb.Coins, release bool) error {
+	lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, dealID, actionType)
+	if err != nil {
+		return err
+	}
+	lockStatus := entity.DealActionLockStatusFailed
+	defer func() {
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, lockStatus)
+	}()
+
+	if err = w.Transfer(ctx, toAddr, amount, string(actionType)); err != nil {
+		logger.Error("escrow transfer failed", "deal_id", dealID, "release", release, "error", err)
+		return err
+	}
+
+	if err = s.setDealStatusAfterTransfer(ctx, dealID, release); err != nil {
+		return err
+	}
+	_ = s.dealChatService.DeleteDealForumTopic(ctx, dealID)
+	lockStatus = entity.DealActionLockStatusCompleted
 	return nil
 }
 

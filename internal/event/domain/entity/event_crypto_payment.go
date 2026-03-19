@@ -1,7 +1,7 @@
 package entity
 
 const (
-	streamCryptoPayment = "events:crypto_payment"
+	streamKeyCryptoPayment = "events:crypto_payment"
 )
 
 type EventCryptoPayment struct {
@@ -26,13 +26,13 @@ func (e *EventCryptoPayment) ToMap() map[string]interface{} {
 }
 
 func (e *EventCryptoPayment) FromMap(m map[string]interface{}) {
-	e.Address = m["address"].(string)
-	e.Currency = m["currency"].(string)
-	e.Amount = mustParseInt64(m["amount"])
-	e.TxHash = m["tx_hash"].(string)
-	e.Timestamp = mustParseInt64(m["timestamp"])
+	e.Address = stringFromMap(m, "address")
+	e.Currency = stringFromMap(m, "currency")
+	e.Amount = int64FromMap(m, "amount")
+	e.TxHash = stringFromMap(m, "tx_hash")
+	e.Timestamp = int64FromMap(m, "timestamp")
 }
 
 func (e *EventCryptoPayment) StreamKey() string {
-	return streamCryptoPayment
+	return streamKeyCryptoPayment
 }

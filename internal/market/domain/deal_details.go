@@ -9,12 +9,28 @@ import (
 
 var ErrDealDetailsInvalid = errors.New("deal details contains invalid or disallowed fields")
 
+var validButtonStyles = map[string]bool{"red": true, "green": true, "blue": true, "default": true}
+
 // DealDetailsButton represents an inline button on the ad post.
 type DealDetailsButton struct {
 	Text  string `json:"text"`
 	URL   string `json:"url"`
 	Style string `json:"style"` // "red", "green", "blue", "default"
 	Emoji string `json:"emoji"` // emoji string, or "" for none
+}
+
+// IsValid reports whether the button has a valid style and a valid http/https URL if set.
+func (b *DealDetailsButton) IsValid() bool {
+	if !validButtonStyles[b.Style] {
+		return false
+	}
+	if b.URL != "" {
+		parsed, err := url.ParseRequestURI(b.URL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateDealDetails parses raw as JSON and ensures it contains only allowed keys.
@@ -93,15 +109,8 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 		if err := json.Unmarshal(btnBytes, &btn); err != nil {
 			return nil, ErrDealDetailsInvalid
 		}
-		validStyles := map[string]bool{"red": true, "green": true, "blue": true, "default": true}
-		if !validStyles[btn.Style] {
+		if !btn.IsValid() {
 			return nil, ErrDealDetailsInvalid
-		}
-		if btn.URL != "" {
-			parsed, parseErr := url.ParseRequestURI(btn.URL)
-			if parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-				return nil, ErrDealDetailsInvalid
-			}
 		}
 		button = &btn
 	}

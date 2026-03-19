@@ -27,6 +27,7 @@ const (
 	consumerName                  = "updates"
 	readTelegramUpdateEventsLimit = 100
 	telegramUpdateEventsAge       = 48 * time.Hour
+	streamCleanPeriod             = 24 * time.Hour
 	pendingPeriod                 = 15 * time.Second
 	pendingMinIdle                = 30 * time.Second
 )
@@ -63,7 +64,7 @@ type marketDealChatService interface {
 
 type channelRepository interface {
 	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
-	UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status string) error
+	UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status marketentity.BotMemberStatus) error
 	ListChannelsWithBotAccess(ctx context.Context) ([]*marketentity.Channel, error)
 	ResetChannelAccessHash(ctx context.Context, channelID int64) error
 	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
@@ -175,8 +176,10 @@ func (s *service) processUpdates(ctx context.Context) error {
 	for _, updateEvent := range telegramUpdateEvents {
 		if err := s.processUpdate(ctx, updateEvent); err != nil {
 			slog.Error("failed to process update", "error", err, "event_id", updateEvent.ID)
+			promUpdatesFailed.Inc()
 			continue
 		}
+		promUpdatesProcessed.Inc()
 		messageIDs = append(messageIDs, updateEvent.ID)
 	}
 
@@ -205,7 +208,7 @@ func (s *service) processUpdate(ctx context.Context, updateEvent *evententity.Ev
 	case UpdateCallback:
 		return s.handleCallback(ctx, update.CallbackQuery)
 	case UpdateUnknown:
-		// No action needed
+		slog.Debug("received unknown telegram update type, skipping", "update_id", updateEvent.Update.UpdateID)
 	}
 
 	return nil
@@ -274,8 +277,7 @@ func (s *service) processPendingUpdates(ctx context.Context) {
 }
 
 func (s *service) streamCleaner(ctx context.Context) {
-	tickerPeriod := 24 * time.Hour
-	ticker := time.NewTicker(tickerPeriod)
+	ticker := time.NewTicker(streamCleanPeriod)
 	defer ticker.Stop()
 
 	for {
@@ -287,7 +289,7 @@ func (s *service) streamCleaner(ctx context.Context) {
 			if err := s.eventService.TrimStreamByAge(ctx, telegramUpdateEventsAge); err != nil {
 				slog.Error("failed to trim telegram update events stream by age", "err", err)
 			}
-			ticker.Reset(tickerPeriod)
+			ticker.Reset(streamCleanPeriod)
 		}
 	}
 }
@@ -302,6 +304,5 @@ func (s *service) sendWelcomeNotification(ctx context.Context, chatID int64) {
 		Buttons: string(buttons),
 	}); err != nil {
 		slog.Error("failed to add notification", "type", "welcome", "chat_id", chatID, "error", err)
-
 	}
 }

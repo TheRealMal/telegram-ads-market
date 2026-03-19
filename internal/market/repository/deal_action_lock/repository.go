@@ -3,6 +3,7 @@ package deal_action_lock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
@@ -32,7 +33,7 @@ func New(db database) *repository {
 func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (string, error) {
 	txCtx, beginErr := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if beginErr != nil {
-		return "", beginErr
+		return "", fmt.Errorf("take deal action lock for deal %d action %s: begin transaction: %w", dealID, actionType, beginErr)
 	}
 	var err error
 	defer func() { _ = r.db.EndTx(txCtx, err, "TakeDealActionLock") }()
@@ -48,15 +49,15 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 		},
 	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("take deal action lock for deal %d action %s: %w", dealID, actionType, err)
 	}
 	defer rows.Close()
 	active, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.DealActionLockExistsRow])
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("take deal action lock for deal %d action %s: %w", dealID, actionType, err)
 	}
 	if len(active) > 0 {
-		err = errors.New("deal action already locked")
+		err = fmt.Errorf("deal action already locked: deal %d action %s", dealID, actionType)
 		return "", err
 	}
 
@@ -73,12 +74,12 @@ func (r *repository) TakeDealActionLock(ctx context.Context, dealID int64, actio
 		},
 	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("take deal action lock for deal %d action %s: insert: %w", dealID, actionType, err)
 	}
 	defer insertRows.Close()
 	row, err := pgx.CollectExactlyOneRow(insertRows, pgx.RowToStructByName[model.DealActionLockReturnRow])
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("take deal action lock for deal %d action %s: scan row: %w", dealID, actionType, err)
 	}
 	return row.ID, nil
 }
@@ -96,7 +97,7 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get last deal action lock for deal %d action %s: %w", dealID, actionType, err)
 	}
 	defer rows.Close()
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealActionLockRow])
@@ -104,15 +105,18 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("get last deal action lock for deal %d action %s: %w", dealID, actionType, err)
 	}
 	return model.DealActionLockRowToEntity(row), nil
 }
 
 func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (lockID string, ok bool, err error) {
 	lock, err := r.GetLastDealActionLock(ctx, dealID, actionType)
-	if err != nil || lock == nil {
-		return "", false, err
+	if err != nil {
+		return "", false, fmt.Errorf("get expired deal action lock for deal %d: %w", dealID, err)
+	}
+	if lock == nil {
+		return "", false, nil
 	}
 	if lock.Status != entity.DealActionLockStatusLocked || lock.ExpireAt.After(time.Now()) {
 		return "", false, nil
@@ -128,5 +132,8 @@ func (r *repository) ReleaseDealActionLock(ctx context.Context, lockID string, s
 			"id":     lockID,
 		},
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("release deal action lock %s: %w", lockID, err)
+	}
+	return nil
 }

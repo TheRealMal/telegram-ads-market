@@ -68,8 +68,14 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 
 			// Event streams: telegram updates + telegram notifications
 			eventRepo := eventredis.New(redisClient)
-			telegramEventSvc := eventtelegram.NewService(eventRepo)
-			telegramNotifyEventSvc := eventtelegramnotify.NewService(eventRepo)
+			telegramEventSvc, err := eventtelegram.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create telegram update event service")
+			}
+			telegramNotifyEventSvc, err := eventtelegramnotify.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create telegram notification event service")
+			}
 
 			pg, err := postgres.New(ctxRun, cfg.Database)
 			if err != nil {

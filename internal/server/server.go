@@ -110,6 +110,7 @@ func (s *Server) run(ctx context.Context) {
 	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("%s:%d", s.Config.ListenAddr, s.Config.ListenPort))
 	if err != nil {
 		slog.Error("Error creating listener", "error", err)
+		return
 	}
 	defer listener.Close()
 

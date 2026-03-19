@@ -42,14 +42,14 @@ func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dea
 		if !ok || !durationRegex.MatchString(durStr) {
 			continue
 		}
-		price, ok := parsePriceAsInt64(triple[2])
+		price, ok := ParsePriceAsInt64(triple[2])
 		if !ok {
 			continue
 		}
 		if adType != dealType || price != dealPriceNanoton {
 			continue
 		}
-		entryHours := parseDurationHours(durStr)
+		entryHours := ParseDurationHours(durStr)
 		if entryHours >= 0 && entryHours != dealDuration {
 			continue
 		}
@@ -80,7 +80,7 @@ func ListingHasAdType(listingPrices json.RawMessage, adType string) bool {
 	return false
 }
 
-func parsePriceNumber(v interface{}) (float64, bool) {
+func ParsePriceNumber(v interface{}) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
 		return x, true
@@ -92,7 +92,7 @@ func parsePriceNumber(v interface{}) (float64, bool) {
 	}
 }
 
-func parseDurationHours(durStr string) int64 {
+func ParseDurationHours(durStr string) int64 {
 	n := durationRegex.FindString(durStr)
 	if n == "" || len(n) < 3 {
 		return -1

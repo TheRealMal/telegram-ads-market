@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	apperrors "ads-mrkt/internal/errors"
-	marketerrors "ads-mrkt/internal/market/domain/errors"
 	_ "ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	_ "ads-mrkt/internal/server/templates/response"
 )
 
@@ -57,7 +57,7 @@ func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interf
 				Err:     err,
 				Message: tooSoon.Error(),
 				Code:    apperrors.ErrorCodeTooManyRequests,
-				Data:   map[string]string{"next_available_at": tooSoon.NextAvailableAt.Format("15:04")},
+				Data:    map[string]string{"next_available_at": tooSoon.NextAvailableAt.Format("15:04")},
 			}
 		}
 		return nil, toServiceError(err)
@@ -72,7 +72,7 @@ func (h *handler) RefreshChannel(w http.ResponseWriter, r *http.Request) (interf
 // @Tags		Market
 // @Summary	Get channel statistics. Allowed for channel admins or users who have a listing with this channel.
 // @Produce	json
-// @Param		id	path		int	true	"Channel ID"
+// @Param		id	path		int								true	"Channel ID"
 // @Success	200	{object}	response.Template{data=object}	"Channel stats (Telegram broadcast stats shape)"
 // @Failure	400	{object}	response.Template{data=string}	"Bad request"
 // @Failure	401	{object}	response.Template{data=string}	"Unauthorized"

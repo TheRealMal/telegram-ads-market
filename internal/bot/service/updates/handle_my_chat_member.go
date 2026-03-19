@@ -20,13 +20,14 @@ func (s *service) handleMyChatMember(ctx context.Context, update *telegram.ChatM
 		return nil
 	}
 
-	newStatus := update.NewChatMember.Status
+	newStatusStr := update.NewChatMember.Status
+	newStatus := marketentity.BotMemberStatus(newStatusStr)
 	channelID := update.Chat.ID
 
 	slog.Info("bot chat member status changed",
 		"channel_id", channelID,
 		"title", update.Chat.Title,
-		"new_status", newStatus,
+		"new_status", newStatusStr,
 	)
 
 	if newStatus == marketentity.BotMemberStatusAdministrator {

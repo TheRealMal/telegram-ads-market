@@ -12,7 +12,7 @@ import (
 // @Summary	Get waitlist status for current user
 // @Produce	json
 // @Success	200	{object}	response.Template{data=model.WaitlistResponse}	"Waitlist status with channel count"
-// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
+// @Failure	401	{object}	response.Template{data=string}					"Unauthorized"
 // @Router		/market/waitlist [get]
 func (h *handler) GetWaitlist(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, err := requireUserID(r)

@@ -58,8 +58,8 @@ func snapshotToResponse(snap *domain.Snapshot) *model.SnapshotResponse {
 // @Tags		Analytics
 // @Summary	Get latest analytics snapshot
 // @Produce	json
-// @Success	200	{object}	response.Template{data=LatestSnapshotResponse}	"Latest snapshot (snapshot field null when none)"
-// @Failure	500	{object}	response.Template{data=string}				"Internal error"
+// @Success	200	{object}	response.Template{data=model.LatestSnapshotResponse}	"Latest snapshot (snapshot field null when none)"
+// @Failure	500	{object}	response.Template{data=string}							"Internal error"
 // @Router		/analytics/snapshot/latest [get]
 func (h *handler) GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	snap, err := h.svc.GetLatestSnapshot(r.Context())
@@ -75,10 +75,10 @@ func (h *handler) GetLatestSnapshot(w http.ResponseWriter, r *http.Request) (int
 // @Tags		Analytics
 // @Summary	Get analytics snapshot history for charts
 // @Produce	json
-// @Param		period	query		string	false	"Time range: week (7d), month (30d), year (365d)"	Enums(week, month, year)
-// @Success	200	{object}	response.Template{data=HistoryResponse}	"Timestamps (Unix) and metric series"
-// @Failure	400	{object}	response.Template{data=string}				"Bad request (invalid period)"
-// @Failure	500	{object}	response.Template{data=string}				"Internal error"
+// @Param		period	query		string											false	"Time range: week (7d), month (30d), year (365d)"	Enums(week, month, year)
+// @Success	200		{object}	response.Template{data=model.HistoryResponse}	"Timestamps (Unix) and metric series"
+// @Failure	400		{object}	response.Template{data=string}					"Bad request (invalid period)"
+// @Failure	500		{object}	response.Template{data=string}					"Internal error"
 // @Router		/analytics/snapshot/history [get]
 func (h *handler) GetSnapshotHistory(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	period := r.URL.Query().Get("period")

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"ads-mrkt/internal/market/domain/entity"
 )
@@ -19,11 +20,37 @@ type channelAdminRepository interface {
 	IsChannelAdmin(ctx context.Context, userID, channelID int64) (bool, error)
 }
 
+type userRepository interface {
+	GetUserByID(ctx context.Context, id int64) (*entity.User, error)
+}
+
+// CreateListingInput holds all request inputs for creating a listing.
+type CreateListingInput struct {
+	Status       string
+	ChannelID    *int64
+	Type         string
+	PricesTON    json.RawMessage
+	Categories   []string
+	Description  string
+	PreparedPost json.RawMessage
+}
+
+// UpdateListingInput holds the optional request inputs for updating a listing.
+type UpdateListingInput struct {
+	Status       *string
+	Type         *string
+	PricesTON    json.RawMessage
+	Categories   *[]string
+	Description  *string
+	PreparedPost json.RawMessage
+}
+
 type listingService struct {
 	listingRepo listingRepository
 	adminRepo   channelAdminRepository
+	userRepo    userRepository
 }
 
-func NewListingService(listingRepo listingRepository, adminRepo channelAdminRepository) *listingService {
-	return &listingService{listingRepo: listingRepo, adminRepo: adminRepo}
+func NewListingService(listingRepo listingRepository, adminRepo channelAdminRepository, userRepo userRepository) *listingService {
+	return &listingService{listingRepo: listingRepo, adminRepo: adminRepo, userRepo: userRepo}
 }

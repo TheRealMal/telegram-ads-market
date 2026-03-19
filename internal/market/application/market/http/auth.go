@@ -16,7 +16,7 @@ import (
 // @Summary	Authenticate user
 // @Accept		json
 // @Produce	json
-// @Param		request				body		AuthUserRequest					true	"request body"
+// @Param		request				body		model.AuthUserRequest			true	"request body"
 // @Param		X-Telegram-InitData	header		string							true	"Telegram init data"
 // @Success	200					{object}	response.Template{data=string}	"JWT token"
 // @Failure	401					{object}	response.Template{data=string}	"Unauthorized"
@@ -62,7 +62,7 @@ func (h *handler) AuthUser(w http.ResponseWriter, r *http.Request) (interface{},
 // @Summary	Set current user's TON wallet (raw format) for deal payouts.
 // @Accept		json
 // @Produce	json
-// @Param		request	body		SetWalletRequest				true	"wallet_address (raw)"
+// @Param		request	body		model.SetWalletRequest			true	"wallet_address (raw)"
 // @Success	200		{object}	response.Template{data=string}	"ok"
 // @Failure	400		{object}	response.Template{data=string}	"Bad request"
 // @Failure	401		{object}	response.Template{data=string}	"Unauthorized"

@@ -41,7 +41,7 @@ type dealForumTopicRepository interface {
 }
 
 type dealSigner interface {
-	SignDeal(ctx context.Context, userID int64, dealID int64) error
+	SignDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error)
 }
 
 type service struct {
@@ -68,16 +68,8 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 // if topics already exist in the DB, returns nil without creating new ones.
 // The flow is: check DB → create Telegram topics → INSERT ON CONFLICT DO NOTHING.
 // If a concurrent caller inserted first, the orphaned Telegram topics are cleaned up.
-func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64, listingType entity.ListingType) error {
-	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
-	if err != nil {
-		return fmt.Errorf("get deal: %w", err)
-	}
-	if deal == nil {
-		return marketerrors.ErrNotFound
-	}
-
-	existing, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
+func (s *service) CreateDealForumTopics(ctx context.Context, deal *entity.Deal, listingType entity.ListingType) error {
+	existing, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, deal.ID)
 	if err != nil {
 		return fmt.Errorf("get deal forum topic: %w", err)
 	}
@@ -85,7 +77,7 @@ func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64, listi
 		return nil
 	}
 
-	name := "Deal #" + strconv.FormatInt(dealID, 10)
+	name := "Deal #" + strconv.FormatInt(deal.ID, 10)
 	lessorThreadID, err := s.telegramForum.CreateForumTopic(ctx, deal.LessorID, name)
 	if err != nil {
 		return fmt.Errorf("create lessor forum topic: %w", err)
@@ -97,7 +89,7 @@ func (s *service) CreateDealForumTopics(ctx context.Context, dealID int64, listi
 	}
 
 	t := &entity.DealForumTopic{
-		DealID:                dealID,
+		DealID:                deal.ID,
 		LessorChatID:          deal.LessorID,
 		LesseeChatID:          deal.LesseeID,
 		LessorMessageThreadID: lessorThreadID,
@@ -135,7 +127,7 @@ func (s *service) buildInitialMessages(deal *entity.Deal, listingType entity.Lis
 		var b strings.Builder
 		b.WriteString(prefix)
 		b.WriteString(" ")
-		b.WriteString(deal.Type)
+		b.WriteString(string(deal.Type))
 		b.WriteString("\nChannel: ")
 		b.WriteString(channelID)
 		b.WriteString("\n\n💰 ")

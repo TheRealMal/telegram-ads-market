@@ -49,7 +49,7 @@ func DealRowToEntity(row DealRow) *entity.Deal {
 		LessorID:            row.LessorID,
 		LesseeID:            row.LesseeID,
 		ChannelID:           row.ChannelID,
-		Type:                row.Type,
+		Type:                entity.AdType(row.Type),
 		Duration:            row.Duration,
 		Price:               row.Price,
 		EscrowAmount:        row.EscrowAmount,

@@ -43,107 +43,102 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 		return
 	}
 	for _, deal := range deals {
-		listing, err := s.listingRepo.GetListingByID(ctx, deal.ListingID)
-		if err != nil || listing == nil || listing.ChannelID == nil {
-			logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
-			continue
-		}
-		channel, err := s.channelRepo.GetChannelByID(ctx, *listing.ChannelID)
-		if err != nil || channel == nil {
-			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
-			continue
-		}
-		channel, err = s.ensureChannelAccess(ctx, channel)
-		if err != nil {
-			logger.Error("ensure channel access", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "error", err)
-			continue
-		}
-		text := domain.GetMessageFromDetails(deal.Details)
-		if text == "" {
-			logger.Error("skip deal, no message in details", "deal_id", deal.ID)
-			continue
-		}
-		if postedAt, ok := domain.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
-			logger.Debug("skip deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
-			continue
-		}
+		s.processPostDeal(ctx, logger, deal)
+	}
+}
 
-		var botEntities []helpertelegram.MessageEntity
-		if raw := domain.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
+func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal *marketentity.Deal) {
+	listing, err := s.listingRepo.GetListingByID(ctx, deal.ListingID)
+	if err != nil || listing == nil || listing.ChannelID == nil {
+		logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
+		return
+	}
+	channel, err := s.channelRepo.GetChannelByID(ctx, *listing.ChannelID)
+	if err != nil || channel == nil {
+		logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
+		return
+	}
+	channel, err = s.ensureChannelAccess(ctx, channel)
+	if err != nil {
+		logger.Error("ensure channel access", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "error", err)
+		return
+	}
+	text := domain.GetMessageFromDetails(deal.Details)
+	if text == "" {
+		logger.Error("skip deal, no message in details", "deal_id", deal.ID)
+		return
+	}
+	if postedAt, ok := domain.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
+		logger.Debug("skip deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
+		return
+	}
+
+	var botEntities []helpertelegram.MessageEntity
+	if raw := domain.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
+		_ = json.Unmarshal(raw, &botEntities)
+	}
+	if len(botEntities) == 0 {
+		if raw := domain.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
 			_ = json.Unmarshal(raw, &botEntities)
 		}
-		if len(botEntities) == 0 {
-			if raw := domain.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
-				_ = json.Unmarshal(raw, &botEntities)
+	}
+	mtprotoEntities := toMTProtoEntities(botEntities)
+
+	// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
+	lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+	if err != nil {
+		logger.Error("get last lock", "deal_id", deal.ID, "error", err)
+		return
+	}
+	if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+		if foundMsgID, found := s.tryRecoverPostFromChannel(ctx, *listing.ChannelID, channel.AccessHash, text); found {
+			m := s.makeDealPostMessage(deal, *listing.ChannelID, foundMsgID, text)
+			if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+				logger.Error("recover create deal_post_message", "deal_id", deal.ID, "error", err)
+				_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+				return
 			}
+			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusCompleted)
+			logger.Info("recovered post from channel", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", foundMsgID)
+			return
 		}
-		mtprotoEntities := toMTProtoEntities(botEntities)
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+	}
 
-		// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
-		lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
-		if err != nil {
-			logger.Error("get last lock", "deal_id", deal.ID, "error", err)
-			continue
-		}
-		if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
-			if foundMsgID, found := s.tryRecoverPostFromChannel(ctx, *listing.ChannelID, channel.AccessHash, text); found {
-				untilTs := time.Now().Add(time.Duration(deal.Duration) * time.Hour)
-				nextCheck := time.Now().Add(postCheckAdvanceHour)
-				m := &marketentity.DealPostMessage{
-					DealID:      deal.ID,
-					ChannelID:   *listing.ChannelID,
-					MessageID:   foundMsgID,
-					PostMessage: text,
-					Status:      marketentity.DealPostMessageStatusExists,
-					NextCheck:   nextCheck,
-					UntilTs:     untilTs,
-				}
-				if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
-					logger.Error("recover create deal_post_message", "deal_id", deal.ID, "error", err)
-					_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
-					continue
-				}
-				_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusCompleted)
-				logger.Info("recovered post from channel", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", foundMsgID)
-				continue
-			}
-			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
-		}
+	lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+	if err != nil {
+		logger.Debug("skip deal, lock not acquired", "deal_id", deal.ID, "error", err)
+		return
+	}
+	releaseLock := func(status marketentity.DealActionLockStatus) {
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, status)
+	}
 
-		lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
-		if err != nil {
-			logger.Debug("skip deal, lock not acquired", "deal_id", deal.ID, "error", err)
-			continue
-		}
-		releaseLock := func(status marketentity.DealActionLockStatus) {
-			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, status)
-		}
+	msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text, mtprotoEntities)
+	if err != nil {
+		logger.Error("send message", "deal_id", deal.ID, "error", err)
+		releaseLock(marketentity.DealActionLockStatusFailed)
+		return
+	}
+	m := s.makeDealPostMessage(deal, *listing.ChannelID, msgID, text)
+	if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+		logger.Error("create deal_post_message", "deal_id", deal.ID, "error", err)
+		releaseLock(marketentity.DealActionLockStatusFailed)
+		return
+	}
+	releaseLock(marketentity.DealActionLockStatusCompleted)
+	logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
+}
 
-		msgID, err := s.sendChannelMessage(ctx, *listing.ChannelID, channel.AccessHash, text, mtprotoEntities)
-		if err != nil {
-			logger.Error("send message", "deal_id", deal.ID, "error", err)
-			releaseLock(marketentity.DealActionLockStatusFailed)
-			continue
-		}
-		untilTs := time.Now().Add(time.Duration(deal.Duration) * time.Hour)
-		nextCheck := time.Now().Add(postCheckAdvanceHour)
-		m := &marketentity.DealPostMessage{
-			DealID:      deal.ID,
-			ChannelID:   *listing.ChannelID,
-			MessageID:   msgID,
-			PostMessage: text,
-			Status:      marketentity.DealPostMessageStatusExists,
-			NextCheck:   nextCheck,
-			UntilTs:     untilTs,
-		}
-		if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
-			logger.Error("create deal_post_message", "deal_id", deal.ID, "error", err)
-			releaseLock(marketentity.DealActionLockStatusFailed)
-			continue
-		}
-		releaseLock(marketentity.DealActionLockStatusCompleted)
-		logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
-
+func (s *service) makeDealPostMessage(deal *marketentity.Deal, channelID int64, msgID int64, text string) *marketentity.DealPostMessage {
+	return &marketentity.DealPostMessage{
+		DealID:      deal.ID,
+		ChannelID:   channelID,
+		MessageID:   msgID,
+		PostMessage: text,
+		Status:      marketentity.DealPostMessageStatusExists,
+		NextCheck:   time.Now().Add(postCheckAdvanceHour),
+		UntilTs:     time.Now().Add(time.Duration(deal.Duration) * time.Hour),
 	}
 }
 

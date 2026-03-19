@@ -13,7 +13,7 @@ import (
 
 type dealRepository interface {
 	GetDealByID(ctx context.Context, id int64) (*entity.Deal, error)
-	SignDealInTx(ctx context.Context, dealID int64, userID int64, sig string) error
+	SignDealInTx(ctx context.Context, dealID int64, userID int64, sig string) (*entity.Deal, error)
 }
 
 type userRepository interface {
@@ -39,37 +39,39 @@ func NewService(dealRepo dealRepository, userRepo userRepository, notificationAd
 }
 
 // SignDeal sets the current user's signature on the deal. Both payout addresses must be set; user's wallet must match.
-func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) error {
+// Returns the updated deal.
+func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error) {
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil || existing == nil {
-		return marketerrors.ErrNotFound
+		return nil, marketerrors.ErrNotFound
 	}
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil || user == nil {
-		return marketerrors.ErrNotFound
+		return nil, marketerrors.ErrNotFound
 	}
-	if user.WalletAddress == nil || *user.WalletAddress == "" {
-		return marketerrors.ErrWalletNotSet
+	if !user.HasWallet() {
+		return nil, marketerrors.ErrWalletNotSet
 	}
 	if existing.LessorPayoutAddress == nil || *existing.LessorPayoutAddress == "" ||
 		existing.LesseePayoutAddress == nil || *existing.LesseePayoutAddress == "" {
-		return marketerrors.ErrPayoutNotSet
+		return nil, marketerrors.ErrPayoutNotSet
 	}
 	if strings.TrimSpace(domain.GetMessageFromDetails(existing.Details)) == "" {
-		return marketerrors.ErrDealDetailsMessageRequired
+		return nil, marketerrors.ErrDealDetailsMessageRequired
 	}
 	myPayout := *existing.LesseePayoutAddress
 	if userID == existing.LessorID {
 		myPayout = *existing.LessorPayoutAddress
 	}
 	if *user.WalletAddress != myPayout {
-		return marketerrors.ErrWalletNotSet
+		return nil, marketerrors.ErrWalletNotSet
 	}
 	lessorPayout := *existing.LessorPayoutAddress
 	lesseePayout := *existing.LesseePayoutAddress
-	sig := domain.ComputeDealSignature(existing.Type, existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
-	if err := s.dealRepo.SignDealInTx(ctx, dealID, userID, sig); err != nil {
-		return err
+	sig := domain.ComputeDealSignature(string(existing.Type), existing.Duration, existing.Price, existing.Details, userID, lessorPayout, lesseePayout)
+	d, err := s.dealRepo.SignDealInTx(ctx, dealID, userID, sig)
+	if err != nil {
+		return nil, err
 	}
 	otherID := existing.LesseeID
 	if userID == existing.LesseeID {
@@ -83,7 +85,6 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) erro
 		},
 	); err != nil {
 		slog.Error("failed to add notification", "type", "deal_sign", "chat_id", otherID, "error", err)
-
 	}
-	return nil
+	return d, nil
 }

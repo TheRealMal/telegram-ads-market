@@ -2,12 +2,13 @@ package event
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
 	"ads-mrkt/internal/event/domain/entity"
 
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -29,17 +30,19 @@ const (
 	groupName = "master"
 )
 
-func NewService(repository repository) *Service {
+func NewService(ctx context.Context, repository repository) (*Service, error) {
 	s := &Service{
 		repository: repository,
 	}
 
-	err := s.repository.CreateGroup(context.Background(), (*entity.EventTelegramUpdate)(nil).StreamKey(), groupName, "$")
+	err := s.repository.CreateGroup(ctx, (*entity.EventTelegramUpdate)(nil).StreamKey(), groupName, "$")
 	if err != nil {
-		if !strings.Contains(err.Error(), "BUSYGROUP") {
-			log.Fatalf("failed to create group: %v", err)
+		if strings.Contains(err.Error(), "BUSYGROUP") {
+			slog.Info("consumer group already exists", "group", groupName)
+		} else {
+			return nil, errors.Wrap(err, "failed to create group")
 		}
 	}
 
-	return s
+	return s, nil
 }

@@ -8,24 +8,10 @@ import (
 
 	apperrors "ads-mrkt/internal/errors"
 	"ads-mrkt/internal/market/application/market/http/model"
-	"ads-mrkt/internal/market/domain"
 	"ads-mrkt/internal/market/domain/entity"
+	listingservice "ads-mrkt/internal/market/service/listing"
 	_ "ads-mrkt/internal/server/templates/response"
 )
-
-func validateInstantPostListing(typ entity.ListingType, prices json.RawMessage, preparedPost json.RawMessage) error {
-	if !domain.ListingHasAdType(prices, string(entity.AdTypeInstantPost)) {
-		return nil
-	}
-	if typ != entity.ListingTypeLessee {
-		return apperrors.ServiceError{Err: nil, Message: "instant_post ad type is only allowed for lessee listings", Code: apperrors.ErrorCodeBadRequest}
-	}
-	msg := domain.GetMessageFromDetails(preparedPost)
-	if strings.TrimSpace(msg) == "" {
-		return apperrors.ServiceError{Err: nil, Message: "prepared_post with non-empty message is required for instant_post listings", Code: apperrors.ErrorCodeBadRequest}
-	}
-	return nil
-}
 
 func splitComma(s string) []string {
 	var out []string
@@ -57,64 +43,12 @@ func parseListListingsQuery(r *http.Request) (typ *entity.ListingType, categorie
 	return typ, categories, minFollowers
 }
 
-func mergeListingWithUpdate(existing *entity.Listing, id int64, req *model.UpdateListingRequest) (*entity.Listing, error) {
-	if len(req.Prices) > 0 {
-		if err := domain.ValidateListingPrices(req.Prices); err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-		}
-	}
-	if req.Categories != nil {
-		if err := domain.ValidateListingCategories(*req.Categories); err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-		}
-	}
-
-	l := *existing
-	l.ID = id
-	if req.Status != nil {
-		l.Status = entity.ListingStatus(*req.Status)
-	}
-	if req.Type != nil {
-		l.Type = entity.ListingType(*req.Type)
-	}
-	if req.Prices != nil {
-		pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
-		if err != nil {
-			return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
-		}
-		l.Prices = pricesNanoton
-	}
-	if req.Categories != nil {
-		l.Categories = model.CategoriesToRaw(*req.Categories)
-	}
-	if req.Description != nil {
-		l.Description = *req.Description
-	}
-	if req.PreparedPost != nil {
-		l.PreparedPost = req.PreparedPost
-	}
-
-	listingType := l.Type
-	if req.Type != nil {
-		listingType = entity.ListingType(*req.Type)
-	}
-	pricesToCheck := l.Prices
-	if req.Prices != nil {
-		pricesToCheck = req.Prices
-	}
-	if err := validateInstantPostListing(listingType, pricesToCheck, l.PreparedPost); err != nil {
-		return nil, err
-	}
-
-	return &l, nil
-}
-
 // @Security	JWT
 // @Tags		Market
 // @Summary	Create listing
 // @Accept		json
 // @Produce	json
-// @Param		request	body		CreateListingRequest					true	"listing body"
+// @Param		request	body		model.CreateListingRequest				true	"listing body"
 // @Success	200		{object}	response.Template{data=entity.Listing}	"Created listing"
 // @Failure	400		{object}	response.Template{data=string}			"Bad request"
 // @Failure	401		{object}	response.Template{data=string}			"Unauthorized"
@@ -126,46 +60,21 @@ func (h *handler) CreateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, err
 	}
 
-	user, err := h.userService.GetUserByID(r.Context(), userID)
-	if err != nil {
-		return nil, toServiceError(err)
-	}
-	if user == nil || user.WalletAddress == nil || *user.WalletAddress == "" {
-		return nil, apperrors.ServiceError{Err: nil, Message: "connect wallet before creating a listing", Code: apperrors.ErrorCodeBadRequest}
-	}
-
 	var req model.CreateListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
-	if err := domain.ValidateListingPrices(req.Prices); err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-	}
-	if err := domain.ValidateListingCategories(req.Categories); err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: err.Error(), Code: apperrors.ErrorCodeBadRequest}
-	}
-	pricesNanoton, err := domain.ConvertListingPricesTONToNanoton(req.Prices)
-	if err != nil {
-		return nil, apperrors.ServiceError{Err: err, Message: "invalid prices", Code: apperrors.ErrorCodeBadRequest}
-	}
 
-	if err := validateInstantPostListing(entity.ListingType(req.Type), req.Prices, req.PreparedPost); err != nil {
-		return nil, err
-	}
-
-	l := &entity.Listing{
-		Status:       entity.ListingStatus(req.Status),
+	l, err := h.listingService.CreateListing(r.Context(), userID, listingservice.CreateListingInput{
+		Status:       req.Status,
 		ChannelID:    req.ChannelID,
-		Type:         entity.ListingType(req.Type),
-		Prices:       pricesNanoton,
-		Categories:   model.CategoriesToRaw(req.Categories),
+		Type:         req.Type,
+		PricesTON:    req.Prices,
+		Categories:   req.Categories,
 		Description:  req.Description,
 		PreparedPost: req.PreparedPost,
-	}
-	if l.Status == "" {
-		l.Status = entity.ListingStatusInactive
-	}
-	if err := h.listingService.CreateListing(r.Context(), userID, l); err != nil {
+	})
+	if err != nil {
 		return nil, toServiceError(err)
 	}
 	return model.ListingWithPricesInTON(l), nil
@@ -198,10 +107,10 @@ func (h *handler) GetListing(w http.ResponseWriter, r *http.Request) (interface{
 // @Tags		Market
 // @Summary	List all listings with optional type, categories, and min_followers filter (public, no auth)
 // @Produce	json
-// @Param		type	query		string										false	"Filter by type: lessor | lessee"
-// @Param		categories	query		string									false	"Comma-separated categories (e.g. Tech,Crypto)"
-// @Param		min_followers	query		int									false	"Min channel followers (only lessor listings with stats)"
-// @Success	200		{object}	response.Template{data=[]entity.Listing}	"List of listings"
+// @Param		type			query		string										false	"Filter by type: lessor | lessee"
+// @Param		categories		query		string										false	"Comma-separated categories (e.g. Tech,Crypto)"
+// @Param		min_followers	query		int											false	"Min channel followers (only lessor listings with stats)"
+// @Success	200				{object}	response.Template{data=[]entity.Listing}	"List of listings"
 // @Router		/market/listings [get]
 func (h *handler) ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	typ, categories, minFollowers := parseListListingsQuery(r)
@@ -239,7 +148,7 @@ func (h *handler) ListMyListings(w http.ResponseWriter, r *http.Request) (interf
 // @Accept		json
 // @Produce	json
 // @Param		id		path		int										true	"Listing ID"
-// @Param		request	body		UpdateListingRequest					true	"fields to update"
+// @Param		request	body		model.UpdateListingRequest				true	"fields to update"
 // @Success	200		{object}	response.Template{data=entity.Listing}	"Updated listing"
 // @Failure	400		{object}	response.Template{data=string}			"Bad request"
 // @Failure	401		{object}	response.Template{data=string}			"Unauthorized"
@@ -256,24 +165,29 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, err
 	}
 
-	existing, err := h.listingService.GetListing(r.Context(), id)
-	if err != nil || existing == nil {
-		return nil, toServiceError(err)
-	}
-
 	var req model.UpdateListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return nil, apperrors.ServiceError{Err: err, Message: "invalid body", Code: apperrors.ErrorCodeBadRequest}
 	}
-	l, err := mergeListingWithUpdate(existing, id, &req)
-	if err != nil {
-		return nil, err
-	}
 
-	if err := h.listingService.UpdateListing(r.Context(), userID, l); err != nil {
+	if err := h.listingService.UpdateListing(r.Context(), userID, id, listingservice.UpdateListingInput{
+		Status:       req.Status,
+		Type:         req.Type,
+		PricesTON:    req.Prices,
+		Categories:   req.Categories,
+		Description:  req.Description,
+		PreparedPost: req.PreparedPost,
+	}); err != nil {
 		return nil, toServiceError(err)
 	}
-	updated, _ := h.listingService.GetListing(r.Context(), id)
+
+	updated, err := h.listingService.GetListing(r.Context(), id)
+	if err != nil {
+		return nil, toServiceError(err)
+	}
+	if updated == nil {
+		return nil, apperrors.ServiceError{Err: nil, Message: "not found", Code: apperrors.ErrorCodeNotFound}
+	}
 	return model.ListingWithPricesInTON(updated), nil
 }
 
@@ -281,12 +195,12 @@ func (h *handler) UpdateListing(w http.ResponseWriter, r *http.Request) (interfa
 // @Tags		Market
 // @Summary	Delete listing
 // @Produce	json
-// @Param		id	path		int										true	"Listing ID"
-// @Success	200		{object}	response.Template{data=string}			"Deleted"
-// @Failure	400		{object}	response.Template{data=string}			"Bad request"
-// @Failure	401		{object}	response.Template{data=string}			"Unauthorized"
-// @Failure	403		{object}	response.Template{data=string}			"Forbidden"
-// @Failure	404		{object}	response.Template{data=string}			"Not found"
+// @Param		id	path		int								true	"Listing ID"
+// @Success	200	{object}	response.Template{data=string}	"Deleted"
+// @Failure	400	{object}	response.Template{data=string}	"Bad request"
+// @Failure	401	{object}	response.Template{data=string}	"Unauthorized"
+// @Failure	403	{object}	response.Template{data=string}	"Forbidden"
+// @Failure	404	{object}	response.Template{data=string}	"Not found"
 // @Router		/market/listings/{id} [delete]
 func (h *handler) DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	userID, err := requireUserID(r)

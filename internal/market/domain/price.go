@@ -32,7 +32,7 @@ func ConvertListingPricesTONToNanoton(raw json.RawMessage) (json.RawMessage, err
 		if err := json.Unmarshal(slot, &triple); err != nil || len(triple) != 3 {
 			continue
 		}
-		ton, ok := parsePriceNumber(triple[2])
+		ton, ok := ParsePriceNumber(triple[2])
 		if !ok || ton < 0 {
 			continue
 		}
@@ -56,7 +56,7 @@ func ConvertListingPricesNanotonToTON(raw json.RawMessage) (json.RawMessage, err
 		if err := json.Unmarshal(slot, &triple); err != nil || len(triple) != 3 {
 			continue
 		}
-		n, ok := parsePriceAsInt64(triple[2])
+		n, ok := ParsePriceAsInt64(triple[2])
 		if !ok {
 			continue
 		}
@@ -65,7 +65,7 @@ func ConvertListingPricesNanotonToTON(raw json.RawMessage) (json.RawMessage, err
 	return json.Marshal(out)
 }
 
-func parsePriceAsInt64(v interface{}) (int64, bool) {
+func ParsePriceAsInt64(v interface{}) (int64, bool) {
 	switch x := v.(type) {
 	case float64:
 		return int64(x), true

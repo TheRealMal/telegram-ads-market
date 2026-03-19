@@ -61,7 +61,10 @@ func runCmd(ctx context.Context, conf *config.Config) *cobra.Command {
 
 			dealRepo := deal.New(pg)
 			eventRepo := eventredis.New(redisClient)
-			escrowDepositEventSvc := escrowdepositevent.NewService(eventRepo)
+			escrowDepositEventSvc, err := escrowdepositevent.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return errors.Wrap(err, "create escrow deposit event service")
+			}
 			obs := blockchain_observer.New(lc, redisClient.Client(), dealRepo, escrowDepositEventSvc, conf.Redis.DB)
 
 			go func() {

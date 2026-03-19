@@ -15,6 +15,135 @@
     "host": "localhost:8080",
     "basePath": "/api/v1",
     "paths": {
+        "/analytics/snapshot/history": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get analytics snapshot history for charts",
+                "parameters": [
+                    {
+                        "enum": [
+                            "week",
+                            "month",
+                            "year"
+                        ],
+                        "type": "string",
+                        "description": "Time range: week (7d), month (30d), year (365d)",
+                        "name": "period",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Timestamps (Unix) and metric series",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/ads-mrkt_internal_analytics_application_http_model.HistoryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (invalid period)",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/snapshot/latest": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get latest analytics snapshot",
+                "responses": {
+                    "200": {
+                        "description": "Latest snapshot (snapshot field null when none)",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/ads-mrkt_internal_analytics_application_http_model.LatestSnapshotResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/market/auth": {
             "post": {
                 "security": [],
@@ -35,7 +164,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_market_application_market_http.AuthUserRequest"
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.AuthUserRequest"
                         }
                     },
                     {
@@ -203,6 +332,123 @@
                 }
             }
         },
+        "/market/channels/{id}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Get channel statistics. Allowed for channel admins or users who have a listing with this channel.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Channel ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Channel stats (Telegram broadcast stats shape)",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/market/deals": {
             "post": {
                 "security": [
@@ -227,7 +473,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_market_application_market_http.CreateDealRequest"
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.CreateDealRequest"
                         }
                     }
                 ],
@@ -243,7 +489,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Deal"
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                         }
                                     }
                                 }
@@ -327,13 +573,18 @@
         },
         "/market/deals/{id}": {
             "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Market"
                 ],
-                "summary": "Get deal by ID",
+                "summary": "Get deal by ID (only if caller is lessor or lessee)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -355,7 +606,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Deal"
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                         }
                                     }
                                 }
@@ -364,6 +615,24 @@
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "allOf": [
                                 {
@@ -430,7 +699,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_market_application_market_http.UpdateDealDraftRequest"
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.UpdateDealDraftRequest"
                         }
                     }
                 ],
@@ -446,7 +715,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Deal"
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                         }
                                     }
                                 }
@@ -528,127 +797,7 @@
                 }
             }
         },
-        "/market/deals/{id}/messages": {
-            "get": {
-                "security": [
-                    {
-                        "JWT": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Market"
-                ],
-                "summary": "List deal messages (chat invite + replies) for the deal in chronological order. Caller must be lessor or lessee.",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Deal ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of deal chat messages",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.DealChat"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/market/deals/{id}/send-chat-message": {
+        "/market/deals/{id}/chat-link": {
             "post": {
                 "security": [
                     {
@@ -661,7 +810,7 @@
                 "tags": [
                     "Market"
                 ],
-                "summary": "Send deal chat invite message to the current user. Sends \"Reply to this message to chat with the other side.\" and stores the message for reply tracking.",
+                "summary": "Get deal forum chat link. Caller must be lessor or lessee.",
                 "parameters": [
                     {
                         "type": "integer",
@@ -673,7 +822,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Created deal chat row",
+                        "description": "Chat link to open in Telegram",
                         "schema": {
                             "allOf": [
                                 {
@@ -683,7 +832,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.DealChat"
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealChatLinkResponse"
                                         }
                                     }
                                 }
@@ -728,6 +877,234 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/market/deals/{id}/payout-address": {
+            "put": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Set your payout address on the deal (lessor or lessee). Required before signing. Draft only.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Deal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "wallet_address (raw)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.SetDealPayoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated deal",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/market/deals/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Reject deal. Only allowed when deal status is draft; caller must be lessor or lessee.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Deal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated deal",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden (deal not draft or not a side)",
                         "schema": {
                             "allOf": [
                                 {
@@ -800,7 +1177,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Deal"
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                         }
                                     }
                                 }
@@ -890,12 +1267,24 @@
                 "tags": [
                     "Market"
                 ],
-                "summary": "List all listings with optional type filter (public, no auth)",
+                "summary": "List all listings with optional type, categories, and min_followers filter (public, no auth)",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Filter by type: lessor | lessee",
                         "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated categories (e.g. Tech,Crypto)",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Min channel followers (only lessor listings with stats)",
+                        "name": "min_followers",
                         "in": "query"
                     }
                 ],
@@ -946,7 +1335,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_market_application_market_http.CreateListingRequest"
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.CreateListingRequest"
                         }
                     }
                 ],
@@ -1101,6 +1490,121 @@
                     }
                 }
             },
+            "delete": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Delete listing",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Listing ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -1131,7 +1635,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_market_application_market_http.UpdateListingRequest"
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.UpdateListingRequest"
                         }
                     }
                 ],
@@ -1231,13 +1735,18 @@
         },
         "/market/listings/{listing_id}/deals": {
             "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Market"
                 ],
-                "summary": "List deals by listing ID",
+                "summary": "List deals by listing ID (only deals where caller is lessor or lessee)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1261,7 +1770,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Deal"
+                                                "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                             }
                                         }
                                     }
@@ -1271,6 +1780,162 @@
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/market/me/wallet": {
+            "put": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Set current user's TON wallet (raw format) for deal payouts.",
+                "parameters": [
+                    {
+                        "description": "wallet_address (raw)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.SetWalletRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Disconnect wallet (clear linked TON wallet for current user).",
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "allOf": [
                                 {
@@ -1319,6 +1984,63 @@
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Channel"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/market/my-deals": {
+            "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "List deals for the current user (as lessor or lessee)",
+                "responses": {
+                    "200": {
+                        "description": "List of user's deals",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.DealResponse"
                                             }
                                         }
                                     }
@@ -1412,6 +2134,60 @@
                 }
             }
         },
+        "/market/waitlist": {
+            "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Get waitlist status for current user",
+                "responses": {
+                    "200": {
+                        "description": "Waitlist status with channel count",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/ads-mrkt_internal_market_application_market_http_model.WaitlistResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ads-mrkt_internal_server_templates_response.Template"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/telegram/webhook": {
             "post": {
                 "security": [],
@@ -1448,6 +2224,357 @@
         }
     },
     "definitions": {
+        "ads-mrkt_internal_analytics_application_http_model.HistoryResponse": {
+            "type": "object",
+            "properties": {
+                "avg_listings_per_user": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "commission_earned_ton": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "deal_amounts_by_status_ton": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float64"
+                        }
+                    }
+                },
+                "deals_by_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                },
+                "deals_count": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "from": {
+                    "type": "string"
+                },
+                "listings_count": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "period": {
+                    "type": "string"
+                },
+                "timestamps": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "to": {
+                    "type": "string"
+                },
+                "users_count": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "ads-mrkt_internal_analytics_application_http_model.LatestSnapshotResponse": {
+            "type": "object",
+            "properties": {
+                "snapshot": {
+                    "$ref": "#/definitions/ads-mrkt_internal_analytics_application_http_model.SnapshotResponse"
+                }
+            }
+        },
+        "ads-mrkt_internal_analytics_application_http_model.SnapshotResponse": {
+            "type": "object",
+            "properties": {
+                "avg_listings_per_user": {
+                    "type": "number"
+                },
+                "commission_earned_ton": {
+                    "type": "number"
+                },
+                "deal_amounts_by_status_ton": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "deals_by_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "deals_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "listings_count": {
+                    "type": "integer"
+                },
+                "recorded_at": {
+                    "type": "string"
+                },
+                "users_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.AuthUserRequest": {
+            "type": "object",
+            "properties": {
+                "referrer": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.CreateDealRequest": {
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "integer"
+                },
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "listing_id": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.CreateListingRequest": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "channel_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "prepared_post": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.DealChatLinkResponse": {
+            "type": "object",
+            "properties": {
+                "chat_link": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.DealResponse": {
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "escrow_address": {
+                    "type": "string"
+                },
+                "escrow_amount": {
+                    "type": "integer"
+                },
+                "escrow_release_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lessee_id": {
+                    "type": "integer"
+                },
+                "lessee_payout_address": {
+                    "type": "string"
+                },
+                "lessee_signature": {
+                    "type": "string"
+                },
+                "lessor_id": {
+                    "type": "integer"
+                },
+                "lessor_payout_address": {
+                    "type": "string"
+                },
+                "lessor_signature": {
+                    "type": "string"
+                },
+                "listing_id": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "status": {
+                    "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.DealStatus"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.SetDealPayoutRequest": {
+            "type": "object",
+            "properties": {
+                "wallet_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.SetWalletRequest": {
+            "type": "object",
+            "properties": {
+                "wallet_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.UpdateDealDraftRequest": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.UpdateListingRequest": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "prepared_post": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "ads-mrkt_internal_market_application_market_http_model.WaitlistResponse": {
+            "type": "object",
+            "properties": {
+                "channels_connected": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.Channel"
+                    }
+                },
+                "referrals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.User"
+                    }
+                }
+            }
+        },
         "ads-mrkt_internal_market_domain_entity.Channel": {
             "type": "object",
             "properties": {
@@ -1465,79 +2592,6 @@
                 }
             }
         },
-        "ads-mrkt_internal_market_domain_entity.Deal": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "details": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "duration": {
-                    "type": "integer"
-                },
-                "escrow_address": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "lessee_id": {
-                    "type": "integer"
-                },
-                "lessee_signature": {
-                    "type": "string"
-                },
-                "lessor_id": {
-                    "type": "integer"
-                },
-                "lessor_signature": {
-                    "type": "string"
-                },
-                "listing_id": {
-                    "type": "integer"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "status": {
-                    "$ref": "#/definitions/ads-mrkt_internal_market_domain_entity.DealStatus"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "ads-mrkt_internal_market_domain_entity.DealChat": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "deal_id": {
-                    "type": "integer"
-                },
-                "replied_message": {
-                    "type": "string"
-                },
-                "reply_to_chat_id": {
-                    "type": "integer"
-                },
-                "reply_to_message_id": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "ads-mrkt_internal_market_domain_entity.DealStatus": {
             "type": "string",
             "enum": [
@@ -1549,6 +2603,8 @@
                 "waiting_escrow_release",
                 "escrow_release_confirmed",
                 "completed",
+                "waiting_escrow_refund",
+                "escrow_refund_confirmed",
                 "expired",
                 "rejected"
             ],
@@ -1561,6 +2617,8 @@
                 "DealStatusWaitingEscrowRelease",
                 "DealStatusEscrowReleaseConfirmed",
                 "DealStatusCompleted",
+                "DealStatusWaitingEscrowRefund",
+                "DealStatusEscrowRefundConfirmed",
                 "DealStatusExpired",
                 "DealStatusRejected"
             ]
@@ -1568,14 +2626,43 @@
         "ads-mrkt_internal_market_domain_entity.Listing": {
             "type": "object",
             "properties": {
+                "categories": {
+                    "description": "JSON array of strings from predefined set",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "channel_followers": {
+                    "type": "integer"
+                },
                 "channel_id": {
                     "type": "integer"
+                },
+                "channel_photo": {
+                    "type": "string"
+                },
+                "channel_title": {
+                    "type": "string"
+                },
+                "channel_username": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "prepared_post": {
+                    "description": "JSON object, e.g. {\"message\": \"ad text\"}; extensible",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "prices": {
                     "type": "array",
@@ -1619,6 +2706,41 @@
                 "ListingTypeLessee"
             ]
         },
+        "ads-mrkt_internal_market_domain_entity.User": {
+            "type": "object",
+            "properties": {
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "locale": {
+                    "type": "string"
+                },
+                "photo": {
+                    "type": "string"
+                },
+                "role": {
+                    "description": "user | admin",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/ads-mrkt_pkg_auth_role.Role"
+                        }
+                    ]
+                },
+                "username": {
+                    "type": "string"
+                },
+                "wallet_address": {
+                    "description": "TON address in raw format",
+                    "type": "string"
+                }
+            }
+        },
         "ads-mrkt_internal_server_templates_response.Template": {
             "type": "object",
             "properties": {
@@ -1631,100 +2753,18 @@
                 }
             }
         },
-        "internal_market_application_market_http.AuthUserRequest": {
-            "type": "object",
-            "properties": {
-                "referrer": {
-                    "description": "optional, for future use",
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_market_application_market_http.CreateDealRequest": {
-            "type": "object",
-            "properties": {
-                "details": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "duration": {
-                    "type": "integer"
-                },
-                "listing_id": {
-                    "type": "integer"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_market_application_market_http.CreateListingRequest": {
-            "type": "object",
-            "properties": {
-                "channel_id": {
-                    "type": "integer"
-                },
-                "prices": {
-                    "description": "[[\"\u003cnumber_of_hours\u003ehr\", \u003cprice\u003e], ...]",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "status": {
-                    "description": "active | inactive",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "lessor | lessee",
-                    "type": "string"
-                }
-            }
-        },
-        "internal_market_application_market_http.UpdateDealDraftRequest": {
-            "type": "object",
-            "properties": {
-                "details": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "duration": {
-                    "type": "integer"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_market_application_market_http.UpdateListingRequest": {
-            "type": "object",
-            "properties": {
-                "channel_id": {
-                    "type": "integer"
-                },
-                "prices": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "status": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
+        "ads-mrkt_pkg_auth_role.Role": {
+            "type": "string",
+            "enum": [
+                "user",
+                "admin",
+                ""
+            ],
+            "x-enum-varnames": [
+                "UserRole",
+                "AdminRole",
+                "EmptyRole"
+            ]
         }
     },
     "securityDefinitions": {

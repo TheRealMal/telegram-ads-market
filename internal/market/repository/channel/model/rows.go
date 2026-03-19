@@ -30,7 +30,7 @@ func ChannelRowToEntity(row ChannelRow) (*entity.Channel, error) {
 	return &entity.Channel{
 		ID:              row.ID,
 		AccessHash:      row.AccessHash,
-		BotMemberStatus: row.BotMemberStatus,
+		BotMemberStatus: entity.BotMemberStatus(row.BotMemberStatus),
 		AdminRights:     rights,
 		Title:           row.Title,
 		Username:        row.Username,

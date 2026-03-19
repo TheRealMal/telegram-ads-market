@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -28,21 +29,16 @@ func NewHandler(updatesService updatesService) *handler {
 // @Param		request	body		[]byte	true	"request body"
 // @Success	200		{object}	string
 // @Router		/telegram/webhook [post]
-func (h *handler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
+func (h *handler) HandleUpdate(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		slog.Error("ServiceError", "error", err)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 	defer r.Body.Close()
-
-	err = h.updatesService.HandleUpdate(r.Context(), bodyBytes)
 	if err != nil {
-		slog.Error("ServiceError", "error", err, "request_body", string(bodyBytes))
-		w.WriteHeader(http.StatusOK)
-		return
+		return nil, fmt.Errorf("read webhook body: %w", err)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if err := h.updatesService.HandleUpdate(r.Context(), bodyBytes); err != nil {
+		slog.Error("handle update", "error", err, "request_body", string(bodyBytes))
+	}
+
+	return nil, nil
 }

@@ -2,11 +2,12 @@ package event
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 
 	"ads-mrkt/internal/event/domain/entity"
 
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -25,18 +26,20 @@ const (
 	groupName = "market"
 )
 
-func NewService(repository repository) *Service {
+func NewService(ctx context.Context, repository repository) (*Service, error) {
 	s := &Service{
 		repository: repository,
 	}
 
 	streamKey := (*entity.EventEscrowDeposit)(nil).StreamKey()
-	err := s.repository.CreateGroup(context.Background(), streamKey, groupName, "0")
+	err := s.repository.CreateGroup(ctx, streamKey, groupName, "0")
 	if err != nil {
-		if !strings.Contains(err.Error(), "BUSYGROUP") {
-			log.Fatalf("failed to create escrow_deposit event group: %v", err)
+		if strings.Contains(err.Error(), "BUSYGROUP") {
+			slog.Info("consumer group already exists", "group", groupName)
+		} else {
+			return nil, errors.Wrap(err, "failed to create escrow_deposit event group")
 		}
 	}
 
-	return s
+	return s, nil
 }

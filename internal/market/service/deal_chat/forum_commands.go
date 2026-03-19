@@ -122,15 +122,7 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 	adjustedEntities := telegram.AdjustEntitiesOffset(rawEntities, editPrefixUTF16Len)
 
 	// Detect media from the message
-	var mediaType, mediaFileID string
-	if len(message.Photo) > 0 {
-		// Pick the largest photo (last in array per Telegram docs)
-		mediaType = "photo"
-		mediaFileID = message.Photo[len(message.Photo)-1].FileID
-	} else if message.Video != nil {
-		mediaType = "video"
-		mediaFileID = message.Video.FileID
-	}
+	mediaType, mediaFileID := detectMediaFromMessage(message)
 
 	// Update deal details
 	details := deal.Details
@@ -261,7 +253,7 @@ func (s *service) HandleApproveCallback(ctx context.Context, callbackQuery *tele
 	}
 
 	// Sign the deal for the pressing user
-	if signErr := s.dealSigner.SignDeal(ctx, callbackQuery.From.ID, dealID); signErr != nil {
+	if _, signErr := s.dealSigner.SignDeal(ctx, callbackQuery.From.ID, dealID); signErr != nil {
 		// Show error alert, keep Approve button for retry
 		alertText := mapSignError(signErr)
 		if err := s.telegramForum.AnswerCallbackQuery(ctx, callbackQuery.ID, alertText, true); err != nil {
@@ -349,7 +341,8 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 
 	userID := callbackQuery.From.ID
 
-	if signErr := s.dealSigner.SignDeal(ctx, userID, dealID); signErr != nil {
+	deal, signErr := s.dealSigner.SignDeal(ctx, userID, dealID)
+	if signErr != nil {
 		alertText := mapSignError(signErr)
 		if err := s.telegramForum.AnswerCallbackQuery(ctx, callbackQuery.ID, alertText, true); err != nil {
 			slog.Error("answer confirm sign callback query with alert", "error", err)
@@ -360,12 +353,6 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 	// Success: answer callback and remove "Confirm & Sign" button (preserve URL button)
 	if err := s.telegramForum.AnswerCallbackQuery(ctx, callbackQuery.ID, "Signed!", false); err != nil {
 		slog.Error("answer confirm sign callback query", "error", err)
-	}
-
-	// Get deal to remove Confirm & Sign button (preserve URL button) and notify other side
-	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
-	if err != nil || deal == nil {
-		return nil
 	}
 
 	button := domain.GetButtonFromDetails(deal.Details)
@@ -492,6 +479,18 @@ func (s *service) sendToThread(ctx context.Context, chatID int64, threadID int64
 	}); err != nil {
 		slog.Error("failed to add notification", "type", "send_to_thread_helper", "msg", text, "chat_id", chatID, "thread_id", threadID, "error", err)
 	}
+}
+
+// detectMediaFromMessage extracts the media type and file ID from a message, if any.
+func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFileID string) {
+	if len(message.Photo) > 0 {
+		// Pick the largest photo (last in array per Telegram docs)
+		return "photo", message.Photo[len(message.Photo)-1].FileID
+	}
+	if message.Video != nil {
+		return "video", message.Video.FileID
+	}
+	return "", ""
 }
 
 // buildURLButton creates an InlineKeyboardMarkup with a single URL button.

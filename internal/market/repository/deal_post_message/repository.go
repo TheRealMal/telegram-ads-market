@@ -205,7 +205,7 @@ func (r *repository) CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx
 		UPDATE market.deal SET status = @status_waiting_escrow_release, updated_at = NOW()
 		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`,
 		pgx.NamedArgs{
-			"ids":                            ids,
+			"ids":                           ids,
 			"status_waiting_escrow_release": string(entity.DealStatusWaitingEscrowRelease),
 		},
 	)
@@ -239,7 +239,7 @@ func (r *repository) FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx cont
 		UPDATE market.deal SET status = @status_waiting_escrow_refund, updated_at = NOW()
 		WHERE id IN (SELECT deal_id FROM market.deal_post_message WHERE id = ANY(@ids))`,
 		pgx.NamedArgs{
-			"ids":                           ids,
+			"ids":                          ids,
 			"status_waiting_escrow_refund": string(entity.DealStatusWaitingEscrowRefund),
 		},
 	)

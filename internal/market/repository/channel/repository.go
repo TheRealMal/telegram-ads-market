@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"ads-mrkt/internal/market/domain/entity"
 	"ads-mrkt/internal/market/repository/channel/model"
+	"ads-mrkt/internal/market/repository/pgxutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// channelSelectCols is the standard column list for market.channel SELECT queries.
+const channelSelectCols = "id, access_hash, bot_member_status, admin_rights, title, username, photo"
 
 type database interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
@@ -28,12 +33,11 @@ func New(db database) *repository {
 }
 
 func (r *repository) GetChannelByID(ctx context.Context, id int64) (*entity.Channel, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, access_hash, bot_member_status, admin_rights, title, username, photo
-		FROM market.channel WHERE id = @id`,
+	rows, err := r.db.Query(ctx,
+		"SELECT "+channelSelectCols+" FROM market.channel WHERE id = @id",
 		pgx.NamedArgs{"id": id})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get channel by id %d: %w", id, err)
 	}
 	defer rows.Close()
 
@@ -42,7 +46,7 @@ func (r *repository) GetChannelByID(ctx context.Context, id int64) (*entity.Chan
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("get channel by id %d: %w", id, err)
 	}
 	return model.ChannelRowToEntity(row)
 }
@@ -56,21 +60,13 @@ func (r *repository) ListChannelsByAdminUserID(ctx context.Context, userID int64
 		ORDER BY c.updated_at DESC`,
 		pgx.NamedArgs{"user_id": userID})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list channels by admin user id %d: %w", userID, err)
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ChannelRow])
+	list, err := pgxutil.CollectAndConvertErr(rows, model.ChannelRowToEntity)
 	if err != nil {
-		return nil, err
-	}
-	list := make([]*entity.Channel, 0, len(slice))
-	for _, row := range slice {
-		ch, err := model.ChannelRowToEntity(row)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, ch)
+		return nil, fmt.Errorf("list channels by admin user id %d: %w", userID, err)
 	}
 	return list, nil
 }
@@ -78,7 +74,7 @@ func (r *repository) ListChannelsByAdminUserID(ctx context.Context, userID int64
 func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel) error {
 	adminRightsJSON, err := json.Marshal(channel.AdminRights)
 	if err != nil {
-		return err
+		return fmt.Errorf("upsert channel %d: marshal admin rights: %w", channel.ID, err)
 	}
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO market.channel (admin_rights, id, title, username, photo, access_hash, bot_member_status)
@@ -100,38 +96,34 @@ func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel)
 		"access_hash":       channel.AccessHash,
 		"bot_member_status": channel.BotMemberStatus,
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("upsert channel %d: %w", channel.ID, err)
+	}
+	return nil
 }
 
-func (r *repository) UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status string) error {
+func (r *repository) UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status entity.BotMemberStatus) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.channel SET bot_member_status = @status, updated_at = NOW() WHERE id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID, "status": status})
-	return err
+	if err != nil {
+		return fmt.Errorf("update channel %d bot member status: %w", channelID, err)
+	}
+	return nil
 }
 
 func (r *repository) ListChannelsWithBotAccess(ctx context.Context) ([]*entity.Channel, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, access_hash, bot_member_status, admin_rights, title, username, photo
-		FROM market.channel
-		WHERE bot_member_status = 'administrator'
-		ORDER BY updated_at DESC`)
+	rows, err := r.db.Query(ctx,
+		"SELECT "+channelSelectCols+" FROM market.channel WHERE bot_member_status = @status_administrator ORDER BY updated_at DESC",
+		pgx.NamedArgs{"status_administrator": entity.BotMemberStatusAdministrator})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list channels with bot access: %w", err)
 	}
 	defer rows.Close()
 
-	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.ChannelRow])
+	list, err := pgxutil.CollectAndConvertErr(rows, model.ChannelRowToEntity)
 	if err != nil {
-		return nil, err
-	}
-	list := make([]*entity.Channel, 0, len(slice))
-	for _, row := range slice {
-		ch, err := model.ChannelRowToEntity(row)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, ch)
+		return nil, fmt.Errorf("list channels with bot access: %w", err)
 	}
 	return list, nil
 }
@@ -140,14 +132,20 @@ func (r *repository) ResetChannelAccessHash(ctx context.Context, channelID int64
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.channel SET access_hash = 0, updated_at = NOW() WHERE id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID})
-	return err
+	if err != nil {
+		return fmt.Errorf("reset channel %d access hash: %w", channelID, err)
+	}
+	return nil
 }
 
 func (r *repository) UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE market.channel SET photo = @photo, updated_at = NOW() WHERE id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID, "photo": photo})
-	return err
+	if err != nil {
+		return fmt.Errorf("update channel %d photo: %w", channelID, err)
+	}
+	return nil
 }
 
 func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error {
@@ -161,7 +159,10 @@ func (r *repository) UpsertChannelStats(ctx context.Context, channelID int64, st
 		"channel_id": channelID,
 		"stats":      stats,
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("upsert channel %d stats: %w", channelID, err)
+	}
+	return nil
 }
 
 func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json.RawMessage, error) {
@@ -169,7 +170,7 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 		SELECT stats FROM market.channel_stats WHERE channel_id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get channel %d stats: %w", channelID, err)
 	}
 	defer rows.Close()
 
@@ -178,7 +179,7 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("get channel %d stats: %w", channelID, err)
 	}
 	return row.Stats, nil
 }
@@ -186,12 +187,12 @@ func (r *repository) GetChannelStats(ctx context.Context, channelID int64) (json
 func (r *repository) MergeStatsRequestedAt(ctx context.Context, channelID int64, requestedAtUnix int64) error {
 	raw, err := r.GetChannelStats(ctx, channelID)
 	if err != nil {
-		return err
+		return fmt.Errorf("merge stats requested at for channel %d: %w", channelID, err)
 	}
 	var statsMap map[string]interface{}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &statsMap); err != nil {
-			return err
+			return fmt.Errorf("merge stats requested at for channel %d: unmarshal stats: %w", channelID, err)
 		}
 	}
 	if statsMap == nil {
@@ -200,7 +201,7 @@ func (r *repository) MergeStatsRequestedAt(ctx context.Context, channelID int64,
 	statsMap["requested_at"] = requestedAtUnix
 	merged, err := json.Marshal(statsMap)
 	if err != nil {
-		return err
+		return fmt.Errorf("merge stats requested at for channel %d: marshal stats: %w", channelID, err)
 	}
 	return r.UpsertChannelStats(ctx, channelID, merged)
 }

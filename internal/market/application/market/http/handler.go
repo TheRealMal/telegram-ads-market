@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"ads-mrkt/internal/market/domain/entity"
+	dealservice "ads-mrkt/internal/market/service/deal"
+	listingservice "ads-mrkt/internal/market/service/listing"
 	"ads-mrkt/pkg/auth"
 )
 
@@ -16,30 +18,30 @@ type userService interface {
 }
 
 type listingService interface {
-	CreateListing(ctx context.Context, userID int64, l *entity.Listing) error
+	CreateListing(ctx context.Context, userID int64, input listingservice.CreateListingInput) (*entity.Listing, error)
 	GetListing(ctx context.Context, id int64) (*entity.Listing, error)
-	UpdateListing(ctx context.Context, userID int64, l *entity.Listing) error
+	UpdateListing(ctx context.Context, userID int64, id int64, input listingservice.UpdateListingInput) error
 	DeleteListing(ctx context.Context, userID int64, id int64) error
 	ListListingsByUserID(ctx context.Context, userID int64, typ *entity.ListingType) ([]*entity.Listing, error)
 	ListListingsAll(ctx context.Context, typ *entity.ListingType, categories []string, minFollowers *int64) ([]*entity.Listing, error)
 }
 
 type dealService interface {
-	CreateDeal(ctx context.Context, d *entity.Deal, otherSideID int64) error
+	CreateDealFromRequest(ctx context.Context, userID int64, input dealservice.CreateDealInput) (*entity.Deal, entity.ListingType, error)
 	GetDeal(ctx context.Context, id int64) (*entity.Deal, error)
 	GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error)
 	GetDealsByListingID(ctx context.Context, listingID int64) ([]*entity.Deal, error)
 	GetDealsByListingIDForUser(ctx context.Context, listingID int64, userID int64) ([]*entity.Deal, error)
 	GetDealsByUserID(ctx context.Context, userID int64) ([]*entity.Deal, error)
-	UpdateDealDraft(ctx context.Context, userID int64, d *entity.Deal) error
-	SignDeal(ctx context.Context, userID int64, dealID int64) error
-	SetDealPayoutAddress(ctx context.Context, userID int64, dealID int64, payoutAddressRaw string) error
-	RejectDeal(ctx context.Context, userID int64, dealID int64) error
+	UpdateDealDraft(ctx context.Context, userID int64, dealID int64, input dealservice.UpdateDealDraftInput) (*entity.Deal, error)
+	SignDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error)
+	SetDealPayoutAddress(ctx context.Context, userID int64, dealID int64, payoutAddressRaw string) (*entity.Deal, error)
+	RejectDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error)
 }
 
 type dealChatService interface {
 	GetDealChatLink(ctx context.Context, dealID, userID int64) (chatLink string, err error)
-	CreateDealForumTopics(ctx context.Context, dealID int64, listingType entity.ListingType) error
+	CreateDealForumTopics(ctx context.Context, deal *entity.Deal, listingType entity.ListingType) error
 }
 
 type channelService interface {
