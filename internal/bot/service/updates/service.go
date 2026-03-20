@@ -59,6 +59,7 @@ type marketDealChatService interface {
 	HandleForumCommand(ctx context.Context, message *telegram.UpdateMessage) error
 	HandleApproveCallback(ctx context.Context, callbackQuery *telegram.CallbackQuery) error
 	HandleConfirmSignCallback(ctx context.Context, callbackQuery *telegram.CallbackQuery) error
+	HandleWizardStep(ctx context.Context, chatID, threadID int64, message *telegram.UpdateMessage) (bool, error)
 }
 
 type channelRepository interface {
@@ -231,11 +232,12 @@ func (s *service) getUpdateType(update *telegram.Update) UpdateType {
 		return UpdateCallback
 	}
 	if update.Message != nil {
-		if update.Message.Text == "/start" {
-			return UpdateCommandStart
-		}
+		// Forum thread messages take priority (even /start in a thread)
 		if update.Message.Chat != nil && update.Message.MessageThreadID != 0 {
 			return UpdateForumMessage
+		}
+		if update.Message.Text == "/start" {
+			return UpdateCommandStart
 		}
 	}
 	return UpdateUnknown

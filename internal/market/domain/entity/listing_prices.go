@@ -15,6 +15,7 @@ var durationRegex = regexp.MustCompile(`^\d+hr$`)
 var validAdTypes = map[string]bool{
 	string(AdTypePost):        true,
 	string(AdTypeInstantPost): true,
+	string(AdTypeStory):       true,
 }
 
 // DealPriceMatchesListing checks that the deal's ad type, duration, and price correspond to an option in the listing's prices.
@@ -121,7 +122,7 @@ func ValidateListingPrices(raw json.RawMessage) error {
 			return fmt.Errorf("prices[%d][0]: ad_type must be a string (e.g. \"post\")", i)
 		}
 		if !validAdTypes[adType] {
-			return fmt.Errorf("prices[%d][0]: ad_type must be one of \"post\", \"instant_post\"", i)
+			return fmt.Errorf("prices[%d][0]: ad_type must be one of \"post\", \"instant_post\", \"story\"", i)
 		}
 		durStr, ok := triple[1].(string)
 		if !ok {

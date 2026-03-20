@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
@@ -44,22 +45,30 @@ type dealSigner interface {
 	SignDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error)
 }
 
+type wizardStore interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	Del(ctx context.Context, keys ...string) error
+}
+
 type service struct {
 	dealRepo          dealRepository
 	forumTopicRepo    dealForumTopicRepository
 	telegramForum     telegramForum
 	dealSigner        dealSigner
 	notificationAdder notificationAdder
+	wizardStore       wizardStore
 	botUsername       string
 }
 
-func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, dealSigner dealSigner, notificationAdder notificationAdder, botUsername string) *service {
+func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository, telegramForum telegramForum, dealSigner dealSigner, notificationAdder notificationAdder, wizardStore wizardStore, botUsername string) *service {
 	return &service{
 		dealRepo:          dealRepo,
 		forumTopicRepo:    forumTopicRepo,
 		telegramForum:     telegramForum,
 		dealSigner:        dealSigner,
 		notificationAdder: notificationAdder,
+		wizardStore:       wizardStore,
 		botUsername:       strings.TrimPrefix(strings.TrimSpace(botUsername), "@"),
 	}
 }

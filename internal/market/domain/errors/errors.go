@@ -14,6 +14,7 @@ var (
 	ErrWalletNotSet               = errors.New("market: connect wallet before signing")
 	ErrPayoutNotSet               = errors.New("market: both parties must set payout address before signing")
 	ErrDealDetailsMessageRequired = errors.New("market: deal details message must be set before signing")
+	ErrDealDetailsMediaRequired   = errors.New("market: deal details media must be set before signing story deal")
 	ErrWalletRequired             = errors.New("market: connect wallet before proceeding")
 	ErrPriceMismatch              = errors.New("market: type, duration and price must match one of the listing's price options")
 	ErrOwnListing                 = errors.New("market: cannot create deal on your own listing")

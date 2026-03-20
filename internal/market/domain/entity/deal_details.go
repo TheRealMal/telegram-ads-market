@@ -49,6 +49,7 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 		"media_type":       true,
 		"media_file_id":    true,
 		"button":           true,
+		"buttons":          true, // array of DealDetailsButton
 		"entities":         true,
 		"caption_entities": true,
 	}
@@ -115,6 +116,22 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 		button = &btn
 	}
 
+	var buttons []DealDetailsButton
+	if btnsRaw, ok := m["buttons"]; ok && btnsRaw != nil {
+		btnsBytes, err := json.Marshal(btnsRaw)
+		if err != nil {
+			return nil, ErrDealDetailsInvalid
+		}
+		if err := json.Unmarshal(btnsBytes, &buttons); err != nil {
+			return nil, ErrDealDetailsInvalid
+		}
+		for _, btn := range buttons {
+			if !btn.IsValid() {
+				return nil, ErrDealDetailsInvalid
+			}
+		}
+	}
+
 	var entities []interface{}
 	if ent, ok := m["entities"]; ok && ent != nil {
 		entArr, ok := ent.([]interface{})
@@ -151,6 +168,9 @@ func ValidateDealDetails(raw json.RawMessage) (json.RawMessage, error) {
 	}
 	if button != nil {
 		canon["button"] = button
+	}
+	if len(buttons) > 0 {
+		canon["buttons"] = buttons
 	}
 	if len(entities) > 0 {
 		canon["entities"] = entities
@@ -355,6 +375,69 @@ func setRawField(details json.RawMessage, key string, raw json.RawMessage) (json
 			return nil, err
 		}
 		m[key] = val
+	}
+	return json.Marshal(m)
+}
+
+// GetButtonsFromDetails returns all buttons from deal details. Supports both the new "buttons"
+// array format and the legacy single "button" format for backward compatibility.
+func GetButtonsFromDetails(details json.RawMessage) []DealDetailsButton {
+	if len(details) == 0 || string(details) == "null" {
+		return nil
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(details, &m); err != nil {
+		return nil
+	}
+	// Try "buttons" first (new array format)
+	if btnsRaw, ok := m["buttons"]; ok && btnsRaw != nil {
+		btnsBytes, err := json.Marshal(btnsRaw)
+		if err != nil {
+			return nil
+		}
+		var btns []DealDetailsButton
+		if err := json.Unmarshal(btnsBytes, &btns); err != nil {
+			return nil
+		}
+		return btns
+	}
+	// Fallback: "button" (old single-button format)
+	if btnRaw, ok := m["button"]; ok && btnRaw != nil {
+		btnBytes, err := json.Marshal(btnRaw)
+		if err != nil {
+			return nil
+		}
+		var btn DealDetailsButton
+		if err := json.Unmarshal(btnBytes, &btn); err != nil {
+			return nil
+		}
+		return []DealDetailsButton{btn}
+	}
+	return nil
+}
+
+// StripNonMediaFields removes message, buttons, button, entities, and caption_entities from details,
+// keeping only media_type, media_file_id, and posted_at. Used to enforce story deals as media-only.
+func StripNonMediaFields(details json.RawMessage) json.RawMessage {
+	m := parseDetailsMap(details)
+	delete(m, "message")
+	delete(m, "button")
+	delete(m, "buttons")
+	delete(m, "entities")
+	delete(m, "caption_entities")
+	b, _ := json.Marshal(m)
+	return b
+}
+
+// SetButtonsInDetails sets the "buttons" array in details JSON, removing the legacy "button" key.
+// Pass an empty slice to remove all buttons.
+func SetButtonsInDetails(details json.RawMessage, buttons []DealDetailsButton) (json.RawMessage, error) {
+	m := parseDetailsMap(details)
+	delete(m, "button") // remove old single-button key
+	if len(buttons) == 0 {
+		delete(m, "buttons")
+	} else {
+		m["buttons"] = buttons
 	}
 	return json.Marshal(m)
 }

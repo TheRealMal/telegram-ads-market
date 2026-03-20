@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ type getFileResponse struct {
 
 func (c *APIClient) getFile(fileID string) (*File, error) {
 	getFileURL := c.buildTelegramURL(telegramPathGetFile)
-	getFileURL = getFileURL + "?file_id=" + fileID
+	getFileURL = getFileURL + "?file_id=" + url.QueryEscape(fileID)
 
 	req, err := http.NewRequest(http.MethodGet, getFileURL, nil)
 	if err != nil {

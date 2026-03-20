@@ -5,3 +5,5 @@
 /data/
 test.json
 build/
+.claude/
+CLAUDE.md

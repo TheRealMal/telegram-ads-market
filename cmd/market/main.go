@@ -121,7 +121,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 
 			// Standalone deal signer for deal chat (breaks circular dep: dealChatSvc -> dealSigner -> escrowSvc -> dealChatSvc).
 			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc, dealForumTopicRepo)
-			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, cfg.Telegram.BotUsername)
+			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, redisClient, cfg.Telegram.BotUsername)
 			vaultClient, err := vault.NewClient(cfg.Vault)
 			if err != nil {
 				return errors.Wrap(err, "create vault client")

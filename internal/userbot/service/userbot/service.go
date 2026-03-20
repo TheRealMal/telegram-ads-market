@@ -26,6 +26,7 @@ type listingRepository interface {
 
 type dealRepository interface {
 	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
+	GetDealByID(ctx context.Context, id int64) (*marketentity.Deal, error)
 }
 
 type dealPostMessageRepository interface {
@@ -49,6 +50,7 @@ type channelRepository interface {
 
 type botAPIClient interface {
 	PromoteChatMember(ctx context.Context, chatID int64, userID int64, rights helpertelegram.AdminPromoteRights) error
+	GetFileURL(fileID string) (string, error)
 }
 
 type channelUpdateStatsEventService interface {

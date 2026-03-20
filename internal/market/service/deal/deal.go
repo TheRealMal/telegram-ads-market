@@ -189,6 +189,10 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, dealID 
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", marketerrors.ErrInvalidDealDetails, err.Error())
 		}
+		// Story deals are media-only: strip text, buttons, and entities
+		if d.Type == entity.AdTypeStory {
+			canonDetails = entity.StripNonMediaFields(canonDetails)
+		}
 		d.Details = canonDetails
 	}
 

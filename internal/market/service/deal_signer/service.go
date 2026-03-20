@@ -61,8 +61,15 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*en
 		existing.LesseePayoutAddress == nil || *existing.LesseePayoutAddress == "" {
 		return nil, marketerrors.ErrPayoutNotSet
 	}
-	if strings.TrimSpace(entity.GetMessageFromDetails(existing.Details)) == "" {
-		return nil, marketerrors.ErrDealDetailsMessageRequired
+	if existing.IsStory() {
+		mediaType, _ := entity.GetMediaFromDetails(existing.Details)
+		if mediaType == "" {
+			return nil, marketerrors.ErrDealDetailsMediaRequired
+		}
+	} else {
+		if strings.TrimSpace(entity.GetMessageFromDetails(existing.Details)) == "" {
+			return nil, marketerrors.ErrDealDetailsMessageRequired
+		}
 	}
 	myPayout := *existing.LesseePayoutAddress
 	if userID == existing.LessorID {

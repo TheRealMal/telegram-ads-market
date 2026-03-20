@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 
+	"github.com/gotd/td/telegram/uploader"
 	"github.com/gotd/td/tg"
 )
 
@@ -60,6 +62,10 @@ func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal
 	channel, err = s.ensureChannelAccess(ctx, channel)
 	if err != nil {
 		logger.Error("ensure channel access", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "error", err)
+		return
+	}
+	if deal.IsStory() {
+		s.processStoryDeal(ctx, logger, deal, listing, channel)
 		return
 	}
 	text := marketentity.GetMessageFromDetails(deal.Details)
@@ -264,14 +270,26 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 			logger.Error("ensure channel access", "channel_id", m.ChannelID, "error", err)
 			continue
 		}
-		exists, err := s.getChannelMessageExists(ctx, m.ChannelID, channel.AccessHash, m.MessageID)
+
+		deal, err := s.dealRepo.GetDealByID(ctx, m.DealID)
+		if err != nil || deal == nil {
+			logger.Error("get deal for checker", "deal_id", m.DealID, "error", err)
+			continue
+		}
+
+		var exists bool
+		if deal.IsStory() {
+			exists, err = s.getChannelStoryExists(ctx, m.ChannelID, channel.AccessHash, m.MessageID)
+		} else {
+			exists, err = s.getChannelMessageExists(ctx, m.ChannelID, channel.AccessHash, m.MessageID)
+		}
 		if err != nil {
-			logger.Error("get message", "id", m.ID, "error", err)
+			logger.Error("check existence", "id", m.ID, "is_story", deal.IsStory(), "error", err)
 			continue
 		}
 		if !exists {
 			_ = s.dealPostMessageRepo.UpdateDealPostMessageStatus(ctx, m.ID, marketentity.DealPostMessageStatusDeleted)
-			logger.Info("message deleted", "id", m.ID, "deal_id", m.DealID)
+			logger.Info("deleted", "id", m.ID, "deal_id", m.DealID, "is_story", deal.IsStory())
 			continue
 		}
 		nextCheck := m.NextCheck.Add(postCheckAdvanceHour)
@@ -354,4 +372,180 @@ func (s *service) tryRecoverPostFromChannel(ctx context.Context, channelID int64
 		}
 	}
 	return 0, false
+}
+
+func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, deal *marketentity.Deal, listing *marketentity.Listing, channel *marketentity.Channel) {
+	mediaType, mediaFileID := marketentity.GetMediaFromDetails(deal.Details)
+	if mediaType == "" || mediaFileID == "" {
+		logger.Error("skip story deal, no media in details", "deal_id", deal.ID)
+		return
+	}
+	if postedAt, ok := marketentity.GetPostedAtFromDetails(deal.Details); ok && time.Now().Before(postedAt) {
+		logger.Debug("skip story deal, posted_at in future", "deal_id", deal.ID, "posted_at", postedAt)
+		return
+	}
+
+	// Stories cannot be recovered by text matching if the lock expired while locked.
+	// Release the expired lock as failed and let the next cycle retry from scratch.
+	lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+	if err != nil {
+		logger.Error("get last lock for story", "deal_id", deal.ID, "error", err)
+		return
+	}
+	if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+		logger.Warn("released expired story lock as failed", "deal_id", deal.ID, "lock_id", lastLock.ID)
+	}
+
+	lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
+	if err != nil {
+		logger.Debug("skip story deal, lock not acquired", "deal_id", deal.ID, "error", err)
+		return
+	}
+	releaseLock := func(status marketentity.DealActionLockStatus) {
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lockID, status)
+	}
+
+	inputMedia, err := s.uploadMediaForStory(ctx, mediaType, mediaFileID)
+	if err != nil {
+		logger.Error("upload media for story", "deal_id", deal.ID, "error", err)
+		releaseLock(marketentity.DealActionLockStatusFailed)
+		return
+	}
+
+	caption := marketentity.GetMessageFromDetails(deal.Details)
+	var mtprotoEntities []tg.MessageEntityClass
+	var botEntities []helpertelegram.MessageEntity
+	if raw := marketentity.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
+		_ = json.Unmarshal(raw, &botEntities)
+	}
+	if len(botEntities) == 0 {
+		if raw := marketentity.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
+			_ = json.Unmarshal(raw, &botEntities)
+		}
+	}
+	if len(botEntities) > 0 {
+		mtprotoEntities = toMTProtoEntities(botEntities)
+	}
+
+	storyID, err := s.sendChannelStory(ctx, *listing.ChannelID, channel.AccessHash, inputMedia, caption, mtprotoEntities)
+	if err != nil {
+		logger.Error("send story", "deal_id", deal.ID, "error", err)
+		releaseLock(marketentity.DealActionLockStatusFailed)
+		return
+	}
+
+	m := s.makeDealPostMessage(deal, *listing.ChannelID, storyID, caption)
+	if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
+		logger.Error("create deal_post_message for story", "deal_id", deal.ID, "error", err)
+		releaseLock(marketentity.DealActionLockStatusFailed)
+		return
+	}
+	releaseLock(marketentity.DealActionLockStatusCompleted)
+	logger.Info("story sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "story_id", storyID)
+}
+
+func (s *service) uploadMediaForStory(ctx context.Context, mediaType string, mediaFileID string) (tg.InputMediaClass, error) {
+	fileURL, err := s.botAPIClient.GetFileURL(mediaFileID)
+	if err != nil {
+		return nil, fmt.Errorf("get file URL: %w", err)
+	}
+
+	u := uploader.NewUploader(s.telegramClient.API())
+	inputFile, err := u.FromURL(ctx, fileURL)
+	if err != nil {
+		return nil, fmt.Errorf("upload from URL: %w", err)
+	}
+
+	switch mediaType {
+	case "photo":
+		return &tg.InputMediaUploadedPhoto{
+			File: inputFile,
+		}, nil
+	case "video":
+		return &tg.InputMediaUploadedDocument{
+			File:     inputFile,
+			MimeType: "video/mp4",
+			Attributes: []tg.DocumentAttributeClass{
+				&tg.DocumentAttributeVideo{
+					SupportsStreaming: true,
+				},
+			},
+		}, nil
+	case "animation":
+		return &tg.InputMediaUploadedDocument{
+			File:         inputFile,
+			MimeType:     "video/mp4",
+			NosoundVideo: true,
+			Attributes: []tg.DocumentAttributeClass{
+				&tg.DocumentAttributeAnimated{},
+				&tg.DocumentAttributeVideo{
+					SupportsStreaming: true,
+				},
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported media type for story: %s", mediaType)
+	}
+}
+
+func (s *service) sendChannelStory(ctx context.Context, channelID int64, accessHash int64, media tg.InputMediaClass, caption string, entities []tg.MessageEntityClass) (int64, error) {
+	peer := &tg.InputPeerChannel{
+		ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
+		AccessHash: accessHash,
+	}
+
+	req := &tg.StoriesSendStoryRequest{
+		Peer:     peer,
+		Media:    media,
+		RandomID: rand.Int63(),
+		PrivacyRules: []tg.InputPrivacyRuleClass{
+			&tg.InputPrivacyValueAllowAll{},
+		},
+	}
+	req.SetPinned(true)
+	if caption != "" {
+		req.SetCaption(caption)
+	}
+	if len(entities) > 0 {
+		req.SetEntities(entities)
+	}
+
+	result, err := s.telegramClient.API().StoriesSendStory(ctx, req)
+	if err != nil {
+		return 0, fmt.Errorf("stories.sendStory: %w", err)
+	}
+
+	upd, ok := result.(*tg.Updates)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type from stories.sendStory: %T", result)
+	}
+	for _, u := range upd.Updates {
+		if storyUpdate, ok := u.(*tg.UpdateStory); ok {
+			if storyItem, ok := storyUpdate.Story.(*tg.StoryItem); ok {
+				return int64(storyItem.ID), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("no UpdateStory found in stories.sendStory response")
+}
+
+func (s *service) getChannelStoryExists(ctx context.Context, channelID int64, accessHash int64, storyID int64) (bool, error) {
+	peer := &tg.InputPeerChannel{
+		ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
+		AccessHash: accessHash,
+	}
+	result, err := s.telegramClient.API().StoriesGetStoriesByID(ctx, &tg.StoriesGetStoriesByIDRequest{
+		Peer: peer,
+		ID:   []int{int(storyID)},
+	})
+	if err != nil {
+		return false, fmt.Errorf("stories.getStoriesByID: %w", err)
+	}
+	for _, story := range result.Stories {
+		if _, ok := story.(*tg.StoryItem); ok && story.GetID() == int(storyID) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

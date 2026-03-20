@@ -10,6 +10,7 @@ type AdType string
 const (
 	AdTypePost        AdType = "post"
 	AdTypeInstantPost AdType = "instant_post"
+	AdTypeStory       AdType = "story"
 )
 
 type DealStatus string
@@ -75,6 +76,11 @@ func (d *Deal) CanBeEdited() bool {
 // IsInstantPost reports whether the deal is of instant_post ad type.
 func (d *Deal) IsInstantPost() bool {
 	return d.Type == AdTypeInstantPost
+}
+
+// IsStory reports whether the deal is of story ad type.
+func (d *Deal) IsStory() bool {
+	return d.Type == AdTypeStory
 }
 
 // CanBeApproved reports whether both parties have set their signatures on the deal.
