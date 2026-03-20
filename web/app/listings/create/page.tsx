@@ -15,7 +15,7 @@ import { PageTopSpacer } from '@/components/PageTopSpacer';
 type ListingType = 'lessor' | 'lessee';
 type ListingStatus = 'active' | 'inactive';
 
-type AdType = 'post' | 'instant_post';
+type AdType = 'post' | 'instant_post' | 'story';
 
 interface PriceRow {
   adType: AdType;
@@ -286,6 +286,7 @@ export default function CreateListingPage() {
                 >
                   <option value="post">Post</option>
                   <option value="instant_post">Instant</option>
+                  <option value="story">Story</option>
                 </select>
                 <div className="flex-1">
                   <Input

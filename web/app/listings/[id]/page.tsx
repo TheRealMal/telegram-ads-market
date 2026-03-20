@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { MessageCircle, BarChart3, Power, PowerOff, Trash2, X } from 'lucide-react';
 import { api, ensureValidToken } from '@/lib/api';
 import { useTelegramBackButton } from '@/lib/telegram';
-import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue } from '@/lib/formatPrice';
+import { parseListingPrices, formatPriceEntry, formatPriceKey, formatPriceValue, formatAdTypeLabel } from '@/lib/formatPrice';
 import type { Listing, Deal, Channel } from '@/types';
 import { getDealStatusLabel } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -229,7 +229,7 @@ export default function ListingDetailPage() {
                     className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
                   >
                     <span className="text-sm text-muted-foreground">
-                      {row.adType === 'instant_post' ? 'Instant' : 'Post'} · {formatPriceKey(row.duration)}
+                      {formatAdTypeLabel(row.adType)} · {formatPriceKey(row.duration)}
                     </span>
                     <span className="font-semibold tabular-nums text-primary">{formatPriceValue(row.price)}</span>
                   </div>
@@ -398,7 +398,7 @@ export default function ListingDetailPage() {
                   >
                     {priceRowsForListing.map((row, i) => (
                       <option key={i} value={i}>
-                        {row.adType === 'instant_post' ? 'Instant' : 'Post'} · {formatPriceEntry(row.duration, row.price)}
+                        {formatAdTypeLabel(row.adType)} · {formatPriceEntry(row.duration, row.price)}
                       </option>
                     ))}
                   </select>

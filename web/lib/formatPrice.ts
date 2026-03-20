@@ -61,6 +61,17 @@ export function formatPriceValue(value: number): string {
 }
 
 /**
+ * Human-readable label for an ad type string.
+ */
+export function formatAdTypeLabel(adType: string): string {
+  switch (adType) {
+    case 'instant_post': return 'Instant';
+    case 'story': return 'Story';
+    default: return 'Post';
+  }
+}
+
+/**
  * Single price entry: "24 hours - 100 TON".
  */
 export function formatPriceEntry(durationStr: string, price: number): string {

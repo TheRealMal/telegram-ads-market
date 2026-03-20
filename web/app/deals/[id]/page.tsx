@@ -8,7 +8,7 @@ import { useTonAddress, useTonWallet, useTonConnectUI } from '@tonconnect/ui-rea
 import { api, ensureValidToken } from '@/lib/api';
 import { useTelegramBackButton, openTelegramLink } from '@/lib/telegram';
 import { getTelegramUser } from '@/lib/initData';
-import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry } from '@/lib/formatPrice';
+import { formatPriceKey, formatPriceValue, parseListingPrices, formatPriceEntry, formatAdTypeLabel } from '@/lib/formatPrice';
 import { toFriendlyAddress, formatAddressForDisplay, truncateAddressDisplay, addressesEqual } from '@/lib/tonAddress';
 import type { Deal, Listing } from '@/types';
 import { getDealStatusLabel } from '@/types';
@@ -783,7 +783,7 @@ export default function DealDetailPage() {
 
           {/* Type, Duration, Price, Listing, Post date, Post text */}
           <p className="text-sm">
-            <strong>Type:</strong> Post
+            <strong>Type:</strong> {formatAdTypeLabel(deal.type)}
           </p>
           <p className="text-sm">
             <strong>Duration:</strong> {formatPriceKey(String(deal.duration))}
