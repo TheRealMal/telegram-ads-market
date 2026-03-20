@@ -78,12 +78,12 @@ func NewService(dealRepo dealRepository, forumTopicRepo dealForumTopicRepository
 // The flow is: check DB → create Telegram topics → INSERT ON CONFLICT DO NOTHING.
 // If a concurrent caller inserted first, the orphaned Telegram topics are cleaned up.
 func (s *service) CreateDealForumTopics(ctx context.Context, deal *entity.Deal, listingType entity.ListingType) error {
-	existing, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, deal.ID)
-	if err != nil {
+	_, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, deal.ID)
+	if err != nil && !errors.Is(err, marketerrors.ErrNotFound) {
 		return fmt.Errorf("get deal forum topic: %w", err)
 	}
-	if existing != nil {
-		return nil
+	if err == nil {
+		return nil // topics already exist
 	}
 
 	name := "Deal #" + strconv.FormatInt(deal.ID, 10)
@@ -183,9 +183,6 @@ func (s *service) GetDealChatLink(ctx context.Context, dealID int64, userID int6
 	if err != nil {
 		return "", err
 	}
-	if deal == nil {
-		return "", marketerrors.ErrNotFound
-	}
 	if userID != deal.LessorID && userID != deal.LesseeID {
 		return "", marketerrors.ErrUnauthorizedSide
 	}
@@ -215,7 +212,10 @@ func (s *service) chatLinkForUser(t *entity.DealForumTopic, deal *entity.Deal, u
 
 func (s *service) DeleteDealForumTopic(ctx context.Context, dealID int64) error {
 	t, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
-	if err != nil || t == nil {
+	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil
+		}
 		return err
 	}
 	_ = s.telegramForum.DeleteForumTopic(ctx, t.LessorChatID, t.LessorMessageThreadID)
@@ -231,7 +231,7 @@ func (s *service) UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, s
 		return
 	}
 	topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
-	if err != nil || topic == nil {
+	if err != nil {
 		return
 	}
 	s.telegramForum.EditForumTopic(ctx, topic.LessorChatID, topic.LessorMessageThreadID, emojiID)
@@ -240,7 +240,10 @@ func (s *service) UpdateDealForumTopicEmoji(ctx context.Context, dealID int64, s
 
 func (s *service) CopyMessageToOtherTopic(ctx context.Context, chatID int64, messageThreadID int64, messageID int64) error {
 	t, side, err := s.forumTopicRepo.GetDealForumTopicByChatAndThread(ctx, chatID, messageThreadID)
-	if err != nil || t == nil {
+	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil
+		}
 		return err
 	}
 	var toChatID int64

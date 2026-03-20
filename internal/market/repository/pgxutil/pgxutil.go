@@ -4,7 +4,7 @@ import "github.com/jackc/pgx/v5"
 
 // CollectAndConvert collects rows from pgx.Rows, scans each into Row, and converts to *Entity.
 // For conversions that cannot fail.
-func CollectAndConvert[Row, Entity any](rows pgx.Rows, convertFn func(Row) *Entity) ([]*Entity, error) {
+func CollectAndConvert[Row, Entity interface{}](rows pgx.Rows, convertFn func(Row) *Entity) ([]*Entity, error) {
 	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[Row])
 	if err != nil {
 		return nil, err
@@ -18,7 +18,7 @@ func CollectAndConvert[Row, Entity any](rows pgx.Rows, convertFn func(Row) *Enti
 
 // CollectAndConvertErr collects rows from pgx.Rows, scans each into Row, and converts to *Entity.
 // For conversions that can fail.
-func CollectAndConvertErr[Row, Entity any](rows pgx.Rows, convertFn func(Row) (*Entity, error)) ([]*Entity, error) {
+func CollectAndConvertErr[Row, Entity interface{}](rows pgx.Rows, convertFn func(Row) (*Entity, error)) ([]*Entity, error) {
 	slice, err := pgx.CollectRows(rows, pgx.RowToStructByName[Row])
 	if err != nil {
 		return nil, err

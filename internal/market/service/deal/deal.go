@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +11,7 @@ import (
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
+	"ads-mrkt/internal/worker"
 )
 
 const completedWorkerInterval = 30 * time.Second
@@ -19,18 +21,18 @@ const completedWorkerInterval = 30 * time.Second
 func (s *dealService) CreateDealFromRequest(ctx context.Context, userID int64, input CreateDealInput) (*entity.Deal, entity.ListingType, error) {
 	creator, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil, "", marketerrors.ErrWalletRequired
+		}
 		return nil, "", err
 	}
-	if creator == nil || !creator.HasWallet() {
+	if !creator.HasWallet() {
 		return nil, "", marketerrors.ErrWalletRequired
 	}
 
 	listing, err := s.listingRepo.GetListingByID(ctx, input.ListingID)
 	if err != nil {
 		return nil, "", err
-	}
-	if listing == nil {
-		return nil, "", marketerrors.ErrNotFound
 	}
 	if listing.UserID == userID {
 		return nil, "", marketerrors.ErrOwnListing
@@ -43,9 +45,6 @@ func (s *dealService) CreateDealFromRequest(ctx context.Context, userID int64, i
 	listingOwner, err := s.userRepo.GetUserByID(ctx, listing.UserID)
 	if err != nil {
 		return nil, "", err
-	}
-	if listingOwner == nil {
-		return nil, "", marketerrors.ErrNotFound
 	}
 
 	var lessor, lessee *entity.User
@@ -134,7 +133,7 @@ func (s *dealService) GetDeal(ctx context.Context, id int64) (*entity.Deal, erro
 // GetDealForUser returns the deal only if the user is lessor or lessee; otherwise nil.
 func (s *dealService) GetDealForUser(ctx context.Context, id int64, userID int64) (*entity.Deal, error) {
 	d, err := s.dealRepo.GetDealByID(ctx, id)
-	if err != nil || d == nil {
+	if err != nil {
 		return nil, err
 	}
 	if d.LessorID != userID && d.LesseeID != userID {
@@ -162,9 +161,6 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, dealID 
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
 	if err != nil {
 		return nil, err
-	}
-	if existing == nil {
-		return nil, marketerrors.ErrNotFound
 	}
 	if !existing.CanBeEdited() {
 		return nil, marketerrors.ErrDealNotDraft
@@ -198,10 +194,10 @@ func (s *dealService) UpdateDealDraft(ctx context.Context, userID int64, dealID 
 
 	if input.Type != nil || input.Duration != nil || input.PriceTON != nil {
 		listing, err := s.listingRepo.GetListingByID(ctx, existing.ListingID)
-		if err != nil {
+		if err != nil && !errors.Is(err, marketerrors.ErrNotFound) {
 			return nil, err
 		}
-		if listing != nil && !entity.DealPriceMatchesListing(listing.Prices, string(d.Type), d.Duration, d.Price) {
+		if err == nil && !entity.DealPriceMatchesListing(listing.Prices, string(d.Type), d.Duration, d.Price) {
 			return nil, marketerrors.ErrPriceMismatch
 		}
 	}
@@ -221,9 +217,6 @@ func (s *dealService) SetDealPayoutAddress(ctx context.Context, userID int64, de
 	if err != nil {
 		return nil, err
 	}
-	if existing == nil {
-		return nil, marketerrors.ErrNotFound
-	}
 	if !existing.CanBeEdited() {
 		return nil, marketerrors.ErrDealNotDraft
 	}
@@ -242,18 +235,15 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	if err != nil {
 		return nil, err
 	}
-	if existing == nil {
-		return nil, marketerrors.ErrNotFound
-	}
 	if userID != existing.LessorID && userID != existing.LesseeID {
 		return nil, marketerrors.ErrUnauthorizedSide
 	}
 	d, err := s.dealRepo.SetDealStatusRejected(ctx, dealID)
 	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil, marketerrors.ErrDealNotDraft
+		}
 		return nil, err
-	}
-	if d == nil {
-		return nil, marketerrors.ErrDealNotDraft
 	}
 	s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, dealID, entity.DealStatusRejected)
 	otherID := existing.LesseeID
@@ -267,7 +257,7 @@ func (s *dealService) RejectDeal(ctx context.Context, userID int64, dealID int64
 	}
 
 	// Try to route notification into the deal's forum topic
-	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil && topic != nil {
+	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil {
 		if otherID == existing.LessorID {
 			notification.ThreadID = topic.LessorMessageThreadID
 		} else {
@@ -301,27 +291,21 @@ func (s *dealService) ExpireTimedOutDeposits(ctx context.Context, olderThan time
 
 // RunCompletedWorker moves deals from escrow_release_confirmed / escrow_refund_confirmed to completed (final status for frontend). Run in a goroutine.
 func (s *dealService) RunCompletedWorker(ctx context.Context) {
-	logger := slog.With("component", "deal_completed_worker")
-	ticker := time.NewTicker(completedWorkerInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			deals, err := s.dealRepo.ListDealsEscrowConfirmedToComplete(ctx)
-			if err != nil {
-				logger.Error("list deals to complete", "error", err)
-				continue
-			}
-			for _, d := range deals {
-				if err := s.dealRepo.SetDealStatusCompleted(ctx, d.ID); err != nil {
-					logger.Error("set deal completed", "deal_id", d.ID, "error", err)
-					continue
-				}
-				s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, d.ID, entity.DealStatusCompleted)
-				logger.Info("deal set completed", "deal_id", d.ID)
-			}
+	worker.RunTicker(ctx, "deal_completed_worker", completedWorkerInterval, false, s.runCompletedOnce)
+}
+
+func (s *dealService) runCompletedOnce(ctx context.Context, logger *slog.Logger) {
+	deals, err := s.dealRepo.ListDealsEscrowConfirmedToComplete(ctx)
+	if err != nil {
+		logger.Error("list deals to complete", "error", err)
+		return
+	}
+	for _, d := range deals {
+		if err := s.dealRepo.SetDealStatusCompleted(ctx, d.ID); err != nil {
+			logger.Error("set deal completed", "deal_id", d.ID, "error", err)
+			continue
 		}
+		s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, d.ID, entity.DealStatusCompleted)
+		logger.Info("deal set completed", "deal_id", d.ID)
 	}
 }

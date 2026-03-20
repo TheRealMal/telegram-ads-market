@@ -11,6 +11,7 @@ import (
 	"ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	dealmodel "ads-mrkt/internal/market/repository/deal/model"
+	"ads-mrkt/internal/worker"
 )
 
 type UpdateType string
@@ -152,18 +153,21 @@ func (s *service) HandleUpdate(ctx context.Context, raw []byte) error {
 	return s.eventService.AddTelegramUpdateEvent(ctx, update, time.Now())
 }
 
-func (s *service) StartBackgroundProcessingUpdates(ctx context.Context) {
+func (s *service) RunUpdateProcessorWorker(ctx context.Context) {
+	logger := slog.With("component", "telegram_update_processor")
+	logger.Info("started")
+	defer logger.Info("stopped")
+
 	go s.streamCleaner(ctx)
-	go s.processPendingUpdates(ctx)
+	go s.runPendingUpdateProcessorWorker(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("context done, stopping background processing updates")
 			return
 		default:
 			if err := s.processUpdates(ctx); err != nil {
-				slog.Error("failed to process updates", "error", err)
+				logger.Error("process updates", "error", err)
 			}
 		}
 	}
@@ -243,63 +247,40 @@ func (s *service) getUpdateType(update *telegram.Update) UpdateType {
 	return UpdateUnknown
 }
 
-func (s *service) processPendingUpdates(ctx context.Context) {
-	tickerPending := time.NewTicker(pendingPeriod)
-	defer tickerPending.Stop()
+func (s *service) runPendingUpdateProcessorWorker(ctx context.Context) {
+	worker.RunTicker(ctx, "telegram_update_pending_processor", pendingPeriod, false, s.processPendingUpdatesBatch)
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("pending telegram update events processor stopped")
-			return
-		case <-tickerPending.C:
-			events, err := s.eventService.PendingTelegramUpdateEvents(ctx, groupName, consumerName, readTelegramUpdateEventsLimit, pendingMinIdle)
-			if err != nil {
-				slog.Error("failed to read pending telegram update events", "error", err)
-				continue
-			}
-
-			if len(events) == 0 {
-				tickerPending.Reset(pendingPeriod)
-				continue
-			}
-
-			messageIDs := make([]string, 0, len(events))
-			for _, updateEvent := range events {
-				if err := s.processUpdate(ctx, updateEvent); err != nil {
-					slog.Error("failed to process pending update", "error", err, "event_id", updateEvent.ID)
-					continue
-				}
-				messageIDs = append(messageIDs, updateEvent.ID)
-			}
-
-			if len(messageIDs) > 0 {
-				if err := s.eventService.AckMessages(ctx, groupName, messageIDs); err != nil {
-					slog.Error("failed to ack pending telegram update messages", "error", err)
-				}
-			}
-
-			tickerPending.Reset(pendingPeriod)
+func (s *service) processPendingUpdatesBatch(ctx context.Context, logger *slog.Logger) {
+	events, err := s.eventService.PendingTelegramUpdateEvents(ctx, groupName, consumerName, readTelegramUpdateEventsLimit, pendingMinIdle)
+	if err != nil {
+		logger.Error("read pending events", "error", err)
+		return
+	}
+	if len(events) == 0 {
+		return
+	}
+	messageIDs := make([]string, 0, len(events))
+	for _, updateEvent := range events {
+		if err := s.processUpdate(ctx, updateEvent); err != nil {
+			logger.Error("process pending update", "error", err, "event_id", updateEvent.ID)
+			continue
+		}
+		messageIDs = append(messageIDs, updateEvent.ID)
+	}
+	if len(messageIDs) > 0 {
+		if err := s.eventService.AckMessages(ctx, groupName, messageIDs); err != nil {
+			logger.Error("ack pending messages", "error", err)
 		}
 	}
 }
 
 func (s *service) streamCleaner(ctx context.Context) {
-	ticker := time.NewTicker(streamCleanPeriod)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("telegram update events stream cleaner stopped")
-			return
-		case <-ticker.C:
-			if err := s.eventService.TrimStreamByAge(ctx, telegramUpdateEventsAge); err != nil {
-				slog.Error("failed to trim telegram update events stream by age", "err", err)
-			}
-			ticker.Reset(streamCleanPeriod)
+	worker.RunTicker(ctx, "telegram_update_stream_cleaner", streamCleanPeriod, false, func(ctx context.Context, logger *slog.Logger) {
+		if err := s.eventService.TrimStreamByAge(ctx, telegramUpdateEventsAge); err != nil {
+			logger.Error("trim stream by age", "err", err)
 		}
-	}
+	})
 }
 
 func (s *service) sendWelcomeNotification(ctx context.Context, chatID int64) {

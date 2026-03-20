@@ -2,6 +2,7 @@ package deal_signer
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -47,12 +48,18 @@ func NewService(dealRepo dealRepository, userRepo userRepository, notificationAd
 // Returns the updated deal.
 func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*entity.Deal, error) {
 	existing, err := s.dealRepo.GetDealByID(ctx, dealID)
-	if err != nil || existing == nil {
-		return nil, marketerrors.ErrNotFound
+	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil, marketerrors.ErrNotFound
+		}
+		return nil, err
 	}
 	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil || user == nil {
-		return nil, marketerrors.ErrNotFound
+	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil, marketerrors.ErrNotFound
+		}
+		return nil, err
 	}
 	if !user.HasWallet() {
 		return nil, marketerrors.ErrWalletNotSet
@@ -96,7 +103,7 @@ func (s *Service) SignDeal(ctx context.Context, userID int64, dealID int64) (*en
 	}
 
 	// Try to route notification into the deal's forum topic
-	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil && topic != nil {
+	if topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID); err == nil {
 		if otherID == existing.LessorID {
 			notification.ThreadID = topic.LessorMessageThreadID
 		} else {

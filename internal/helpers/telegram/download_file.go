@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,8 +9,8 @@ import (
 	"strings"
 )
 
-func (c *APIClient) GetFileURL(fileID string) (string, error) {
-	file, err := c.getFile(fileID)
+func (c *APIClient) GetFileURL(ctx context.Context, fileID string) (string, error) {
+	file, err := c.getFile(ctx, fileID)
 	if err != nil {
 		return "", err
 	}
@@ -22,11 +23,11 @@ type getFileResponse struct {
 	Result File `json:"result"`
 }
 
-func (c *APIClient) getFile(fileID string) (*File, error) {
+func (c *APIClient) getFile(ctx context.Context, fileID string) (*File, error) {
 	getFileURL := c.buildTelegramURL(telegramPathGetFile)
 	getFileURL = getFileURL + "?file_id=" + url.QueryEscape(fileID)
 
-	req, err := http.NewRequest(http.MethodGet, getFileURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getFileURL, nil)
 	if err != nil {
 		return nil, err
 	}

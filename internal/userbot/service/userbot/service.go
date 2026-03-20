@@ -50,7 +50,7 @@ type channelRepository interface {
 
 type botAPIClient interface {
 	PromoteChatMember(ctx context.Context, chatID int64, userID int64, rights helpertelegram.AdminPromoteRights) error
-	GetFileURL(fileID string) (string, error)
+	GetFileURL(ctx context.Context, fileID string) (string, error)
 }
 
 type channelUpdateStatsEventService interface {

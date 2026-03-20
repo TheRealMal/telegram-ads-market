@@ -6,23 +6,13 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/worker"
 )
 
 const postCheckerInterval = 5 * time.Minute
 
 func (s *service) RunDealPostCheckerWorker(ctx context.Context) {
-	logger := slog.With("component", "bot_deal_post_checker")
-	ticker := time.NewTicker(postCheckerInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.runDealPostCheckerOnce(ctx, logger)
-		}
-	}
+	worker.RunTicker(ctx, "bot_deal_post_checker", postCheckerInterval, false, s.runDealPostCheckerOnce)
 }
 
 func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logger) {

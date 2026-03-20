@@ -3,11 +3,14 @@ package deal_post
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
 	telegram "ads-mrkt/internal/helpers/telegram"
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
+	"ads-mrkt/internal/worker"
 )
 
 const (
@@ -16,18 +19,7 @@ const (
 )
 
 func (s *service) RunDealPostSenderWorker(ctx context.Context) {
-	logger := slog.With("component", "bot_deal_post_sender")
-	ticker := time.NewTicker(postSenderInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.runDealPostSenderOnce(ctx, logger)
-		}
-	}
+	worker.RunTicker(ctx, "bot_deal_post_sender", postSenderInterval, false, s.runDealPostSenderOnce)
 }
 
 func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger) {
@@ -38,15 +30,19 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 	}
 	for _, deal := range deals {
 		listing, err := s.listingRepo.GetListingByID(ctx, deal.ListingID)
-		if err != nil || listing == nil || listing.ChannelID == nil {
-			logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
+		if err != nil {
+			logger.Error("skip deal, listing error", "deal_id", deal.ID, "error", err)
+			continue
+		}
+		if listing.ChannelID == nil {
+			logger.Error("skip deal, no channel on listing", "deal_id", deal.ID)
 			continue
 		}
 		channelID := *listing.ChannelID
 
 		ch, err := s.channelRepo.GetChannelByID(ctx, channelID)
-		if err != nil || ch == nil {
-			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", channelID)
+		if err != nil {
+			logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", channelID, "error", err)
 			continue
 		}
 		if !ch.CanPostMessages() {
@@ -66,22 +62,19 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 
 		// Extract entities (prefer "entities", fall back to "caption_entities")
 		var entities []telegram.MessageEntity
-		if raw := entity.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
-			_ = json.Unmarshal(raw, &entities)
-		}
-		if len(entities) == 0 {
-			if raw := entity.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
-				_ = json.Unmarshal(raw, &entities)
+		if raw := entity.GetBotAPIEntitiesFromDetails(deal.Details); len(raw) > 0 {
+			if err := json.Unmarshal(raw, &entities); err != nil {
+				logger.Error("unmarshal entities from deal details", "deal_id", deal.ID, "error", err)
 			}
 		}
 
 		// Crash recovery: if last lock is expired and still locked, release it as failed and let next tick retry.
 		lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, entity.DealActionTypePostMessage)
-		if err != nil {
+		if err != nil && !errors.Is(err, marketerrors.ErrNotFound) {
 			logger.Error("get last lock", "deal_id", deal.ID, "error", err)
 			continue
 		}
-		if lastLock != nil && lastLock.Status == entity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+		if err == nil && lastLock.Status == entity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
 			_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, entity.DealActionLockStatusFailed)
 			logger.Warn("released expired lock, will retry next tick", "deal_id", deal.ID)
 			continue

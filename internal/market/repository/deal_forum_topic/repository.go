@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/repository/deal_forum_topic/model"
 
 	"github.com/jackc/pgx/v5"
@@ -12,8 +13,8 @@ import (
 )
 
 type database interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
 	EndTx(ctx context.Context, err error, source string) error
 }
@@ -56,7 +57,7 @@ func (r *repository) GetDealForumTopicByDealID(ctx context.Context, dealID int64
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealForumTopicRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, marketerrors.ErrNotFound
 		}
 		return nil, err
 	}
@@ -77,7 +78,7 @@ func (r *repository) GetDealForumTopicByChatAndThread(ctx context.Context, chatI
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealForumTopicRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, "", nil
+			return nil, "", marketerrors.ErrNotFound
 		}
 		return nil, "", err
 	}

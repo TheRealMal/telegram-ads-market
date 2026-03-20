@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/repository/deal_action_lock/model"
 
 	"github.com/jackc/pgx/v5"
@@ -14,8 +15,8 @@ import (
 )
 
 type database interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
 	EndTx(ctx context.Context, err error, source string) error
 }
@@ -103,7 +104,7 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.DealActionLockRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, marketerrors.ErrNotFound
 		}
 		return nil, fmt.Errorf("get last deal action lock for deal %d action %s: %w", dealID, actionType, err)
 	}
@@ -113,10 +114,10 @@ func (r *repository) GetLastDealActionLock(ctx context.Context, dealID int64, ac
 func (r *repository) GetExpiredDealActionLock(ctx context.Context, dealID int64, actionType entity.DealActionType) (lockID string, ok bool, err error) {
 	lock, err := r.GetLastDealActionLock(ctx, dealID, actionType)
 	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return "", false, nil
+		}
 		return "", false, fmt.Errorf("get expired deal action lock for deal %d: %w", dealID, err)
-	}
-	if lock == nil {
-		return "", false, nil
 	}
 	if lock.Status != entity.DealActionLockStatusLocked || lock.ExpireAt.After(time.Now()) {
 		return "", false, nil

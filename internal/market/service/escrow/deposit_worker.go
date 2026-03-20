@@ -7,6 +7,7 @@ import (
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/worker"
 )
 
 const (
@@ -21,18 +22,10 @@ type escrowDepositEventService interface {
 	AckEscrowDepositMessages(ctx context.Context, group string, messageIDs []string) error
 }
 
-func (s *service) DepositStreamWorker(ctx context.Context, eventService escrowDepositEventService) {
-	logger := slog.With("component", "escrow_deposit_worker")
-	ticker := time.NewTicker(escrowDepositPollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.processDepositEvents(ctx, eventService, logger)
-		}
-	}
+func (s *service) RunDepositStreamWorker(ctx context.Context, eventService escrowDepositEventService) {
+	worker.RunTicker(ctx, "escrow_deposit_worker", escrowDepositPollInterval, false, func(ctx context.Context, logger *slog.Logger) {
+		s.processDepositEvents(ctx, eventService, logger)
+	})
 }
 
 func (s *service) processDepositEvents(ctx context.Context, eventService escrowDepositEventService, logger *slog.Logger) {

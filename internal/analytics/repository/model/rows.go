@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"ads-mrkt/internal/analytics/domain"
@@ -53,7 +54,11 @@ func SnapshotRowToDomain(row SnapshotRow) *domain.Snapshot {
 	}
 	s.DealsByStatus = make(map[string]int64)
 	s.DealAmountsByStatusTON = make(map[string]float64)
-	_ = json.Unmarshal(row.DealsByStatus, &s.DealsByStatus)
-	_ = json.Unmarshal(row.DealAmountsByStatusTon, &s.DealAmountsByStatusTON)
+	if err := json.Unmarshal(row.DealsByStatus, &s.DealsByStatus); err != nil {
+		slog.Error("unmarshal deals_by_status", "snapshot_id", row.ID, "error", err)
+	}
+	if err := json.Unmarshal(row.DealAmountsByStatusTon, &s.DealAmountsByStatusTON); err != nil {
+		slog.Error("unmarshal deal_amounts_by_status_ton", "snapshot_id", row.ID, "error", err)
+	}
 	return s
 }

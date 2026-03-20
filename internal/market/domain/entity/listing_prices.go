@@ -57,7 +57,7 @@ func DealPriceMatchesListing(listingPrices json.RawMessage, dealType string, dea
 	return false
 }
 
-// ListingHasAdType checks whether the listing's prices contain any entry with the given ad type.
+// ListingHasAdType checks whether the listing's prices contain interface{} entry with the given ad type.
 func ListingHasAdType(listingPrices json.RawMessage, adType string) bool {
 	if len(listingPrices) == 0 {
 		return false

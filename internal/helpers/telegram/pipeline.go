@@ -41,11 +41,6 @@ func newPipeline(ctx context.Context, rl *ratelimiter.RateLimiter) *pipeline {
 }
 
 func (p *pipeline) worker(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("pipeline worker panicked", "panic", r)
-		}
-	}()
 	for {
 		select {
 		case <-ctx.Done():

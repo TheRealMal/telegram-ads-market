@@ -1,11 +1,12 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
 )
 
 // Load provide app config.
@@ -29,11 +30,11 @@ func loadEnv() error {
 			return nil
 		}
 
-		return errors.Wrap(err, "os file stat")
+		return fmt.Errorf("os file stat: %w", err)
 	}
 
 	if err := godotenv.Load(envFile); err != nil {
-		return errors.Wrapf(err, "on load config from %s", envFile)
+		return fmt.Errorf("on load config from %s: %w", envFile, err)
 	}
 
 	return nil
@@ -42,7 +43,7 @@ func loadEnv() error {
 func makeConfig() (*Config, error) {
 	var cfg Config
 	if err := cleanenv.ReadEnv(&cfg); err != nil {
-		return nil, errors.Wrap(err, "read environment")
+		return nil, fmt.Errorf("read environment: %w", err)
 	}
 
 	cfg.InternalHandling()

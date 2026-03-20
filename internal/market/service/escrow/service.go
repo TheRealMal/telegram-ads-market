@@ -2,6 +2,7 @@ package escrow
 
 import (
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"context"
 	"errors"
 	"fmt"
@@ -65,7 +66,7 @@ type service struct {
 	redis                 redisCache
 	dealChatService       dealChatService
 	transactionGasNanoton int64
-	comissionMultiplier   float64
+	commissionMultiplier  float64
 }
 
 func NewService(dealRepo dealRepository, vaultRepository vaultRepository, dealActionLockRepo dealActionLockRepository, liteclient liteclient, redis redisCache, dealChatService dealChatService, transactionGasTON float64, commissionPercent float64) *service {
@@ -77,7 +78,7 @@ func NewService(dealRepo dealRepository, vaultRepository vaultRepository, dealAc
 		redis:                 redis,
 		dealChatService:       dealChatService,
 		transactionGasNanoton: int64(transactionGasTON * nanotonPerTON),
-		comissionMultiplier:   1 + (commissionPercent / 100.0),
+		commissionMultiplier:  1 + (commissionPercent / 100.0),
 	}
 }
 
@@ -122,9 +123,6 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 	if err != nil {
 		return err
 	}
-	if deal == nil {
-		return errors.New("deal not found")
-	}
 
 	actionType, destAddr, err := prepareAction(deal, release)
 	if err != nil {
@@ -165,7 +163,7 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 
 	// If the last lock for this action is Locked and expired, previous run may have transferred then crashed: try to find outgoing tx by amount and recover.
 	lastLock, lerr := s.dealActionLockRepo.GetLastDealActionLock(ctx, dealID, actionType)
-	if lerr == nil && lastLock != nil {
+	if lerr == nil {
 		recovered, err := s.checkAndRecoverExpiredLock(ctx, logger, dealID, actionType, lastLock, escrowAddr, amountNanoton, toAddr, release)
 		if err != nil {
 			return err
@@ -173,6 +171,8 @@ func (s *service) ReleaseOrRefundEscrow(ctx context.Context, logger *slog.Logger
 		if recovered {
 			return nil
 		}
+	} else if !errors.Is(lerr, marketerrors.ErrNotFound) {
+		return fmt.Errorf("get last deal action lock for deal %d: %w", dealID, lerr)
 	}
 
 	if err := s.performTransfer(ctx, logger, dealID, actionType, w, toAddr, amount, release); err != nil {

@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -41,7 +42,6 @@ import (
 	"ads-mrkt/pkg/auth"
 	"ads-mrkt/pkg/health"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -73,18 +73,18 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 
 			pg, err := postgres.New(ctx, cfg.Database)
 			if err != nil {
-				return errors.Wrap(err, "create postgres client")
+				return fmt.Errorf("create postgres client: %w", err)
 			}
 
 			redisClient, err := redis.New(ctxRun, cfg.Redis)
 			if err != nil {
-				return errors.Wrap(err, "redis")
+				return fmt.Errorf("redis: %w", err)
 			}
 			defer redisClient.Close()
 
 			lc, err := liteclient.NewClient(ctxRun, cfg.Liteclient, cfg.IsTestnet, cfg.IsPublic)
 			if err != nil {
-				return errors.Wrap(err, "create liteclient for escrow worker")
+				return fmt.Errorf("create liteclient for escrow worker: %w", err)
 			}
 
 			// Telegram API client (for welcome message + middleware secret token)
@@ -105,15 +105,15 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc, err := escrowdepositevent.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create escrow deposit event service")
+				return fmt.Errorf("create escrow deposit event service: %w", err)
 			}
 			channelUpdateStatsEventSvc, err := channelupdateevent.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create channel update stats event service")
+				return fmt.Errorf("create channel update stats event service: %w", err)
 			}
 			telegramNotifyEventSvc, err := telegramnotifyevent.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create telegram notification event service")
+				return fmt.Errorf("create telegram notification event service: %w", err)
 			}
 
 			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
@@ -124,7 +124,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, redisClient, cfg.Telegram.BotUsername)
 			vaultClient, err := vault.NewClient(cfg.Vault)
 			if err != nil {
-				return errors.Wrap(err, "create vault client")
+				return fmt.Errorf("create vault client: %w", err)
 			}
 			escrowSvc := escrowservice.NewService(dealRepo, vaultClient, dealActionLockRepo, lc, redisClient, dealChatSvc, cfg.MarketTransactionGasTON, cfg.MarketCommissionPercent)
 
@@ -138,12 +138,12 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			}
 			preloadCancel()
 
-			go escrowSvc.Worker(ctxRun)
-			go escrowSvc.DepositStreamWorker(ctxRun, escrowDepositEventSvc)
-			go escrowSvc.ReleaseRefundWorker(ctxRun)
-			go dealPostMessageSvc.RunPassedWorker(ctxRun)
+			go escrowSvc.RunEscrowCreatorWorker(ctxRun)
+			go escrowSvc.RunDepositStreamWorker(ctxRun, escrowDepositEventSvc)
+			go escrowSvc.RunReleaseRefundWorker(ctxRun)
+			go dealPostMessageSvc.RunDealPostMessageWorker(ctxRun)
 			go dealSvc.RunCompletedWorker(ctxRun)
-			go analyticsSvc.Run(ctxRun)
+			go analyticsSvc.RunSnapshotWorker(ctxRun)
 
 			jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, time.Duration(cfg.Auth.JWTTimeToLive)*time.Hour)
 			authMiddleware := auth.NewAuthMiddleware(jwtManager)

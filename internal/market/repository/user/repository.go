@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/repository/user/model"
 	"ads-mrkt/pkg/auth/role"
 
@@ -13,8 +14,8 @@ import (
 )
 
 type database interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
 	EndTx(ctx context.Context, err error, source string) error
 }
@@ -77,7 +78,7 @@ func (r *repository) GetUserByID(ctx context.Context, id int64) (*entity.User, e
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.UserRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, marketerrors.ErrNotFound
 		}
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/market/domain/entity"
+	"ads-mrkt/internal/worker"
 )
 
 const workerInterval = 5 * time.Minute
@@ -32,47 +33,42 @@ func NewService(repository repository, dealChatSvc dealChatService) *service {
 	}
 }
 
-func (s *service) RunPassedWorker(ctx context.Context) {
-	ticker := time.NewTicker(workerInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			passedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusPassed)
-			if err != nil {
-				slog.Error("deal_post_message worker: list passed", "error", err)
-			} else if len(passedList) > 0 {
-				ids := make([]int64, 0, len(passedList))
-				for _, m := range passedList {
-					ids = append(ids, m.ID)
-				}
-				if err := s.repository.CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx, ids); err != nil {
-					slog.Error("deal_post_message worker: complete (passed)", "error", err)
-				} else {
-					slog.Info("deal_post_message worker: completed (passed)", "count", len(ids), "ids", ids)
-					for _, m := range passedList {
-						s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRelease)
-					}
-				}
+func (s *service) RunDealPostMessageWorker(ctx context.Context) {
+	worker.RunTicker(ctx, "deal_post_message_worker", workerInterval, false, s.runPassedOnce)
+}
+
+func (s *service) runPassedOnce(ctx context.Context, logger *slog.Logger) {
+	passedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusPassed)
+	if err != nil {
+		logger.Error("list passed", "error", err)
+	} else if len(passedList) > 0 {
+		ids := make([]int64, 0, len(passedList))
+		for _, m := range passedList {
+			ids = append(ids, m.ID)
+		}
+		if err := s.repository.CompleteDealPostMessagesAndSetDealsWaitingEscrowRelease(ctx, ids); err != nil {
+			logger.Error("complete passed", "error", err)
+		} else {
+			logger.Info("completed passed", "count", len(ids), "ids", ids)
+			for _, m := range passedList {
+				s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRelease)
 			}
-			deletedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusDeleted)
-			if err != nil {
-				slog.Error("deal_post_message worker: list deleted", "error", err)
-			} else if len(deletedList) > 0 {
-				ids := make([]int64, 0, len(deletedList))
-				for _, m := range deletedList {
-					ids = append(ids, m.ID)
-				}
-				if err := s.repository.FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx, ids); err != nil {
-					slog.Error("deal_post_message worker: fail (deleted)", "error", err)
-				} else {
-					slog.Info("deal_post_message worker: failed (deleted)", "count", len(ids), "ids", ids)
-					for _, m := range deletedList {
-						s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRefund)
-					}
-				}
+		}
+	}
+	deletedList, err := s.repository.ListDealPostMessageByStatus(ctx, entity.DealPostMessageStatusDeleted)
+	if err != nil {
+		logger.Error("list deleted", "error", err)
+	} else if len(deletedList) > 0 {
+		ids := make([]int64, 0, len(deletedList))
+		for _, m := range deletedList {
+			ids = append(ids, m.ID)
+		}
+		if err := s.repository.FailDealPostMessagesAndSetDealsWaitingEscrowRefund(ctx, ids); err != nil {
+			logger.Error("fail deleted", "error", err)
+		} else {
+			logger.Info("failed deleted", "count", len(ids), "ids", ids)
+			for _, m := range deletedList {
+				s.dealChatSvc.UpdateDealForumTopicEmoji(ctx, m.DealID, entity.DealStatusWaitingEscrowRefund)
 			}
 		}
 	}

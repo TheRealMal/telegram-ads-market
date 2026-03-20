@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -11,7 +12,6 @@ import (
 	"ads-mrkt/cmd/userbot"
 	"ads-mrkt/internal/config"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/common/version"
 	"github.com/spf13/cobra"
 )
@@ -58,8 +58,8 @@ func main() {
 		blockchain_observer.Cmd(ctx, conf),
 	)
 
-	if err := errors.Wrap(rootCmd.ExecuteContext(ctx), "error executing root cmd"); err != nil {
-		slog.Error("failed to execute command", "error", err)
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		slog.Error("failed to execute command", "error", fmt.Errorf("error executing root cmd: %w", err))
 
 		return
 	}

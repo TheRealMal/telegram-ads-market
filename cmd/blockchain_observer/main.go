@@ -2,6 +2,7 @@ package blockchain_observer
 
 import (
 	"context"
+	"fmt"
 
 	"ads-mrkt/cmd/builder"
 	"ads-mrkt/internal/blockchain_observer"
@@ -13,7 +14,6 @@ import (
 	"ads-mrkt/internal/postgres"
 	"ads-mrkt/internal/redis"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -45,25 +45,25 @@ func runCmd(ctx context.Context, conf *config.Config) *cobra.Command {
 
 			pg, err := postgres.New(ctxRun, conf.Database)
 			if err != nil {
-				return errors.Wrap(err, "postgres")
+				return fmt.Errorf("postgres: %w", err)
 			}
 
 			redisClient, err := redis.New(ctxRun, conf.Redis)
 			if err != nil {
-				return errors.Wrap(err, "redis")
+				return fmt.Errorf("redis: %w", err)
 			}
 			defer redisClient.Close()
 
 			lc, err := liteclient.NewClient(ctxRun, conf.Liteclient, conf.IsTestnet, conf.IsPublic)
 			if err != nil {
-				return errors.Wrap(err, "liteclient")
+				return fmt.Errorf("liteclient: %w", err)
 			}
 
 			dealRepo := deal.New(pg)
 			eventRepo := eventredis.New(redisClient)
 			escrowDepositEventSvc, err := escrowdepositevent.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create escrow deposit event service")
+				return fmt.Errorf("create escrow deposit event service: %w", err)
 			}
 			obs := blockchain_observer.New(lc, redisClient.Client(), dealRepo, escrowDepositEventSvc, conf.Redis.DB)
 

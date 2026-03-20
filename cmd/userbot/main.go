@@ -2,6 +2,7 @@ package userbot
 
 import (
 	"context"
+	"fmt"
 
 	"ads-mrkt/internal/config"
 	channelupdateevent "ads-mrkt/internal/event/application/channel_update_stats/event"
@@ -17,7 +18,6 @@ import (
 	userbotrepo "ads-mrkt/internal/userbot/repository/state"
 	userbotservice "ads-mrkt/internal/userbot/service/userbot"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -42,12 +42,12 @@ func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			pg, err := postgres.New(ctx, cfg.Database)
 			if err != nil {
-				return errors.Wrap(err, "postgres")
+				return fmt.Errorf("postgres: %w", err)
 			}
 
 			redisClient, err := redis.New(ctx, cfg.Redis)
 			if err != nil {
-				return errors.Wrap(err, "redis")
+				return fmt.Errorf("redis: %w", err)
 			}
 			defer redisClient.Close()
 
@@ -60,13 +60,13 @@ func runCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			eventRepo := eventredis.New(redisClient)
 			channelUpdateStatsEventSvc, err := channelupdateevent.NewService(ctx, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create channel update stats event service")
+				return fmt.Errorf("create channel update stats event service: %w", err)
 			}
 			telegramBotClient := telegram.NewAPIClient(ctx, cfg.Telegram, redisClient)
 			b := userbotservice.New(cfg.UserBot, stateStorage, channelRepo, listingRepo, dealRepo, dealPostMessageRepo, dealActionLockRepo, channelUpdateStatsEventSvc, telegramBotClient)
 
 			if err := b.Start(ctx); err != nil {
-				return errors.Wrap(err, "userbot start")
+				return fmt.Errorf("userbot start: %w", err)
 			}
 			return nil
 		},

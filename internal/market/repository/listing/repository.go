@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/market/repository/listing/model"
 	"ads-mrkt/internal/market/repository/pgxutil"
 
@@ -23,8 +24,8 @@ const listingWithChannelSelectFrom = "SELECT l.id, l.status, l.user_id, l.channe
 	"LEFT JOIN market.channel_stats cs ON cs.channel_id = l.channel_id"
 
 type database interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (context.Context, error)
 	EndTx(ctx context.Context, err error, source string) error
 }
@@ -83,7 +84,7 @@ func (r *repository) GetListingByID(ctx context.Context, id int64) (*entity.List
 	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.ListingWithChannelRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, marketerrors.ErrNotFound
 		}
 		return nil, fmt.Errorf("get listing by id %d: %w", id, err)
 	}

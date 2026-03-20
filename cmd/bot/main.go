@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"fmt"
 
 	"ads-mrkt/cmd/builder"
 	webhookhttp "ads-mrkt/internal/bot/application/webhook/http"
@@ -26,7 +27,6 @@ import (
 	telegramrouter "ads-mrkt/internal/server/routers/telegram"
 	"ads-mrkt/pkg/health"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +59,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			// Redis for event stream and rate limiting
 			redisClient, err := redis.New(ctxRun, cfg.Redis)
 			if err != nil {
-				return errors.Wrap(err, "redis")
+				return fmt.Errorf("redis: %w", err)
 			}
 			defer redisClient.Close()
 
@@ -70,16 +70,16 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			eventRepo := eventredis.New(redisClient)
 			telegramEventSvc, err := eventtelegram.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create telegram update event service")
+				return fmt.Errorf("create telegram update event service: %w", err)
 			}
 			telegramNotifyEventSvc, err := eventtelegramnotify.NewService(ctxRun, eventRepo)
 			if err != nil {
-				return errors.Wrap(err, "create telegram notification event service")
+				return fmt.Errorf("create telegram notification event service: %w", err)
 			}
 
 			pg, err := postgres.New(ctxRun, cfg.Database)
 			if err != nil {
-				return errors.Wrap(err, "postgres")
+				return fmt.Errorf("postgres: %w", err)
 			}
 
 			channelRepo := channel.New(pg)
@@ -90,9 +90,6 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealRepo := deal.New(pg)
 			dealForumTopicRepo := deal_forum_topic.New(pg)
 			userRepo := userrepo.New(pg)
-			// TODO: (@TheRealMal) Remove at all if userbot flow is choosen
-			// dealPostMessageRepo := deal_post_message.New(pg)
-			// dealActionLockRepo := deal_action_lock.New(pg)
 			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc, dealForumTopicRepo)
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, redisClient, cfg.Telegram.BotUsername)
 
@@ -103,22 +100,9 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				dealForumTopicRepo,
 				cfg.Telegram.BotUsername,
 			)
-			go updatesSvc.StartBackgroundProcessingUpdates(ctxRun)
-			go updatesSvc.StartBackgroundProcessingNotifications(ctxRun)
-			go updatesSvc.StartAdminMonitorWorker(ctxRun)
-
-			// TODO: (@TheRealMal) Remove at all if userbot flow is choosen
-			// dealPostSvc := botdealpost.NewService(
-			// 	telegramClient,
-			// 	channelRepo,
-			// 	listingRepo,
-			// 	dealRepo,
-			// 	dealPostMessageRepo,
-			// 	dealActionLockRepo,
-			// 	cfg.Telegram.ServiceChatID,
-			// )
-			// go dealPostSvc.RunDealPostSenderWorker(ctxRun)
-			// go dealPostSvc.RunDealPostCheckerWorker(ctxRun)
+			go updatesSvc.RunUpdateProcessorWorker(ctxRun)
+			go updatesSvc.RunNotificationProcessorWorker(ctxRun)
+			go updatesSvc.RunAdminMonitorWorker(ctxRun)
 
 			// Webhook HTTP handler and router
 			webhookHandler := webhookhttp.NewHandler(updatesSvc)

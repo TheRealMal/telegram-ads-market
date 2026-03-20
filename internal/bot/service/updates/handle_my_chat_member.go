@@ -41,11 +41,11 @@ func (s *service) handleMyChatMember(ctx context.Context, update *telegram.ChatM
 			return fmt.Errorf("upsert channel on bot added: %w", err)
 		}
 
-		if err := s.syncChannelAdmins(ctx, channelID); err != nil {
+		if err := s.syncChannelAdmins(ctx, slog.Default(), channelID); err != nil {
 			slog.Error("sync admins after bot added", "channel_id", channelID, "error", err)
 		}
 
-		s.syncChannelPhoto(ctx, channelID)
+		s.syncChannelPhoto(ctx, slog.Default(), channelID)
 
 		return nil
 	}

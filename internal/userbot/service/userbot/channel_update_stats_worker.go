@@ -7,6 +7,7 @@ import (
 	"time"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
+	"ads-mrkt/internal/worker"
 )
 
 const (
@@ -21,71 +22,41 @@ const (
 )
 
 func (s *service) RunChannelUpdateStatsWorker(ctx context.Context) {
-	logger := slog.With("component", "channel_update_stats_worker")
-
-	go s.channelUpdateStatsStreamCleaner(ctx, logger)
-	go s.processPendingChannelUpdateStats(ctx, logger)
-	s.runChannelUpdateStatsWorker(ctx, logger)
+	go s.channelUpdateStatsStreamCleaner(ctx)
+	go s.runPendingChannelUpdateStatsWorker(ctx)
+	s.runChannelUpdateStatsWorker(ctx)
 }
 
-func (s *service) runChannelUpdateStatsWorker(ctx context.Context, logger *slog.Logger) {
-	ticker := time.NewTicker(channelUpdateStatsInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("channel update stats worker stopped")
+func (s *service) runChannelUpdateStatsWorker(ctx context.Context) {
+	worker.RunTicker(ctx, "channel_update_stats_reader", channelUpdateStatsInterval, false, func(ctx context.Context, logger *slog.Logger) {
+		events, err := s.channelUpdateStatsEventSvc.ReadChannelUpdateStatsEvents(ctx, channelUpdateStatsGroup, channelUpdateStatsConsumer, channelUpdateStatsLimit)
+		if err != nil || len(events) == 0 {
 			return
-		case <-ticker.C:
-			events, err := s.channelUpdateStatsEventSvc.ReadChannelUpdateStatsEvents(ctx, channelUpdateStatsGroup, channelUpdateStatsConsumer, channelUpdateStatsLimit)
-			if err != nil || len(events) == 0 {
-				continue
-			}
-			s.processChannelUpdateStatsEvents(ctx, logger, events)
 		}
-	}
+		s.processChannelUpdateStatsEvents(ctx, logger, events)
+	})
 }
 
-func (s *service) channelUpdateStatsStreamCleaner(ctx context.Context, logger *slog.Logger) {
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("channel update stats stream cleaner stopped")
-			return
-		case <-ticker.C:
-			if err := s.channelUpdateStatsEventSvc.TrimStreamByAge(ctx, channelUpdateStatsStreamMaxAge); err != nil {
-				logger.Error("trim channel_update_stats stream by age", "err", err)
-			}
-			ticker.Reset(24 * time.Hour)
+func (s *service) channelUpdateStatsStreamCleaner(ctx context.Context) {
+	worker.RunTicker(ctx, "channel_update_stats_stream_cleaner", 24*time.Hour, false, func(ctx context.Context, logger *slog.Logger) {
+		if err := s.channelUpdateStatsEventSvc.TrimStreamByAge(ctx, channelUpdateStatsStreamMaxAge); err != nil {
+			logger.Error("trim stream by age", "err", err)
 		}
-	}
+	})
 }
 
-func (s *service) processPendingChannelUpdateStats(ctx context.Context, logger *slog.Logger) {
-	ticker := time.NewTicker(channelUpdateStatsPendingPeriod)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("pending channel update stats processor stopped")
+func (s *service) runPendingChannelUpdateStatsWorker(ctx context.Context) {
+	worker.RunTicker(ctx, "channel_update_stats_pending_processor", channelUpdateStatsPendingPeriod, false, func(ctx context.Context, logger *slog.Logger) {
+		events, err := s.channelUpdateStatsEventSvc.PendingChannelUpdateStatsEvents(ctx, channelUpdateStatsGroup, channelUpdateStatsConsumer, channelUpdateStatsLimit, channelUpdateStatsPendingMinIdle)
+		if err != nil {
+			logger.Error("read pending events", "error", err)
 			return
-		case <-ticker.C:
-			events, err := s.channelUpdateStatsEventSvc.PendingChannelUpdateStatsEvents(ctx, channelUpdateStatsGroup, channelUpdateStatsConsumer, channelUpdateStatsLimit, channelUpdateStatsPendingMinIdle)
-			if err != nil {
-				logger.Error("read pending channel_update_stats events", "error", err)
-				ticker.Reset(channelUpdateStatsPendingPeriod)
-				continue
-			}
-			if len(events) == 0 {
-				ticker.Reset(channelUpdateStatsPendingPeriod)
-				continue
-			}
-			s.processChannelUpdateStatsEvents(ctx, logger, events)
-			ticker.Reset(channelUpdateStatsPendingPeriod)
 		}
-	}
+		if len(events) == 0 {
+			return
+		}
+		s.processChannelUpdateStatsEvents(ctx, logger, events)
+	})
 }
 
 func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *slog.Logger, events []*evententity.EventChannelUpdateStats) {
@@ -112,7 +83,7 @@ func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *s
 			continue
 		}
 		if ch.AdminRights.CanViewStats {
-			slog.Info("updating channel stats", "channel_id", ev.ChannelID)
+			logger.Info("updating channel stats", "channel_id", ev.ChannelID)
 			if err := s.UpdateChannelStats(ctx, ev.ChannelID, ch.AccessHash, 0); err != nil {
 				logger.Error("update channel stats", "channel_id", ev.ChannelID, "error", err)
 				continue

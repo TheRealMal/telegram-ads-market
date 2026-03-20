@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ads-mrkt/internal/analytics/domain"
+	"ads-mrkt/internal/worker"
 )
 
 const collectInterval = 1 * time.Hour
@@ -37,27 +38,19 @@ func New(repo repository, transactionGasTON float64, commissionPercent float64) 
 	}
 }
 
-func (s *service) Run(ctx context.Context) {
-	ticker := time.NewTicker(collectInterval)
-	defer ticker.Stop()
-	s.collectAndSave(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.collectAndSave(ctx)
-		}
-	}
+func (s *service) RunSnapshotWorker(ctx context.Context) {
+	worker.RunTicker(ctx, "analytics_snapshot", collectInterval, true, func(ctx context.Context, logger *slog.Logger) {
+		s.collectAndSave(ctx, logger)
+	})
 }
 
-func (s *service) collectAndSave(ctx context.Context) {
+func (s *service) collectAndSave(ctx context.Context, logger *slog.Logger) {
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	exists, err := s.repo.HasSnapshotForDate(ctx, today)
 	if err != nil {
-		slog.Error("analytics check snapshot for date", "error", err)
+		logger.Error("check snapshot for date", "error", err)
 		return
 	}
 	if exists {
@@ -72,14 +65,14 @@ func (s *service) collectAndSave(ctx context.Context) {
 
 	snap, err := s.repo.CollectSnapshot(ctx, s.transactionGasNanoton, s.commissionPercent)
 	if err != nil {
-		slog.Error("analytics collect", "error", err)
+		logger.Error("collect", "error", err)
 		return
 	}
 	if err := s.repo.InsertSnapshot(ctx, snap); err != nil {
-		slog.Error("analytics insert snapshot", "error", err)
+		logger.Error("insert snapshot", "error", err)
 		return
 	}
-	slog.Info("analytics snapshot saved",
+	logger.Info("snapshot saved",
 		"listings", snap.ListingsCount,
 		"deals", snap.DealsCount,
 		"users", snap.UsersCount,

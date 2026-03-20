@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func (p *postgres) Exec(ctx context.Context, stmt string, args ...any) (res pgconn.CommandTag, err error) {
+func (p *postgres) Exec(ctx context.Context, stmt string, args ...interface{}) (res pgconn.CommandTag, err error) {
 	slog.Debug("Statement", "stmt", stmt, "args", args)
 	before := time.Now()
 
@@ -36,7 +36,7 @@ func (p *postgres) Exec(ctx context.Context, stmt string, args ...any) (res pgco
 	return p.acquireQuerier(ctx).Exec(ctx, stmt, args...)
 }
 
-func (p *postgres) Query(ctx context.Context, stmt string, args ...any) (rows pgx.Rows, err error) {
+func (p *postgres) Query(ctx context.Context, stmt string, args ...interface{}) (rows pgx.Rows, err error) {
 	slog.Debug("Statement", "stmt", stmt, "args", args)
 	before := time.Now()
 

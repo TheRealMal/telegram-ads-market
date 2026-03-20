@@ -296,7 +296,7 @@ func SetButtonInDetails(details json.RawMessage, button *DealDetailsButton) (jso
 	return json.Marshal(m)
 }
 
-// validateEntityURLs checks that any text_link entity in the array has an http/https URL.
+// validateEntityURLs checks that interface{} text_link entity in the array has an http/https URL.
 func validateEntityURLs(entities []interface{}) error {
 	for _, e := range entities {
 		em, ok := e.(map[string]interface{})
@@ -328,6 +328,18 @@ func parseDetailsMap(details json.RawMessage) map[string]interface{} {
 		return make(map[string]interface{})
 	}
 	return m
+}
+
+// GetBotAPIEntitiesFromDetails returns the raw JSON for Telegram Bot API MessageEntity
+// objects from deal details, preferring "entities" and falling back to "caption_entities".
+func GetBotAPIEntitiesFromDetails(details json.RawMessage) json.RawMessage {
+	if raw := GetRawEntitiesFromDetails(details); len(raw) > 0 {
+		return raw
+	}
+	if raw := GetRawCaptionEntitiesFromDetails(details); len(raw) > 0 {
+		return raw
+	}
+	return nil
 }
 
 // GetRawEntitiesFromDetails returns the raw JSON "entities" array from details, or nil.

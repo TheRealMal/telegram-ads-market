@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -11,6 +12,8 @@ import (
 
 	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
+	"ads-mrkt/internal/worker"
 
 	"github.com/gotd/td/telegram/uploader"
 	"github.com/gotd/td/tg"
@@ -23,18 +26,7 @@ const (
 )
 
 func (s *service) RunDealPostSenderWorker(ctx context.Context) {
-	logger := slog.With("component", "deal_post_sendr")
-	ticker := time.NewTicker(postSenderInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.runDealPostSenderOnce(ctx, logger)
-		}
-	}
+	worker.RunTicker(ctx, "deal_post_sender", postSenderInterval, false, s.runDealPostSenderOnce)
 }
 
 func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger) {
@@ -50,13 +42,17 @@ func (s *service) runDealPostSenderOnce(ctx context.Context, logger *slog.Logger
 
 func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal *marketentity.Deal) {
 	listing, err := s.listingRepo.GetListingByID(ctx, deal.ListingID)
-	if err != nil || listing == nil || listing.ChannelID == nil {
-		logger.Error("skip deal, no listing or channel", "deal_id", deal.ID)
+	if err != nil {
+		logger.Error("skip deal, listing error", "deal_id", deal.ID, "error", err)
+		return
+	}
+	if listing.ChannelID == nil {
+		logger.Error("skip deal, no channel on listing", "deal_id", deal.ID)
 		return
 	}
 	channel, err := s.channelRepo.GetChannelByID(ctx, *listing.ChannelID)
-	if err != nil || channel == nil {
-		logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
+	if err != nil {
+		logger.Error("skip deal, channel not found", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "error", err)
 		return
 	}
 	channel, err = s.ensureChannelAccess(ctx, channel)
@@ -79,23 +75,20 @@ func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal
 	}
 
 	var botEntities []helpertelegram.MessageEntity
-	if raw := marketentity.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
-		_ = json.Unmarshal(raw, &botEntities)
-	}
-	if len(botEntities) == 0 {
-		if raw := marketentity.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
-			_ = json.Unmarshal(raw, &botEntities)
+	if raw := marketentity.GetBotAPIEntitiesFromDetails(deal.Details); len(raw) > 0 {
+		if err := json.Unmarshal(raw, &botEntities); err != nil {
+			logger.Error("unmarshal entities from deal details", "deal_id", deal.ID, "error", err)
 		}
 	}
 	mtprotoEntities := toMTProtoEntities(botEntities)
 
 	// If the last lock for post_message is in status Locked and expired, previous run may have posted then crashed: try to find the message in the channel.
 	lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
-	if err != nil {
+	if err != nil && !errors.Is(err, marketerrors.ErrNotFound) {
 		logger.Error("get last lock", "deal_id", deal.ID, "error", err)
 		return
 	}
-	if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+	if err == nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
 		if foundMsgID, found := s.tryRecoverPostFromChannel(ctx, *listing.ChannelID, channel.AccessHash, text); found {
 			m := s.makeDealPostMessage(deal, *listing.ChannelID, foundMsgID, text)
 			if err := s.dealPostMessageRepo.CreateDealPostMessageAndSetDealInProgress(ctx, m); err != nil {
@@ -133,6 +126,23 @@ func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal
 	}
 	releaseLock(marketentity.DealActionLockStatusCompleted)
 	logger.Info("sent and saved", "deal_id", deal.ID, "channel_id", *listing.ChannelID, "message_id", msgID)
+}
+
+// handleExpiredLock checks the last lock for a deal+action combo. If it's expired and
+// still in locked status, releases it as failed. Returns error only on unexpected failures.
+func (s *service) handleExpiredLock(ctx context.Context, logger *slog.Logger, dealID int64, actionType marketentity.DealActionType) error {
+	lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, dealID, actionType)
+	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("get last lock: %w", err)
+	}
+	if lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
+		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
+		logger.Warn("released expired lock as failed", "deal_id", dealID, "lock_id", lastLock.ID)
+	}
+	return nil
 }
 
 func (s *service) makeDealPostMessage(deal *marketentity.Deal, channelID int64, msgID int64, text string) *marketentity.DealPostMessage {
@@ -239,18 +249,7 @@ func (s *service) sendChannelMessage(ctx context.Context, channelID int64, acces
 }
 
 func (s *service) RunDealPostCheckerWorker(ctx context.Context) {
-	logger := slog.With("component", "deal_post_checker")
-	ticker := time.NewTicker(postCheckerInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.runDealPostCheckerOnce(ctx, logger)
-		}
-	}
+	worker.RunTicker(ctx, "deal_post_checker", postCheckerInterval, false, s.runDealPostCheckerOnce)
 }
 
 func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logger) {
@@ -262,7 +261,7 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 
 	for _, m := range list {
 		channel, err := s.channelRepo.GetChannelByID(ctx, m.ChannelID)
-		if err != nil || channel == nil {
+		if err != nil {
 			continue
 		}
 		channel, err = s.ensureChannelAccess(ctx, channel)
@@ -272,7 +271,7 @@ func (s *service) runDealPostCheckerOnce(ctx context.Context, logger *slog.Logge
 		}
 
 		deal, err := s.dealRepo.GetDealByID(ctx, m.DealID)
-		if err != nil || deal == nil {
+		if err != nil {
 			logger.Error("get deal for checker", "deal_id", m.DealID, "error", err)
 			continue
 		}
@@ -387,14 +386,9 @@ func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, dea
 
 	// Stories cannot be recovered by text matching if the lock expired while locked.
 	// Release the expired lock as failed and let the next cycle retry from scratch.
-	lastLock, err := s.dealActionLockRepo.GetLastDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
-	if err != nil {
-		logger.Error("get last lock for story", "deal_id", deal.ID, "error", err)
+	if err := s.handleExpiredLock(ctx, logger, deal.ID, marketentity.DealActionTypePostMessage); err != nil {
+		logger.Error("handle expired lock for story", "deal_id", deal.ID, "error", err)
 		return
-	}
-	if lastLock != nil && lastLock.Status == marketentity.DealActionLockStatusLocked && !lastLock.ExpireAt.After(time.Now()) {
-		_ = s.dealActionLockRepo.ReleaseDealActionLock(ctx, lastLock.ID, marketentity.DealActionLockStatusFailed)
-		logger.Warn("released expired story lock as failed", "deal_id", deal.ID, "lock_id", lastLock.ID)
 	}
 
 	lockID, err := s.dealActionLockRepo.TakeDealActionLock(ctx, deal.ID, marketentity.DealActionTypePostMessage)
@@ -414,19 +408,13 @@ func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, dea
 	}
 
 	caption := marketentity.GetMessageFromDetails(deal.Details)
-	var mtprotoEntities []tg.MessageEntityClass
 	var botEntities []helpertelegram.MessageEntity
-	if raw := marketentity.GetRawEntitiesFromDetails(deal.Details); len(raw) > 0 {
-		_ = json.Unmarshal(raw, &botEntities)
-	}
-	if len(botEntities) == 0 {
-		if raw := marketentity.GetRawCaptionEntitiesFromDetails(deal.Details); len(raw) > 0 {
-			_ = json.Unmarshal(raw, &botEntities)
+	if raw := marketentity.GetBotAPIEntitiesFromDetails(deal.Details); len(raw) > 0 {
+		if err := json.Unmarshal(raw, &botEntities); err != nil {
+			logger.Error("unmarshal entities from deal details", "deal_id", deal.ID, "error", err)
 		}
 	}
-	if len(botEntities) > 0 {
-		mtprotoEntities = toMTProtoEntities(botEntities)
-	}
+	mtprotoEntities := toMTProtoEntities(botEntities)
 
 	storyID, err := s.sendChannelStory(ctx, *listing.ChannelID, channel.AccessHash, inputMedia, caption, mtprotoEntities)
 	if err != nil {
@@ -446,7 +434,7 @@ func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, dea
 }
 
 func (s *service) uploadMediaForStory(ctx context.Context, mediaType string, mediaFileID string) (tg.InputMediaClass, error) {
-	fileURL, err := s.botAPIClient.GetFileURL(mediaFileID)
+	fileURL, err := s.botAPIClient.GetFileURL(ctx, mediaFileID)
 	if err != nil {
 		return nil, fmt.Errorf("get file URL: %w", err)
 	}

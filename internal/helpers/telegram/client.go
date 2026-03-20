@@ -174,8 +174,8 @@ type NotificationMessage struct {
 }
 
 // SendNotification sends a notification message, dispatching to the appropriate Bot API
-// method based on which fields are populated. It handles text, photo, and video messages
-// with optional thread_id, entities, and inline keyboard buttons.
+// method based on which fields are populated. It handles text, photo, video, and animation
+// messages with optional thread_id, entities, and inline keyboard buttons.
 func (c *APIClient) SendNotification(ctx context.Context, msg NotificationMessage) error {
 	// Parse optional entities
 	var entities []MessageEntity
@@ -196,30 +196,95 @@ func (c *APIClient) SendNotification(ctx context.Context, msg NotificationMessag
 		}
 	}
 
-	// Dispatch based on media type and thread
+	_, err := c.sendMedia(ctx, sendMediaOpts{
+		ChatID:    msg.ChatID,
+		ThreadID:  msg.ThreadID,
+		Text:      msg.Message,
+		Photo:     msg.Photo,
+		Video:     msg.Video,
+		Animation: msg.Animation,
+		Markup:    markup,
+		Entities:  entities,
+	})
+	return err
+}
+
+// sendMediaOpts contains parameters for sending a message with optional media via the Bot API.
+type sendMediaOpts struct {
+	ChatID    int64
+	ThreadID  int64                 // 0 = no thread
+	Text      string                // text or caption
+	Photo     string                // file_id (empty = no photo)
+	Video     string                // file_id (empty = no video)
+	Animation string                // file_id (empty = no animation)
+	Markup    *InlineKeyboardMarkup // nil = no markup
+	Entities  []MessageEntity       // nil = no entities
+}
+
+// apiPath returns the correct Telegram Bot API path based on which media field is set.
+func (o *sendMediaOpts) apiPath() TelegramPath {
 	switch {
-	case msg.Photo != "" && msg.ThreadID != 0:
-		return c.sendPhotoToThread(ctx, msg.ChatID, msg.ThreadID, msg.Photo, msg.Message, markup, entities)
-	case msg.Photo != "":
-		return c.sendPhoto(ctx, msg.ChatID, msg.Photo, msg.Message, markup, entities)
-	case msg.Video != "" && msg.ThreadID != 0:
-		return c.sendVideoToThread(ctx, msg.ChatID, msg.ThreadID, msg.Video, msg.Message, markup, entities)
-	case msg.Video != "":
-		return c.sendVideo(ctx, msg.ChatID, msg.Video, msg.Message, markup, entities)
-	case msg.Animation != "" && msg.ThreadID != 0:
-		return c.sendAnimationToThread(ctx, msg.ChatID, msg.ThreadID, msg.Animation, msg.Message, markup, entities)
-	case msg.Animation != "":
-		return c.sendAnimation(ctx, msg.ChatID, msg.Animation, msg.Message, markup, entities)
-	case msg.ThreadID != 0 && markup != nil:
-		return c.sendMessageToThreadWithMarkup(ctx, msg.ChatID, msg.ThreadID, msg.Message, markup, entities)
-	case msg.ThreadID != 0:
-		return c.sendMessageToThread(ctx, msg.ChatID, msg.ThreadID, msg.Message, entities)
-	case markup != nil:
-		return c.sendMessageWithMarkup(ctx, msg.ChatID, msg.Message, entities, markup)
+	case o.Photo != "":
+		return telegramPathSendPhoto
+	case o.Video != "":
+		return telegramPathSendVideo
+	case o.Animation != "":
+		return telegramPathSendAnimation
 	default:
-		_, err := c.sendMessageInternal(ctx, msg.ChatID, msg.Message, entities)
-		return err
+		return telegramPathSendMessage
 	}
+}
+
+// sendMedia is a unified method for sending text or media messages via the Bot API.
+// It builds the payload based on which fields are set in opts and dispatches to the
+// correct endpoint (sendMessage, sendPhoto, sendVideo, sendAnimation).
+func (c *APIClient) sendMedia(ctx context.Context, opts sendMediaOpts) ([]byte, error) {
+	url := c.buildTelegramURL(opts.apiPath())
+
+	payload := map[string]interface{}{
+		"chat_id": opts.ChatID,
+	}
+
+	if opts.ThreadID != 0 {
+		payload["message_thread_id"] = opts.ThreadID
+	}
+
+	// Determine whether this is a media message or text-only.
+	isMedia := opts.Photo != "" || opts.Video != "" || opts.Animation != ""
+
+	if opts.Photo != "" {
+		payload["photo"] = opts.Photo
+	}
+	if opts.Video != "" {
+		payload["video"] = opts.Video
+	}
+	if opts.Animation != "" {
+		payload["animation"] = opts.Animation
+	}
+
+	if isMedia {
+		if opts.Text != "" {
+			payload["caption"] = opts.Text
+		}
+		if len(opts.Entities) > 0 {
+			payload["caption_entities"] = opts.Entities
+		}
+	} else {
+		payload["text"] = opts.Text
+		if len(opts.Entities) > 0 {
+			payload["entities"] = opts.Entities
+		}
+	}
+
+	if opts.Markup != nil {
+		payload["reply_markup"] = opts.Markup
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal %s payload: %w", opts.apiPath(), err)
+	}
+	return c.sendRequest(ctx, url, jsonData)
 }
 
 // ForceReplyMarkup is the reply_markup for "Reply to this message" (Bot API ForceReply).
@@ -390,7 +455,7 @@ func (c *APIClient) GetChannelPhotoBase64(ctx context.Context, chatID int64) (st
 		return "", nil
 	}
 
-	fileURL, err := c.GetFileURL(chat.Photo.SmallFileID)
+	fileURL, err := c.GetFileURL(ctx, chat.Photo.SmallFileID)
 	if err != nil {
 		return "", fmt.Errorf("get file URL for photo: %w", err)
 	}
@@ -464,20 +529,7 @@ func (c *APIClient) SendMessageToThread(ctx context.Context, chatID int64, messa
 }
 
 func (c *APIClient) sendMessageToThread(ctx context.Context, chatID int64, messageThreadID int64, text string, entities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := map[string]interface{}{
-		"chat_id":           chatID,
-		"message_thread_id": messageThreadID,
-		"text":              text,
-	}
-	if len(entities) > 0 {
-		payload["entities"] = entities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendMessage payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, ThreadID: messageThreadID, Text: text, Entities: entities})
 	return err
 }
 
@@ -492,23 +544,7 @@ func (c *APIClient) sendMessageToThreadWithMarkup(ctx context.Context, chatID in
 }
 
 func (c *APIClient) sendMessageToThreadWithMarkupFull(ctx context.Context, chatID int64, messageThreadID int64, text string, markup *InlineKeyboardMarkup, entities []MessageEntity) (*SentMessage, error) {
-	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := map[string]interface{}{
-		"chat_id":           chatID,
-		"message_thread_id": messageThreadID,
-		"text":              text,
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(entities) > 0 {
-		payload["entities"] = entities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("marshal sendMessage payload: %w", err)
-	}
-	body, err := c.sendRequest(ctx, url, jsonData)
+	body, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, ThreadID: messageThreadID, Text: text, Markup: markup, Entities: entities})
 	if err != nil {
 		return nil, err
 	}
@@ -528,49 +564,12 @@ func (c *APIClient) SendPhotoToThread(ctx context.Context, chatID int64, message
 }
 
 func (c *APIClient) sendPhotoToThread(ctx context.Context, chatID int64, messageThreadID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendPhoto)
-	payload := map[string]interface{}{
-		"chat_id":           chatID,
-		"message_thread_id": messageThreadID,
-		"photo":             photoFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendPhoto payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, ThreadID: messageThreadID, Text: caption, Photo: photoFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
 func (c *APIClient) sendPhoto(ctx context.Context, chatID int64, photoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendPhoto)
-	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"photo":   photoFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendPhoto payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, Text: caption, Photo: photoFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
@@ -580,49 +579,12 @@ func (c *APIClient) SendVideoToThread(ctx context.Context, chatID int64, message
 }
 
 func (c *APIClient) sendVideoToThread(ctx context.Context, chatID int64, messageThreadID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendVideo)
-	payload := map[string]interface{}{
-		"chat_id":           chatID,
-		"message_thread_id": messageThreadID,
-		"video":             videoFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendVideo payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, ThreadID: messageThreadID, Text: caption, Video: videoFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
 func (c *APIClient) sendVideo(ctx context.Context, chatID int64, videoFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendVideo)
-	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"video":   videoFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendVideo payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, Text: caption, Video: videoFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
@@ -632,86 +594,22 @@ func (c *APIClient) SendAnimationToThread(ctx context.Context, chatID int64, mes
 }
 
 func (c *APIClient) sendAnimationToThread(ctx context.Context, chatID int64, messageThreadID int64, animationFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendAnimation)
-	payload := map[string]interface{}{
-		"chat_id":           chatID,
-		"message_thread_id": messageThreadID,
-		"animation":         animationFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendAnimation payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, ThreadID: messageThreadID, Text: caption, Animation: animationFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
 func (c *APIClient) sendAnimation(ctx context.Context, chatID int64, animationFileID string, caption string, markup *InlineKeyboardMarkup, captionEntities []MessageEntity) error {
-	url := c.buildTelegramURL(telegramPathSendAnimation)
-	payload := map[string]interface{}{
-		"chat_id":   chatID,
-		"animation": animationFileID,
-	}
-	if caption != "" {
-		payload["caption"] = caption
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(captionEntities) > 0 {
-		payload["caption_entities"] = captionEntities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendAnimation payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, Text: caption, Animation: animationFileID, Markup: markup, Entities: captionEntities})
 	return err
 }
 
 func (c *APIClient) sendMessageWithMarkup(ctx context.Context, chatID int64, text string, entities []MessageEntity, markup *InlineKeyboardMarkup) error {
-	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"text":    text,
-	}
-	if markup != nil {
-		payload["reply_markup"] = markup
-	}
-	if len(entities) > 0 {
-		payload["entities"] = entities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal sendMessage payload: %w", err)
-	}
-	_, err = c.sendRequest(ctx, url, jsonData)
+	_, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, Text: text, Markup: markup, Entities: entities})
 	return err
 }
 
 func (c *APIClient) sendMessageInternal(ctx context.Context, chatID int64, text string, entities []MessageEntity) (*SentMessage, error) {
-	url := c.buildTelegramURL(telegramPathSendMessage)
-	payload := map[string]interface{}{
-		"chat_id": chatID,
-		"text":    text,
-	}
-	if len(entities) > 0 {
-		payload["entities"] = entities
-	}
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("marshal sendMessage payload: %w", err)
-	}
-	body, err := c.sendRequest(ctx, url, jsonData)
+	body, err := c.sendMedia(ctx, sendMediaOpts{ChatID: chatID, Text: text, Entities: entities})
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ const (
 )
 
 // Update represents an incoming update from Telegram.
-// At most one of the optional parameters can be present in any given update.
+// At most one of the optional parameters can be present in interface{} given update.
 type Update struct {
 	UpdateID         int64              `json:"update_id"`
 	Message          *UpdateMessage     `json:"message,omitempty"`
@@ -238,7 +238,7 @@ type VideoPayload struct {
 
 type PreCheckoutAnswerPayload struct {
 	PreCheckoutQueryID string `json:"pre_checkout_query_id"`   // Unique identifier for the query to be answered.
-	OK                 bool   `json:"ok"`                      // Specify True if everything is alright (goods are available, etc.) and the bot is ready to proceed with the order. Use False if there are any problems.
+	OK                 bool   `json:"ok"`                      // Specify True if everything is alright (goods are available, etc.) and the bot is ready to proceed with the order. Use False if there are interface{} problems.
 	ErrorMessage       string `json:"error_message,omitempty"` // Required if ok is False. Error message in human readable form that explains the reason for failure to proceed with the checkout. Telegram will display this message to the user.
 }
 

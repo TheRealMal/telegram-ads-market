@@ -8,19 +8,28 @@ import (
 	"ads-mrkt/pkg/auth/role"
 )
 
-type handler interface {
+type authHandler interface {
 	AuthUser(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	SetWallet(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	DisconnectWallet(w http.ResponseWriter, r *http.Request) (interface{}, error)
+}
+
+type listingHandler interface {
 	CreateListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListMyListings(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	UpdateListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	DeleteListing(w http.ResponseWriter, r *http.Request) (interface{}, error)
+}
+
+type channelHandler interface {
 	ListMyChannels(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	RefreshChannel(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetChannelStats(w http.ResponseWriter, r *http.Request) (interface{}, error)
+}
+
+type dealHandler interface {
 	CreateDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	ListDealsByListingID(w http.ResponseWriter, r *http.Request) (interface{}, error)
@@ -30,7 +39,18 @@ type handler interface {
 	SetDealPayoutAddress(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	RejectDeal(w http.ResponseWriter, r *http.Request) (interface{}, error)
 	GetDealChatLink(w http.ResponseWriter, r *http.Request) (interface{}, error)
+}
+
+type waitlistHandler interface {
 	GetWaitlist(w http.ResponseWriter, r *http.Request) (interface{}, error)
+}
+
+type handler interface {
+	authHandler
+	listingHandler
+	channelHandler
+	dealHandler
+	waitlistHandler
 }
 
 type authMiddleware interface {
@@ -68,6 +88,17 @@ func (r *Router) GetRoutes() http.Handler {
 
 	mux := http.NewServeMux()
 
+	r.registerAuthRoutes(mux)
+	r.registerListingRoutes(mux)
+	r.registerChannelRoutes(mux)
+	r.registerDealRoutes(mux)
+	r.registerWaitlistRoutes(mux)
+	r.registerAnalyticsRoutes(mux)
+
+	return server.MuxWithCORS(mux, &corsConfig)
+}
+
+func (r *Router) registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/market/auth", server.WithMetrics(
 		server.WithMethod(
 			server.WithJSONResponse(r.handler.AuthUser),
@@ -95,7 +126,9 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+}
 
+func (r *Router) registerListingRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/market/listings", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -156,7 +189,9 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+}
 
+func (r *Router) registerChannelRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/market/my-channels", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -187,7 +222,9 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+}
 
+func (r *Router) registerDealRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/market/deals", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -278,7 +315,9 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+}
 
+func (r *Router) registerWaitlistRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/market/waitlist", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -288,7 +327,9 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
+}
 
+func (r *Router) registerAnalyticsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/analytics/snapshot/latest", server.WithMetrics(
 		r.authMiddleware.WithAuth(
 			server.WithMethod(
@@ -309,6 +350,4 @@ func (r *Router) GetRoutes() http.Handler {
 		),
 		"/api/v1",
 	))
-
-	return server.MuxWithCORS(mux, &corsConfig)
 }

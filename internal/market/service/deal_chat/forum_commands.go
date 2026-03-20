@@ -46,7 +46,7 @@ func (s *service) HandleForumCommand(ctx context.Context, message *telegram.Upda
 		text = message.Caption
 	}
 
-	// /start cancels any active wizard — no deal lookup needed
+	// /start cancels interface{} active wizard — no deal lookup needed
 	if text == "/start" {
 		if message.From != nil {
 			return s.handleStartInForum(ctx, chatID, threadID, message.From.ID)
@@ -69,20 +69,20 @@ func (s *service) HandleForumCommand(ctx context.Context, message *telegram.Upda
 	// Look up the deal forum topic
 	topic, _, err := s.forumTopicRepo.GetDealForumTopicByChatAndThread(ctx, chatID, threadID)
 	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			return nil // Not a deal topic, ignore
+		}
 		return fmt.Errorf("get forum topic: %w", err)
-	}
-	if topic == nil {
-		return nil // Not a deal topic, ignore
 	}
 
 	// Load the deal
 	deal, err := s.dealRepo.GetDealByID(ctx, topic.DealID)
 	if err != nil {
+		if errors.Is(err, marketerrors.ErrNotFound) {
+			s.sendToThread(ctx, chatID, threadID, "Deal not found.")
+			return nil
+		}
 		return fmt.Errorf("get deal: %w", err)
-	}
-	if deal == nil {
-		s.sendToThread(ctx, chatID, threadID, "Deal not found.")
-		return nil
 	}
 
 	// Check deal status is draft
@@ -169,7 +169,7 @@ func (s *service) handleEdit(ctx context.Context, deal *entity.Deal, chatID int6
 	return nil
 }
 
-// handleStartInForum cancels any active wizard for this user+thread.
+// handleStartInForum cancels interface{} active wizard for this user+thread.
 func (s *service) handleStartInForum(ctx context.Context, chatID, threadID int64, userID int64) error {
 	key := wizardKey(userID, threadID)
 	_ = s.wizardStore.Del(ctx, key)
@@ -445,7 +445,7 @@ func (s *service) saveWizardState(ctx context.Context, key string, state *wizard
 }
 
 // HandleApproveCallback handles the "Approve" button callback query.
-// It signs the deal for the pressing user and preserves any URL buttons on the message.
+// It signs the deal for the pressing user and preserves interface{} URL buttons on the message.
 func (s *service) HandleApproveCallback(ctx context.Context, callbackQuery *telegram.CallbackQuery) error {
 	if callbackQuery == nil || !strings.HasPrefix(callbackQuery.Data, "approve_edit:") {
 		return nil
@@ -502,10 +502,10 @@ func mapSignError(err error) string {
 	}
 }
 
-// buildMarkupWithoutApprove returns markup with only the URL buttons (if any), without the Approve button.
+// buildMarkupWithoutApprove returns markup with only the URL buttons (if interface{}), without the Approve button.
 func (s *service) buildMarkupWithoutApprove(ctx context.Context, dealID int64) *telegram.InlineKeyboardMarkup {
 	deal, err := s.dealRepo.GetDealByID(ctx, dealID)
-	if err != nil || deal == nil {
+	if err != nil {
 		return &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{}}
 	}
 	buttons := entity.GetButtonsFromDetails(deal.Details)
@@ -554,9 +554,13 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 				// Verify the user is a party to the deal before writing details
 				deal, err := s.dealRepo.GetDealByID(ctx, dealID)
 				if err != nil {
+					if errors.Is(err, marketerrors.ErrNotFound) {
+						_ = s.wizardStore.Del(ctx, key)
+						return nil
+					}
 					return fmt.Errorf("get deal for wizard confirm: %w", err)
 				}
-				if deal == nil || (userID != deal.LessorID && userID != deal.LesseeID) {
+				if userID != deal.LessorID && userID != deal.LesseeID {
 					_ = s.wizardStore.Del(ctx, key)
 					return nil
 				}
@@ -607,7 +611,7 @@ func (s *service) HandleConfirmSignCallback(ctx context.Context, callbackQuery *
 	}
 
 	topic, err := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, dealID)
-	if err != nil || topic == nil {
+	if err != nil {
 		return nil
 	}
 
@@ -658,14 +662,14 @@ func (s *service) otherSide(topic *entity.DealForumTopic, side string) (int64, i
 
 // getEntitiesFromDetails extracts entities from deal details, falling back to caption_entities for backward compat.
 func getEntitiesFromDetails(details json.RawMessage) []telegram.MessageEntity {
-	var entities []telegram.MessageEntity
-	if raw := entity.GetRawEntitiesFromDetails(details); len(raw) > 0 {
-		_ = json.Unmarshal(raw, &entities)
+	raw := entity.GetBotAPIEntitiesFromDetails(details)
+	if len(raw) == 0 {
+		return nil
 	}
-	if len(entities) == 0 {
-		if raw := entity.GetRawCaptionEntitiesFromDetails(details); len(raw) > 0 {
-			_ = json.Unmarshal(raw, &entities)
-		}
+	var entities []telegram.MessageEntity
+	if err := json.Unmarshal(raw, &entities); err != nil {
+		slog.Error("unmarshal entities from deal details", "error", err)
+		return nil
 	}
 	return entities
 }
@@ -725,7 +729,7 @@ func (s *service) sendToThread(ctx context.Context, chatID int64, threadID int64
 	}
 }
 
-// detectMediaFromMessage extracts the media type and file ID from a message, if any.
+// detectMediaFromMessage extracts the media type and file ID from a message, if interface{}.
 func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFileID string) {
 	if len(message.Photo) > 0 {
 		// Pick the largest photo (last in array per Telegram docs)
@@ -740,7 +744,7 @@ func detectMediaFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFi
 	return "", ""
 }
 
-// detectMediaDimensionsFromMessage extracts the media type, file ID, width, and height from a message, if any.
+// detectMediaDimensionsFromMessage extracts the media type, file ID, width, and height from a message, if interface{}.
 func detectMediaDimensionsFromMessage(message *telegram.UpdateMessage) (mediaType, mediaFileID string, width, height int) {
 	if len(message.Photo) > 0 {
 		// Pick the largest photo (last in array per Telegram docs)

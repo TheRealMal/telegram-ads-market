@@ -2,13 +2,13 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"ads-mrkt/internal/event/domain/entity"
 
-	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -40,7 +40,7 @@ func NewService(ctx context.Context, repository repository) (*Service, error) {
 		if strings.Contains(err.Error(), "BUSYGROUP") {
 			slog.Info("consumer group already exists", "group", groupName)
 		} else {
-			return nil, errors.Wrap(err, "failed to create group")
+			return nil, fmt.Errorf("failed to create group: %w", err)
 		}
 	}
 

@@ -50,7 +50,7 @@ func (c *Client) PutEscrowSeed(ctx context.Context, dealID int64, seedPhrase str
 		ctx,
 		path,
 		schema.KvV2WriteRequest{
-			Data: map[string]any{
+			Data: map[string]interface{}{
 				escrowSecretKey: seedPhrase,
 			},
 		},

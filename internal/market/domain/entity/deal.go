@@ -31,7 +31,7 @@ const (
 )
 
 // Deal represents a deal between lessor and lessee. In draft, both can edit type, duration, price, details;
-// any edit clears both signatures. When both signatures are valid for current [type, duration, price, details],
+// interface{} edit clears both signatures. When both signatures are valid for current [type, duration, price, details],
 // status becomes approved.
 type Deal struct {
 	ID                  int64           `json:"id"`
