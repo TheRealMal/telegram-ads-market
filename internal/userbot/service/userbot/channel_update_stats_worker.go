@@ -82,7 +82,7 @@ func (s *service) processChannelUpdateStatsEvents(ctx context.Context, logger *s
 			ids = append(ids, ev.ID)
 			continue
 		}
-		if ch.AdminRights.CanViewStats {
+		if ch.AdminRights.Userbot.CanViewStats {
 			logger.Info("updating channel stats", "channel_id", ev.ChannelID)
 			if err := s.UpdateChannelStats(ctx, ev.ChannelID, ch.AccessHash, 0); err != nil {
 				logger.Error("update channel stats", "channel_id", ev.ChannelID, "error", err)

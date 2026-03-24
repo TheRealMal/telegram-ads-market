@@ -9,7 +9,7 @@ import (
 )
 
 func (s *userService) AuthUser(ctx context.Context, initDataStr string, referrerID int64) (*entity.User, error) {
-	initData, err := parseAndVerifyInitData(s.botToken, initDataStr)
+	initData, err := parseAndVerifyInitData(s.environment, s.botToken, initDataStr)
 	if err != nil {
 		return nil, fmt.Errorf("verify init data: %w", err)
 	}

@@ -32,6 +32,7 @@ func ChannelRowToEntity(row ChannelRow) (*entity.Channel, error) {
 		AccessHash:      row.AccessHash,
 		BotMemberStatus: entity.BotMemberStatus(row.BotMemberStatus),
 		AdminRights:     rights,
+		BotAdminRights:  rights.Bot,
 		Title:           row.Title,
 		Username:        row.Username,
 		Photo:           row.Photo,

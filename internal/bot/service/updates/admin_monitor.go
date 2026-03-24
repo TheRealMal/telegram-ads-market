@@ -61,9 +61,23 @@ func (s *service) syncChannelAdmins(ctx context.Context, logger *slog.Logger, ch
 	}
 
 	for _, admin := range admins {
-		if admin.User == nil || admin.User.IsBot {
+		if admin.User == nil {
 			continue
 		}
+
+		// Extract the bot's own admin rights
+		if admin.User.IsBot && admin.User.ID == s.botUserID {
+			botRights := mapBotAdminRights(admin)
+			if err := s.channelRepo.UpdateBotAdminRights(ctx, channelID, botRights); err != nil {
+				logger.Error("update bot admin rights", "channel_id", channelID, "error", err)
+			}
+			continue
+		}
+
+		if admin.User.IsBot {
+			continue
+		}
+
 		role := "admin"
 		if marketentity.BotMemberStatus(admin.Status) == marketentity.BotMemberStatusCreator {
 			role = "owner"

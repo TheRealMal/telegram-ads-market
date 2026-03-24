@@ -38,7 +38,7 @@ type telegramInitData struct {
 // parseAndVerifyInitData parses and verifies Telegram init data
 // botToken is your Telegram bot's token
 // initDataStr is the raw init data string from Telegram Mini App
-func parseAndVerifyInitData(botToken, initDataStr string) (*telegramInitData, error) {
+func parseAndVerifyInitData(environment, botToken, initDataStr string) (*telegramInitData, error) {
 	// Parse the URL-encoded string
 	values, err := url.ParseQuery(initDataStr)
 	if err != nil {

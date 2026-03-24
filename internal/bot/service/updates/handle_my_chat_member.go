@@ -41,6 +41,11 @@ func (s *service) handleMyChatMember(ctx context.Context, update *telegram.ChatM
 			return fmt.Errorf("upsert channel on bot added: %w", err)
 		}
 
+		botRights := mapBotAdminRights(update.NewChatMember)
+		if err := s.channelRepo.UpdateBotAdminRights(ctx, channelID, botRights); err != nil {
+			slog.Error("update bot admin rights on promotion", "channel_id", channelID, "error", err)
+		}
+
 		if err := s.syncChannelAdmins(ctx, slog.Default(), channelID); err != nil {
 			slog.Error("sync admins after bot added", "channel_id", channelID, "error", err)
 		}

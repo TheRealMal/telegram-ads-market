@@ -61,7 +61,15 @@ func (s *service) processPostDeal(ctx context.Context, logger *slog.Logger, deal
 		return
 	}
 	if deal.IsStory() {
+		if !channel.AdminRights.Userbot.PostStories {
+			logger.Error("skip story deal, userbot lacks post_stories right", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
+			return
+		}
 		s.processStoryDeal(ctx, logger, deal, listing, channel)
+		return
+	}
+	if !channel.AdminRights.Userbot.HasEnoughRights() {
+		logger.Error("skip deal, userbot lacks post_messages right", "deal_id", deal.ID, "channel_id", *listing.ChannelID)
 		return
 	}
 	text := marketentity.GetMessageFromDetails(deal.Details)

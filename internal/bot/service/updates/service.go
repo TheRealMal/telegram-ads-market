@@ -66,6 +66,7 @@ type marketDealChatService interface {
 type channelRepository interface {
 	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
 	UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status marketentity.BotMemberStatus) error
+	UpdateBotAdminRights(ctx context.Context, channelID int64, rights marketentity.BotAdminRights) error
 	ListChannelsWithBotAccess(ctx context.Context) ([]*marketentity.Channel, error)
 	ResetChannelAccessHash(ctx context.Context, channelID int64) error
 	UpdateChannelPhoto(ctx context.Context, channelID int64, photo string) error
@@ -112,6 +113,7 @@ type service struct {
 	userbotStateRepo      userbotStateRepository
 	dealForumTopicRepo    dealForumTopicRepository
 	botUsername           string
+	botUserID             int64
 }
 
 func NewService(
@@ -127,6 +129,7 @@ func NewService(
 	userbotStateRepo userbotStateRepository,
 	dealForumTopicRepo dealForumTopicRepository,
 	botUsername string,
+	botUserID int64,
 ) *service {
 	return &service{
 		telegramClient:        telegramClient,
@@ -141,6 +144,7 @@ func NewService(
 		userbotStateRepo:      userbotStateRepo,
 		dealForumTopicRepo:    dealForumTopicRepo,
 		botUsername:           botUsername,
+		botUserID:             botUserID,
 	}
 }
 

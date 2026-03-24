@@ -81,7 +81,7 @@ func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel)
 		INSERT INTO market.channel (admin_rights, id, title, username, photo, access_hash, bot_member_status)
 		VALUES (@admin_rights, @id, @title, @username, @photo, @access_hash, @bot_member_status)
 		ON CONFLICT (id) DO UPDATE SET
-			admin_rights = EXCLUDED.admin_rights,
+			admin_rights = CASE WHEN EXCLUDED.admin_rights = '{"bot":{},"userbot":{}}' THEN market.channel.admin_rights ELSE EXCLUDED.admin_rights END,
 			title = EXCLUDED.title,
 			username = EXCLUDED.username,
 			photo = CASE WHEN EXCLUDED.photo = '' THEN market.channel.photo ELSE EXCLUDED.photo END,
@@ -105,10 +105,38 @@ func (r *repository) UpsertChannel(ctx context.Context, channel *entity.Channel)
 
 func (r *repository) UpdateChannelBotMemberStatus(ctx context.Context, channelID int64, status entity.BotMemberStatus) error {
 	_, err := r.db.Exec(ctx, `
-		UPDATE market.channel SET bot_member_status = @status, updated_at = NOW() WHERE id = @channel_id`,
+		UPDATE market.channel SET bot_member_status = @status, admin_rights = jsonb_set(admin_rights, '{bot}', '{}'), updated_at = NOW() WHERE id = @channel_id`,
 		pgx.NamedArgs{"channel_id": channelID, "status": status})
 	if err != nil {
 		return fmt.Errorf("update channel %d bot member status: %w", channelID, err)
+	}
+	return nil
+}
+
+func (r *repository) UpdateBotAdminRights(ctx context.Context, channelID int64, rights entity.BotAdminRights) error {
+	rightsJSON, err := json.Marshal(rights)
+	if err != nil {
+		return fmt.Errorf("update channel %d bot admin rights: marshal: %w", channelID, err)
+	}
+	_, err = r.db.Exec(ctx, `
+		UPDATE market.channel SET admin_rights = jsonb_set(admin_rights, '{bot}', @bot_rights), updated_at = NOW() WHERE id = @channel_id`,
+		pgx.NamedArgs{"channel_id": channelID, "bot_rights": rightsJSON})
+	if err != nil {
+		return fmt.Errorf("update channel %d bot admin rights: %w", channelID, err)
+	}
+	return nil
+}
+
+func (r *repository) UpdateUserbotAdminRights(ctx context.Context, channelID int64, rights entity.UserbotAdminRights) error {
+	rightsJSON, err := json.Marshal(rights)
+	if err != nil {
+		return fmt.Errorf("update channel %d userbot admin rights: marshal: %w", channelID, err)
+	}
+	_, err = r.db.Exec(ctx, `
+		UPDATE market.channel SET admin_rights = jsonb_set(admin_rights, '{userbot}', @userbot_rights), updated_at = NOW() WHERE id = @channel_id`,
+		pgx.NamedArgs{"channel_id": channelID, "userbot_rights": rightsJSON})
+	if err != nil {
+		return fmt.Errorf("update channel %d userbot admin rights: %w", channelID, err)
 	}
 	return nil
 }

@@ -13,7 +13,8 @@ import (
 )
 
 type Config struct {
-	LogLevel string `env:"LOG_LEVEL" env-default:"info"`
+	LogLevel    string `env:"LOG_LEVEL" env-default:"info"`
+	Environment string `env:"ENV" env-default:"dev"`
 
 	UserBot                 userbotconfig.Config `env-prefix:"USER_BOT_"`
 	Database                dbconfig.Config      `env-prefix:"DB_"`

@@ -24,6 +24,10 @@ func (s *service) ensureChannelAccess(ctx context.Context, channel *marketentity
 		return nil, fmt.Errorf("channel %d: bot is not administrator (status=%s), cannot add userbot", channel.ID, channel.BotMemberStatus)
 	}
 
+	if !channel.CanPromoteMembers() {
+		return nil, fmt.Errorf("channel %d: bot lacks can_promote_members right, cannot add userbot", channel.ID)
+	}
+
 	slog.Info("promoting userbot via bot api", "channel_id", channel.ID)
 	err := s.botAPIClient.PromoteChatMember(ctx, channel.ID, s.userID, helpertelegram.AdminPromoteRights{
 		CanPostMessages:   true,

@@ -44,6 +44,7 @@ type dealActionLockRepository interface {
 
 type channelRepository interface {
 	UpsertChannel(ctx context.Context, channel *marketentity.Channel) error
+	UpdateUserbotAdminRights(ctx context.Context, channelID int64, rights marketentity.UserbotAdminRights) error
 	UpsertChannelStats(ctx context.Context, channelID int64, stats json.RawMessage) error
 	GetChannelByID(ctx context.Context, id int64) (*marketentity.Channel, error)
 }

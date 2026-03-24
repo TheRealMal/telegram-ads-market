@@ -29,7 +29,7 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		return fmt.Errorf("failed to get full channel: %w", err)
 	}
 
-	channel, statsDC := mapChannel(fullChannel)
+	channel, userbotRights, statsDC := mapChannel(fullChannel)
 	if channel == nil {
 		slog.Error("failed to map channel", "channel_id", update.ChannelID, "full_channel", fullChannel)
 		return nil
@@ -40,7 +40,11 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 		return fmt.Errorf("failed to upsert channel id=%d: %w", botAPIID, err)
 	}
 
-	if channel.AdminRights.CanViewStats {
+	if err = s.channelRepo.UpdateUserbotAdminRights(ctx, botAPIID, userbotRights); err != nil {
+		return fmt.Errorf("failed to update userbot admin rights for channel id=%d: %w", botAPIID, err)
+	}
+
+	if userbotRights.CanViewStats {
 		slog.Info("updating channel stats", "channel_id", botAPIID)
 		if err = s.UpdateChannelStats(ctx, botAPIID, channelEnt.AccessHash, statsDC); err != nil {
 			slog.Error("failed to update channel stats", "channel_id", botAPIID, "error", err)
@@ -51,19 +55,19 @@ func (s *service) handleChannelUpdate(ctx context.Context, e tg.Entities, update
 	return nil
 }
 
-func mapChannel(rawChannel *tg.MessagesChatFull) (*marketentity.Channel, int) {
+func mapChannel(rawChannel *tg.MessagesChatFull) (*marketentity.Channel, marketentity.UserbotAdminRights, int) {
 	if len(rawChannel.Chats) == 0 {
-		return nil, 0
+		return nil, marketentity.UserbotAdminRights{}, 0
 	}
 
 	channel, ok := rawChannel.GetChats()[0].(*tg.Channel)
 	if !ok {
-		return nil, 0
+		return nil, marketentity.UserbotAdminRights{}, 0
 	}
 
 	channelFull, ok := rawChannel.GetFullChat().(*tg.ChannelFull)
 	if !ok {
-		return nil, 0
+		return nil, marketentity.UserbotAdminRights{}, 0
 	}
 
 	username, ok := channel.GetUsername()
@@ -71,17 +75,18 @@ func mapChannel(rawChannel *tg.MessagesChatFull) (*marketentity.Channel, int) {
 		username = ""
 	}
 
+	userbotRights := mapUserbotAdminRights(channel.AdminRights, channelFull.CanViewStats)
+
 	return &marketentity.Channel{
-		ID:          helpertelegram.ToBotAPIChannelID(channel.GetID()),
-		Title:       channel.GetTitle(),
-		Username:    username,
-		Photo:       "",
-		AdminRights: mapAdminRights(channel.AdminRights, channelFull.CanViewStats),
-	}, channelFull.StatsDC
+		ID:       helpertelegram.ToBotAPIChannelID(channel.GetID()),
+		Title:    channel.GetTitle(),
+		Username: username,
+		Photo:    "",
+	}, userbotRights, channelFull.StatsDC
 }
 
-func mapAdminRights(adminRights tg.ChatAdminRights, canViewStats bool) marketentity.AdminRights {
-	return marketentity.AdminRights{
+func mapUserbotAdminRights(adminRights tg.ChatAdminRights, canViewStats bool) marketentity.UserbotAdminRights {
+	return marketentity.UserbotAdminRights{
 		DeleteMessages: adminRights.DeleteMessages,
 		EditMessages:   adminRights.EditMessages,
 		PostMessages:   adminRights.PostMessages,

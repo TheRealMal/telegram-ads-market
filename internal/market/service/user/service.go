@@ -14,10 +14,15 @@ type userRepository interface {
 }
 
 type userService struct {
-	botToken string
-	userRepo userRepository
+	environment string
+	botToken    string
+	userRepo    userRepository
 }
 
-func NewUserService(botToken string, userRepo userRepository) *userService {
-	return &userService{botToken: botToken, userRepo: userRepo}
+func NewUserService(environment string, botToken string, userRepo userRepository) *userService {
+	return &userService{
+		environment: environment,
+		botToken:    botToken,
+		userRepo:    userRepo,
+	}
 }

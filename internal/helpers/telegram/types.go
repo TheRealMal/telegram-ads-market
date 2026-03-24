@@ -28,10 +28,17 @@ type ChatMemberUpdated struct {
 // ChatMember contains information about one member of a chat.
 // See https://core.telegram.org/bots/api#chatmember
 type ChatMember struct {
-	Status      string `json:"status"`
-	User        *User  `json:"user"`
-	IsAnonymous bool   `json:"is_anonymous,omitempty"`
-	CustomTitle string `json:"custom_title,omitempty"`
+	Status            string `json:"status"`
+	User              *User  `json:"user"`
+	IsAnonymous       bool   `json:"is_anonymous,omitempty"`
+	CustomTitle       string `json:"custom_title,omitempty"`
+	CanPostMessages   bool   `json:"can_post_messages,omitempty"`
+	CanEditMessages   bool   `json:"can_edit_messages,omitempty"`
+	CanDeleteMessages bool   `json:"can_delete_messages,omitempty"`
+	CanPostStories    bool   `json:"can_post_stories,omitempty"`
+	CanEditStories    bool   `json:"can_edit_stories,omitempty"`
+	CanDeleteStories  bool   `json:"can_delete_stories,omitempty"`
+	CanPromoteMembers bool   `json:"can_promote_members,omitempty"`
 }
 
 // MessageEntity represents a special entity in a text message (Bot API format).

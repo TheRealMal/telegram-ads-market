@@ -116,7 +116,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 				return fmt.Errorf("create telegram notification event service: %w", err)
 			}
 
-			userSvc := userservice.NewUserService(cfg.Telegram.Token, userRepo)
+			userSvc := userservice.NewUserService(cfg.Environment, cfg.Telegram.Token, userRepo)
 			listingSvc := listingservice.NewListingService(listingRepo, channelAdminRepo, userRepo)
 
 			// Standalone deal signer for deal chat (breaks circular dep: dealChatSvc -> dealSigner -> escrowSvc -> dealChatSvc).

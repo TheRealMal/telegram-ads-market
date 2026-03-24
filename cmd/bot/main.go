@@ -3,6 +3,8 @@ package bot
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"ads-mrkt/cmd/builder"
 	webhookhttp "ads-mrkt/internal/bot/application/webhook/http"
@@ -93,12 +95,19 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			dealSignerSvc := dealsigner.NewService(dealRepo, userRepo, telegramNotifyEventSvc, dealForumTopicRepo)
 			dealChatSvc := dealchatservice.NewService(dealRepo, dealForumTopicRepo, telegramClient, dealSignerSvc, telegramNotifyEventSvc, redisClient, cfg.Telegram.BotUsername)
 
+			// Parse bot user ID from token (format: "<bot_id>:<hash>")
+			botUserID, err := strconv.ParseInt(strings.Split(cfg.Telegram.Token, ":")[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("parse bot user id from token: %w", err)
+			}
+
 			// Bot updates service
 			updatesSvc := botupdates.NewService(
 				telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc,
 				channelRepo, channelAdminRepo, listingRepo, dealRepo, telegramNotifyEventSvc, userbotStateRepo,
 				dealForumTopicRepo,
 				cfg.Telegram.BotUsername,
+				botUserID,
 			)
 			go updatesSvc.RunUpdateProcessorWorker(ctxRun)
 			go updatesSvc.RunNotificationProcessorWorker(ctxRun)
