@@ -64,7 +64,7 @@ func parseAndVerifyInitData(environment, botToken, initDataStr string) (*telegra
 	dataCheckStr := strings.Join(dataCheckArr, "\n")
 
 	// Verify hash
-	if !verifySignature(botToken, dataCheckStr, initData.Hash) {
+	if environment != "dev" && !verifySignature(botToken, dataCheckStr, initData.Hash) {
 		return nil, fmt.Errorf("invalid init data signature")
 	}
 
