@@ -92,6 +92,10 @@ type notificationAdder interface {
 	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
 }
 
+type channelStatsService interface {
+	RequestStatsRefresh(ctx context.Context, channelID int64, userID int64) (*marketentity.Channel, error)
+}
+
 type userbotStateRepository interface {
 	GetUserbotUserID(ctx context.Context) (int64, error)
 }
@@ -112,6 +116,7 @@ type service struct {
 	notificationAdder     notificationAdder
 	userbotStateRepo      userbotStateRepository
 	dealForumTopicRepo    dealForumTopicRepository
+	channelStatsSvc       channelStatsService
 	botUsername           string
 	botUserID             int64
 }
@@ -128,6 +133,7 @@ func NewService(
 	notificationAdder notificationAdder,
 	userbotStateRepo userbotStateRepository,
 	dealForumTopicRepo dealForumTopicRepository,
+	channelStatsSvc channelStatsService,
 	botUsername string,
 	botUserID int64,
 ) *service {
@@ -143,6 +149,7 @@ func NewService(
 		notificationAdder:     notificationAdder,
 		userbotStateRepo:      userbotStateRepo,
 		dealForumTopicRepo:    dealForumTopicRepo,
+		channelStatsSvc:       channelStatsSvc,
 		botUsername:           botUsername,
 		botUserID:             botUserID,
 	}

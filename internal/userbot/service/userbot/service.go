@@ -27,6 +27,15 @@ type listingRepository interface {
 type dealRepository interface {
 	ListDealsEscrowDepositConfirmedWithoutPostMessage(ctx context.Context) ([]*marketentity.Deal, error)
 	GetDealByID(ctx context.Context, id int64) (*marketentity.Deal, error)
+	SetDealStatusWaitingEscrowRefundFromDeposit(ctx context.Context, dealID int64) error
+}
+
+type notificationAdder interface {
+	AddTelegramNotificationEvent(ctx context.Context, event *evententity.EventTelegramNotification) error
+}
+
+type dealForumTopicRepository interface {
+	GetDealForumTopicByDealID(ctx context.Context, dealID int64) (*marketentity.DealForumTopic, error)
 }
 
 type dealPostMessageRepository interface {
@@ -69,6 +78,8 @@ type service struct {
 	dealPostMessageRepo        dealPostMessageRepository
 	dealActionLockRepo         dealActionLockRepository
 	channelUpdateStatsEventSvc channelUpdateStatsEventService
+	notificationAdder          notificationAdder
+	forumTopicRepo             dealForumTopicRepository
 	botAPIClient               botAPIClient
 	telegramClient             *telegram.Client
 	authFlow                   auth.Flow
@@ -86,6 +97,8 @@ func New(
 	dealActionLockRepo dealActionLockRepository,
 	channelUpdateStatsEventSvc channelUpdateStatsEventService,
 	botAPIClient botAPIClient,
+	notificationAdder notificationAdder,
+	forumTopicRepo dealForumTopicRepository,
 ) *service {
 	s := &service{
 		stateStorage:               stateStorage,
@@ -95,6 +108,8 @@ func New(
 		dealPostMessageRepo:        dealPostMessageRepo,
 		dealActionLockRepo:         dealActionLockRepo,
 		channelUpdateStatsEventSvc: channelUpdateStatsEventSvc,
+		notificationAdder:          notificationAdder,
+		forumTopicRepo:             forumTopicRepo,
 		botAPIClient:               botAPIClient,
 	}
 

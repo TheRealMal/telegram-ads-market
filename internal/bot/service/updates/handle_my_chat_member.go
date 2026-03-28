@@ -2,12 +2,14 @@ package updates
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	evententity "ads-mrkt/internal/event/domain/entity"
 	"ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
+	marketerrors "ads-mrkt/internal/market/domain/errors"
 )
 
 func (s *service) handleMyChatMember(ctx context.Context, update *telegram.ChatMemberUpdated) error {
@@ -44,6 +46,15 @@ func (s *service) handleMyChatMember(ctx context.Context, update *telegram.ChatM
 		botRights := mapBotAdminRights(update.NewChatMember)
 		if err := s.channelRepo.UpdateBotAdminRights(ctx, channelID, botRights); err != nil {
 			slog.Error("update bot admin rights on promotion", "channel_id", channelID, "error", err)
+		}
+
+		if update.From != nil {
+			if _, err := s.channelStatsSvc.RequestStatsRefresh(ctx, channelID, update.From.ID); err != nil {
+				var tooSoonErr *marketerrors.ErrStatsRefreshTooSoon
+				if !errors.As(err, &tooSoonErr) {
+					slog.Error("request stats refresh on bot promotion", "channel_id", channelID, "error", err)
+				}
+			}
 		}
 
 		if err := s.syncChannelAdmins(ctx, slog.Default(), channelID); err != nil {

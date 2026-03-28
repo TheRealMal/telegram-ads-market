@@ -11,6 +11,7 @@ import (
 	userbotstate "ads-mrkt/internal/bot/repository/userbot_state"
 	botupdates "ads-mrkt/internal/bot/service/updates"
 	"ads-mrkt/internal/config"
+	eventchannelstats "ads-mrkt/internal/event/application/channel_update_stats/event"
 	eventtelegramnotify "ads-mrkt/internal/event/application/telegram_notification/event"
 	eventtelegram "ads-mrkt/internal/event/application/telegram_update/event"
 	eventredis "ads-mrkt/internal/event/repository/redis"
@@ -21,6 +22,7 @@ import (
 	"ads-mrkt/internal/market/repository/deal_forum_topic"
 	"ads-mrkt/internal/market/repository/listing"
 	userrepo "ads-mrkt/internal/market/repository/user"
+	channelservice "ads-mrkt/internal/market/service/channel"
 	dealchatservice "ads-mrkt/internal/market/service/deal_chat"
 	dealsigner "ads-mrkt/internal/market/service/deal_signer"
 	"ads-mrkt/internal/postgres"
@@ -89,6 +91,12 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			listingRepo := listing.New(pg)
 			userbotStateRepo := userbotstate.New(pg)
 
+			channelUpdateStatsEventSvc, err := eventchannelstats.NewService(ctxRun, eventRepo)
+			if err != nil {
+				return fmt.Errorf("create channel update stats event service: %w", err)
+			}
+			channelStatsSvc := channelservice.NewChannelService(channelRepo, channelAdminRepo, listingRepo, channelUpdateStatsEventSvc)
+
 			dealRepo := deal.New(pg)
 			dealForumTopicRepo := deal_forum_topic.New(pg)
 			userRepo := userrepo.New(pg)
@@ -105,7 +113,7 @@ func httpCmd(ctx context.Context, cfg *config.Config) *cobra.Command {
 			updatesSvc := botupdates.NewService(
 				telegramClient, telegramEventSvc, telegramNotifyEventSvc, dealChatSvc,
 				channelRepo, channelAdminRepo, listingRepo, dealRepo, telegramNotifyEventSvc, userbotStateRepo,
-				dealForumTopicRepo,
+				dealForumTopicRepo, channelStatsSvc,
 				cfg.Telegram.BotUsername,
 				botUserID,
 			)

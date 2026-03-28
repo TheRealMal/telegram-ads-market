@@ -10,12 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	evententity "ads-mrkt/internal/event/domain/entity"
 	helpertelegram "ads-mrkt/internal/helpers/telegram"
 	marketentity "ads-mrkt/internal/market/domain/entity"
 	marketerrors "ads-mrkt/internal/market/domain/errors"
 	"ads-mrkt/internal/worker"
 
 	"github.com/gotd/td/telegram/uploader"
+	"github.com/gotd/td/tgerr"
 	"github.com/gotd/td/tg"
 )
 
@@ -24,6 +26,21 @@ const (
 	postCheckerInterval  = 5 * time.Minute
 	postCheckAdvanceHour = time.Hour
 )
+
+// permanentStoryErrors lists MTProto error types that will never succeed on retry.
+var permanentStoryErrors = []string{
+	"BOOSTS_REQUIRED",
+	"STORIES_TOO_MUCH",
+	"PREMIUM_ACCOUNT_REQUIRED",
+	"CHAT_ADMIN_REQUIRED",
+	"PEER_ID_INVALID",
+}
+
+// isPermanentStoryError reports whether err is a Telegram RPC error
+// that will not resolve by retrying.
+func isPermanentStoryError(err error) bool {
+	return tgerr.Is(err, permanentStoryErrors...)
+}
 
 func (s *service) RunDealPostSenderWorker(ctx context.Context) {
 	worker.RunTicker(ctx, "deal_post_sender", postSenderInterval, false, s.runDealPostSenderOnce)
@@ -392,6 +409,24 @@ func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, dea
 		return
 	}
 
+	// Pre-flight: verify the channel can accept stories (boosts, daily quota).
+	if err := s.canSendStory(ctx, *listing.ChannelID, channel.AccessHash); err != nil {
+		if isPermanentStoryError(err) {
+			logger.Error("story deal permanently failed pre-flight check",
+				"deal_id", deal.ID,
+				"channel_id", *listing.ChannelID,
+				"error", err,
+			)
+			s.handlePermanentStoryFailure(ctx, logger, deal, err)
+			return
+		}
+		logger.Warn("canSendStory transient error, will retry",
+			"deal_id", deal.ID,
+			"error", err,
+		)
+		return
+	}
+
 	// Stories cannot be recovered by text matching if the lock expired while locked.
 	// Release the expired lock as failed and let the next cycle retry from scratch.
 	if err := s.handleExpiredLock(ctx, logger, deal.ID, marketentity.DealActionTypePostMessage); err != nil {
@@ -426,8 +461,17 @@ func (s *service) processStoryDeal(ctx context.Context, logger *slog.Logger, dea
 
 	storyID, err := s.sendChannelStory(ctx, *listing.ChannelID, channel.AccessHash, inputMedia, caption, mtprotoEntities)
 	if err != nil {
-		logger.Error("send story", "deal_id", deal.ID, "error", err)
 		releaseLock(marketentity.DealActionLockStatusFailed)
+		if isPermanentStoryError(err) {
+			logger.Error("story deal permanently failed",
+				"deal_id", deal.ID,
+				"channel_id", *listing.ChannelID,
+				"error", err,
+			)
+			s.handlePermanentStoryFailure(ctx, logger, deal, err)
+			return
+		}
+		logger.Error("send story (will retry)", "deal_id", deal.ID, "error", err)
 		return
 	}
 
@@ -544,4 +588,68 @@ func (s *service) getChannelStoryExists(ctx context.Context, channelID int64, ac
 		}
 	}
 	return false, nil
+}
+
+// canSendStory checks whether a story can be posted to the channel.
+// Returns nil if posting is allowed. Returns a tgerr.Error on failure
+// (e.g. BOOSTS_REQUIRED, STORIES_TOO_MUCH, CHAT_ADMIN_REQUIRED).
+func (s *service) canSendStory(ctx context.Context, channelID int64, accessHash int64) error {
+	peer := &tg.InputPeerChannel{
+		ChannelID:  helpertelegram.ToMTProtoChannelID(channelID),
+		AccessHash: accessHash,
+	}
+	_, err := s.telegramClient.API().StoriesCanSendStory(ctx, peer)
+	return err
+}
+
+// handlePermanentStoryFailure moves the deal to waiting_escrow_refund and notifies both parties.
+func (s *service) handlePermanentStoryFailure(ctx context.Context, logger *slog.Logger, deal *marketentity.Deal, originalErr error) {
+	if err := s.dealRepo.SetDealStatusWaitingEscrowRefundFromDeposit(ctx, deal.ID); err != nil {
+		logger.Error("failed to set deal to waiting_escrow_refund",
+			"deal_id", deal.ID,
+			"error", err,
+		)
+		return
+	}
+	logger.Info("deal moved to waiting_escrow_refund due to permanent story failure",
+		"deal_id", deal.ID,
+	)
+
+	reason := "Story posting failed"
+	if rpcErr, ok := tgerr.As(originalErr); ok {
+		switch rpcErr.Type {
+		case "BOOSTS_REQUIRED":
+			reason = "Story posting failed: channel needs more boosts to post stories"
+		case "STORIES_TOO_MUCH":
+			reason = "Story posting failed: channel has reached the daily story limit"
+		case "PREMIUM_ACCOUNT_REQUIRED":
+			reason = "Story posting failed: a premium account is required"
+		case "CHAT_ADMIN_REQUIRED":
+			reason = "Story posting failed: admin rights are insufficient"
+		}
+	}
+	msg := fmt.Sprintf("%s. Your escrow deposit will be refunded.", reason)
+
+	for _, userID := range []int64{deal.LessorID, deal.LesseeID} {
+		notification := &evententity.EventTelegramNotification{
+			ChatID:  userID,
+			Message: msg,
+		}
+		if s.forumTopicRepo != nil {
+			if topic, topicErr := s.forumTopicRepo.GetDealForumTopicByDealID(ctx, deal.ID); topicErr == nil {
+				if userID == deal.LessorID {
+					notification.ThreadID = topic.LessorMessageThreadID
+				} else {
+					notification.ThreadID = topic.LesseeMessageThreadID
+				}
+			}
+		}
+		if err := s.notificationAdder.AddTelegramNotificationEvent(ctx, notification); err != nil {
+			logger.Error("failed to send permanent failure notification",
+				"deal_id", deal.ID,
+				"user_id", userID,
+				"error", err,
+			)
+		}
+	}
 }

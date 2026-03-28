@@ -515,6 +515,21 @@ func (r *repository) SetDealStatusEscrowRefundConfirmed(ctx context.Context, dea
 	return nil
 }
 
+func (r *repository) SetDealStatusWaitingEscrowRefundFromDeposit(ctx context.Context, dealID int64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE market.deal SET status = @status, updated_at = NOW()
+		WHERE id = @id AND status = @status_deposit`,
+		pgx.NamedArgs{
+			"id":             dealID,
+			"status":         string(entity.DealStatusWaitingEscrowRefund),
+			"status_deposit": string(entity.DealStatusEscrowDepositConfirmed),
+		})
+	if err != nil {
+		return fmt.Errorf("set deal status waiting escrow refund from deposit for deal %d: %w", dealID, err)
+	}
+	return nil
+}
+
 func (r *repository) RejectDealsByUserAndChannel(ctx context.Context, userID, channelID int64) ([]model.RejectedDealRow, error) {
 	rows, err := r.db.Query(ctx, `
 		UPDATE market.deal SET status = @status_rejected, updated_at = NOW()
